@@ -90,21 +90,21 @@ export const LeadDetailPage: React.FC = () => {
   const [offerForm, setOfferForm] = useState({
     applicationId: '',
     offerType: 'CONDITIONAL' as const,
-    tuitionFee: 30000,
-    depositAmount: 3000,
+    tuitionFee: 0,
+    depositAmount: 0,
     currency: 'USD',
     conditions: '',
-    originalOfferUrl: '/uploads/sample-offer.pdf',
-    originalOfferFileName: 'University_Offer_Letter.pdf',
+    originalOfferUrl: '',
+    originalOfferFileName: '',
   });
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
-    title: 'Tuition Deposit Payment',
+    title: '',
     purpose: 'TUITION_DEPOSIT' as const,
-    amount: 3000,
+    amount: 0,
     currency: 'USD',
-    bankDetails: 'Bank: Barclays UK\nIBAN: GB29BARC20000012345678\nSwift: BARCGB22',
+    bankDetails: '',
   });
 
   const [newMessage, setNewMessage] = useState('');

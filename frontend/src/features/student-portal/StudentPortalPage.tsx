@@ -59,16 +59,16 @@ export const StudentPortalPage: React.FC = () => {
   // Modals for student upload actions
   const [isUploadDocOpen, setIsUploadDocOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
-  const [docFileUrl, setDocFileUrl] = useState('/uploads/sample-student-doc.pdf');
+  const [docFileUrl, setDocFileUrl] = useState('');
 
   const [isSignOfferOpen, setIsSignOfferOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
-  const [signedOfferUrl, setSignedOfferUrl] = useState('/uploads/signed-acceptance.pdf');
+  const [signedOfferUrl, setSignedOfferUrl] = useState('');
 
   const [isSubmitPaymentOpen, setIsSubmitPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [payRef, setPayRef] = useState('');
-  const [payProofUrl, setPayProofUrl] = useState('/uploads/wire-receipt.png');
+  const [payProofUrl, setPayProofUrl] = useState('');
 
   const fetchStudentData = useCallback(async () => {
     setLoading(true);

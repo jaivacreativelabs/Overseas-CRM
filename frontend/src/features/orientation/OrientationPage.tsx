@@ -13,13 +13,13 @@ export const OrientationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({
-    title: 'UK Fall 2026 Pre-Departure Briefing',
-    country: 'United Kingdom',
-    intake: 'Fall 2026',
-    sessionDate: '2026-09-28',
-    sessionTime: '17:00',
-    googleMeetLink: 'https://meet.google.com/ori-uk-2026',
-    description: 'Essential orientation covering UK immigration, BRP collection, student bank accounts, and NHS registration.',
+    title: '',
+    country: '',
+    intake: '',
+    sessionDate: '',
+    sessionTime: '',
+    googleMeetLink: '',
+    description: '',
   });
 
   const { success, error } = useToast();
@@ -46,6 +46,15 @@ export const OrientationPage: React.FC = () => {
       await apiClient.post('/orientation', form);
       success('Orientation session scheduled successfully.');
       setIsModalOpen(false);
+      setForm({
+        title: '',
+        country: '',
+        intake: '',
+        sessionDate: '',
+        sessionTime: '',
+        googleMeetLink: '',
+        description: '',
+      });
       fetchOrientations();
     } catch (err: any) {
       error(err.message || 'Failed to create orientation');

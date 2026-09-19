@@ -54,7 +54,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     city: '',
     targetCountry: '',
     targetCourse: '',
-    targetIntake: 'Fall 2026',
+    targetIntake: '',
     budget: '',
     source: LeadSource.WEBSITE,
     counsellorId: '',
@@ -72,13 +72,13 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     outcome: 'CONNECTED',
     notes: '',
     callbackDate: '',
-    callbackTime: '11:00',
+    callbackTime: '',
   });
 
   const [counsellingForm, setCounsellingForm] = useState({
     scheduledDate: '',
-    scheduledTime: '15:00',
-    googleMeetLink: 'https://meet.google.com/new',
+    scheduledTime: '',
+    googleMeetLink: '',
     notes: '',
     counsellorId: '',
   });

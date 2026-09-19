@@ -44,11 +44,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const setDemoCredentials = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-  };
-
   return (
     <div>
       <form onSubmit={handleLogin}>
@@ -71,81 +66,12 @@ export const LoginPage: React.FC = () => {
         <Button
           type="submit"
           variant="primary"
-          style={{ width: '100%', marginTop: '10px' }}
+          style={{ width: '100%', marginTop: '16px' }}
           loading={loading}
         >
           Sign In
         </Button>
       </form>
-
-      {/* Quick Demo Logins for Pair Testing */}
-      <div
-        style={{
-          marginTop: '24px',
-          paddingTop: '16px',
-          borderTop: '1px solid var(--border-color)',
-        }}
-      >
-        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textAlign: 'center' }}>
-          DEMO ACCOUNTS (ONE-CLICK FILL)
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <button
-            type="button"
-            onClick={() => setDemoCredentials('owner@jaivacrm.com', 'Password@123')}
-            style={{
-              padding: '6px 10px',
-              fontSize: '12px',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-subtle)',
-              cursor: 'pointer',
-              textAlign: 'left',
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}
-          >
-            <strong>Owner Admin</strong>
-            <span style={{ color: 'var(--text-muted)' }}>owner@jaivacrm.com</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setDemoCredentials('counsellor@jaivacrm.com', 'Password@123')}
-            style={{
-              padding: '6px 10px',
-              fontSize: '12px',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-subtle)',
-              cursor: 'pointer',
-              textAlign: 'left',
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}
-          >
-            <strong>Senior Counsellor</strong>
-            <span style={{ color: 'var(--text-muted)' }}>counsellor@jaivacrm.com</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setDemoCredentials('rohan.sharma@example.com', 'Password@123')}
-            style={{
-              padding: '6px 10px',
-              fontSize: '12px',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-subtle)',
-              cursor: 'pointer',
-              textAlign: 'left',
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}
-          >
-            <strong>Student Account</strong>
-            <span style={{ color: 'var(--text-muted)' }}>rohan.sharma@example.com</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
