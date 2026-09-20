@@ -45,7 +45,7 @@ export const StudentPortalPage: React.FC = () => {
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'journey' | 'universities' | 'documents' | 'offers' | 'payments' | 'visa_travel' | 'messages'>('journey');
+  const [activeTab, setActiveTab] = useState<'journey' | 'universities' | 'documents' | 'offers' | 'payments' | 'visa_travel' | 'messages' | 'help'>('journey');
 
   const [shortlists, setShortlists] = useState<Shortlist[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -255,6 +255,9 @@ export const StudentPortalPage: React.FC = () => {
         <button className={`tab-btn ${activeTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveTab('messages')}>
           Message Counsellor ({messages.length})
         </button>
+        <button className={`tab-btn ${activeTab === 'help' ? 'active' : ''}`} onClick={() => setActiveTab('help')}>
+          ❓ Guide & FAQs
+        </button>
       </div>
 
       {/* --- TAB 1: JOURNEY --- */}
@@ -262,25 +265,52 @@ export const StudentPortalPage: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           <div className="card">
             <h3 className="card-title" style={{ marginBottom: '12px' }}>Current Stage Action Item</h3>
-            <div style={{ padding: '14px', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 87, 248, 0.2)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px', marginBottom: '4px' }}>
+            <div style={{ padding: '16px', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 87, 248, 0.2)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px', marginBottom: '6px' }}>
                 Stage: {lead?.stage?.replace(/_/g, ' ')}
               </div>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.5 }}>
                 {lead?.stage === StudentStage.PROFILE_EVALUATION
-                  ? 'Your counsellor is evaluating your academic credentials and test scores.'
+                  ? 'Your counsellor is reviewing your academic transcripts and test scores to build your university recommendations.'
                   : lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING
-                  ? 'Please review your approved university shortlist and select your preferred choice.'
+                  ? 'Your university options are ready! Please review the shortlist and confirm your 1 preferred university.'
                   : lead?.stage === StudentStage.DOCUMENT_COLLECTION
-                  ? 'Please upload your mandatory documents (Passport, Transcripts, IELTS) for verification.'
+                  ? 'Please upload your mandatory documents (Passport, Degree/Transcripts, English Test Score) for verification.'
                   : lead?.stage === StudentStage.OFFER_MANAGEMENT
-                  ? 'Your university offer letter is ready! Download, sign, and upload your signed copy.'
+                  ? 'Congratulations! Your university offer letter is ready. Download it, sign the acceptance page, and upload your signed copy.'
                   : lead?.stage === StudentStage.FEE_PAYMENT
-                  ? 'Please review fee payment instructions and submit your deposit receipt.'
+                  ? 'Your offer is accepted! Please check the fee deposit details and upload your wire transfer receipt.'
                   : lead?.stage === StudentStage.VISA_PROCESSING
-                  ? 'Visa application is in progress. Check embassy updates.'
-                  : 'Prepare for your pre-departure briefing and flight.'}
+                  ? 'Your student visa filing is currently in progress with the embassy. We will notify you upon decision.'
+                  : 'Get ready for your pre-departure orientation and flight booking!'}
               </p>
+
+              {/* Direct CTA button to help user */}
+              {lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING && (
+                <Button variant="primary" size="sm" onClick={() => setActiveTab('universities')}>
+                  👉 Choose Preferred University
+                </Button>
+              )}
+              {lead?.stage === StudentStage.DOCUMENT_COLLECTION && (
+                <Button variant="primary" size="sm" onClick={() => setActiveTab('documents')}>
+                  👉 Upload Required Documents
+                </Button>
+              )}
+              {lead?.stage === StudentStage.OFFER_MANAGEMENT && (
+                <Button variant="primary" size="sm" onClick={() => setActiveTab('offers')}>
+                  👉 Review & Sign Offer Letter
+                </Button>
+              )}
+              {lead?.stage === StudentStage.FEE_PAYMENT && (
+                <Button variant="primary" size="sm" onClick={() => setActiveTab('payments')}>
+                  👉 Submit Fee Receipt Proof
+                </Button>
+              )}
+              {lead?.stage === StudentStage.VISA_PROCESSING && (
+                <Button variant="primary" size="sm" onClick={() => setActiveTab('visa_travel')}>
+                  👉 View Visa & Travel Status
+                </Button>
+              )}
             </div>
           </div>
 
@@ -602,6 +632,61 @@ export const StudentPortalPage: React.FC = () => {
               Send
             </Button>
           </form>
+        </div>
+      )}
+
+      {/* --- TAB 8: STUDENT GUIDE & FAQS --- */}
+      {activeTab === 'help' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="card">
+            <h3 className="card-title" style={{ marginBottom: '14px' }}>📘 Student Study Abroad FAQ & Support</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <strong style={{ fontSize: '13.5px', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  1. How do I select my university from the shortlist?
+                </strong>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Go to the <strong>Shortlisted Universities</strong> tab. Review the programs recommended by your counselor and click <strong>"Confirm Selection"</strong> on your top preferred university. This unlocks your document upload checklist.
+                </p>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <strong style={{ fontSize: '13.5px', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  2. What file formats are accepted for document uploads?
+                </strong>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  We support <strong>PDF, JPG, PNG, and DOCX</strong> files up to 15MB. Ensure all scans (especially passport and grade marksheets) are clear and legible to prevent verification delays.
+                </p>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <strong style={{ fontSize: '13.5px', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  3. How do I accept my university Offer Letter?
+                </strong>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  In the <strong>Offers & Acceptance</strong> tab, download the official university offer PDF. Sign the acceptance declaration page, scan/save it, and click <strong>"Upload Signed Copy"</strong>. Once approved, fee payment instructions are unlocked.
+                </p>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <strong style={{ fontSize: '13.5px', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  4. How do I pay tuition fee deposits and submit proof?
+                </strong>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Under <strong>Fee Payments</strong>, view the required amount and bank wire instructions. After transferring the funds via your bank, click <strong>"Submit Payment Proof"</strong>, enter your Transaction Reference Number, and attach your wire receipt.
+                </p>
+              </div>
+
+              <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <strong style={{ fontSize: '13.5px', color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                  5. Need assistance or have questions?
+                </strong>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Use the <strong>Message Counsellor</strong> tab to send messages directly to your assigned counselor. You can also reach our support desk at <strong>support@iiec.edu.np</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

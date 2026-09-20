@@ -1,10 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Users, GraduationCap, FileCheck, CheckSquare, Stamp, DollarSign, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Users,
+  GraduationCap,
+  FileCheck,
+  CheckSquare,
+  Stamp,
+  DollarSign,
+  ArrowUpRight,
+  TrendingUp,
+  UserPlus,
+  Calendar,
+  CreditCard,
+  Compass,
+  ArrowRight,
+} from 'lucide-react';
 import { apiClient } from '../../services/api-client';
+import { useAuth } from '../../context/AuthContext';
 import { Table } from '../../components/Table';
 import { Badge, StatusBadge } from '../../components/Badge';
 
 export const DashboardPage: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,14 +52,193 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Header */}
-      <div>
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-          Executive Dashboard
-        </h1>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-          Real-time consultancy operational metrics, active conversion funnel, and counsellor workloads.
-        </p>
+      {/* Welcome Banner */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #154D96 0%, #0057F8 100%)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '24px 28px',
+          color: '#FFFFFF',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
+          boxShadow: '0 4px 14px rgba(0, 87, 248, 0.2)',
+        }}
+      >
+        <div>
+          <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.9 }}>
+            IIEC Overseas Consultancy Platform
+          </span>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, margin: '4px 0 6px', color: '#FFFFFF' }}>
+            Welcome back, {user?.name || 'Team'}! 👋
+          </h1>
+          <p style={{ fontSize: '13px', opacity: 0.85, margin: 0, maxWidth: '600px' }}>
+            Monitor your student journeys from inquiry to university arrival. You currently have{' '}
+            <strong>{kpis.activeStudents || 0} active students</strong> progressing through the 14-stage lifecycle.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/leads')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 16px',
+              backgroundColor: '#FFFFFF',
+              color: '#0057F8',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+            }}
+          >
+            <UserPlus size={16} />
+            <span>Manage Leads</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Actions Bar */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '12px',
+        }}
+      >
+        <div
+          onClick={() => navigate('/counselling')}
+          style={{
+            padding: '14px 16px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--primary)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-color)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <div style={{ padding: '8px', backgroundColor: '#EFF6FF', borderRadius: '8px', color: 'var(--primary)' }}>
+            <Calendar size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Counselling Sessions</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Schedule & log meet calls</div>
+          </div>
+          <ArrowRight size={14} color="var(--text-muted)" />
+        </div>
+
+        <div
+          onClick={() => navigate('/documents')}
+          style={{
+            padding: '14px 16px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--primary)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-color)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <div style={{ padding: '8px', backgroundColor: '#ECFDF5', borderRadius: '8px', color: 'var(--success)' }}>
+            <FileCheck size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Document Reviews</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Approve student files</div>
+          </div>
+          <ArrowRight size={14} color="var(--text-muted)" />
+        </div>
+
+        <div
+          onClick={() => navigate('/payments')}
+          style={{
+            padding: '14px 16px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--primary)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-color)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <div style={{ padding: '8px', backgroundColor: '#FFFBEB', borderRadius: '8px', color: 'var(--warning)' }}>
+            <CreditCard size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Fee Payments</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Verify wire receipts</div>
+          </div>
+          <ArrowRight size={14} color="var(--text-muted)" />
+        </div>
+
+        <div
+          onClick={() => navigate('/tasks')}
+          style={{
+            padding: '14px 16px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--primary)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-color)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <div style={{ padding: '8px', backgroundColor: '#FEF2F2', borderRadius: '8px', color: 'var(--danger)' }}>
+            <CheckSquare size={18} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Follow-up Tasks</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{kpis.pendingTasks || 0} pending items</div>
+          </div>
+          <ArrowRight size={14} color="var(--text-muted)" />
+        </div>
       </div>
 
       {/* KPI Cards Grid */}

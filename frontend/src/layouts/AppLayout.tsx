@@ -12,9 +12,10 @@ import {
   Compass,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { NAVIGATION_ITEMS } from '../routes/NavigationConfig';
+import { NAVIGATION_SECTIONS } from '../routes/NavigationConfig';
 import { apiClient } from '../services/api-client';
 import { NotificationItem, UserRole } from '../types';
+import { UserGuideModal } from '../components/UserGuide';
 
 export const AppLayout: React.FC = () => {
   const { user, logout, isStaff, isStudent } = useAuth();
@@ -22,6 +23,7 @@ export const AppLayout: React.FC = () => {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -53,9 +55,10 @@ export const AppLayout: React.FC = () => {
     } catch (err) {}
   };
 
-  const allowedNavItems = NAVIGATION_ITEMS.filter(
-    (item) => user && item.roles.includes(user.role)
-  );
+  const allowedSections = NAVIGATION_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => user && item.roles.includes(user.role)),
+  })).filter((section) => section.items.length > 0);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
@@ -82,93 +85,147 @@ export const AppLayout: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-            padding: sidebarCollapsed ? '0' : '0 18px',
+            padding: sidebarCollapsed ? '0' : '0 14px',
             borderBottom: '1px solid var(--border-color)',
           }}
         >
-          {!sidebarCollapsed && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
+          {!sidebarCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
+              <img
+                src="/logo.png"
+                alt="IIEC Logo"
                 style={{
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '6px',
-                  backgroundColor: 'var(--primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#FFFFFF',
+                  height: '32px',
+                  maxWidth: '135px',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+              <span
+                style={{
+                  fontSize: '10px',
                   fontWeight: 700,
-                  fontSize: '14px',
+                  color: '#D8232A',
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  padding: '2px 5px',
+                  borderRadius: '4px',
+                  letterSpacing: '0.04em',
                 }}
               >
-                J
-              </div>
-              <div>
-                <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-                  JAIVA
-                </span>
-                <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--primary)', marginLeft: '4px' }}>
-                  CRM
-                </span>
-              </div>
+                CRM
+              </span>
+            </div>
+          ) : (
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              onClick={() => setSidebarCollapsed(false)}
+              title="Expand Sidebar"
+            >
+              <img
+                src="/logo.png"
+                alt="IIEC"
+                style={{
+                  height: '22px',
+                  maxWidth: '32px',
+                  objectFit: 'contain',
+                }}
+              />
             </div>
           )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-            title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-          >
-            <Menu size={18} />
-          </button>
+          {!sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title="Collapse Sidebar"
+            >
+              <Menu size={18} />
+            </button>
+          )}
         </div>
 
-        {/* Navigation List */}
+        {/* Grouped Navigation List */}
         <nav
           style={{
             flex: 1,
-            padding: '12px 8px',
+            padding: '10px 8px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px',
+            gap: '8px',
           }}
         >
-          {allowedNavItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                style={({ isActive }) => ({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: sidebarCollapsed ? '10px 0' : '9px 12px',
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  borderRadius: 'var(--radius-md)',
-                  color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                  backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
-                  fontWeight: isActive ? 600 : 500,
-                  fontSize: '13px',
-                  transition: 'all 0.15s ease',
-                })}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                <Icon size={18} strokeWidth={2} />
-                {!sidebarCollapsed && <span>{item.label}</span>}
-              </NavLink>
-            );
-          })}
+          {allowedSections.map((section, sIdx) => (
+            <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {!sidebarCollapsed ? (
+                <div
+                  style={{
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.07em',
+                    padding: sIdx === 0 ? '4px 10px 3px' : '8px 10px 3px',
+                  }}
+                >
+                  {section.title}
+                </div>
+              ) : (
+                sIdx > 0 && (
+                  <div
+                    style={{
+                      height: '1px',
+                      backgroundColor: 'var(--border-light)',
+                      margin: '6px 8px',
+                    }}
+                  />
+                )
+              )}
+
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: sidebarCollapsed ? '9px 0' : '8px 12px',
+                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                      borderRadius: 'var(--radius-md)',
+                      color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+                      backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
+                      fontWeight: isActive ? 600 : 500,
+                      fontSize: '13px',
+                      transition: 'all 0.15s ease',
+                    })}
+                    title={sidebarCollapsed ? `${section.title}: ${item.label}` : undefined}
+                  >
+                    <Icon size={17} strokeWidth={2} />
+                    {!sidebarCollapsed && <span>{item.label}</span>}
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Bottom Section: Help & Logout */}
@@ -182,7 +239,7 @@ export const AppLayout: React.FC = () => {
           }}
         >
           <button
-            onClick={() => alert('Jaiva CRM Support: support@jaivacrm.com')}
+            onClick={() => setIsGuideOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -200,7 +257,7 @@ export const AppLayout: React.FC = () => {
             }}
           >
             <HelpCircle size={18} />
-            {!sidebarCollapsed && <span>Help & Support</span>}
+            {!sidebarCollapsed && <span>User Guide & FAQs</span>}
           </button>
           <button
             onClick={() => {
@@ -258,7 +315,7 @@ export const AppLayout: React.FC = () => {
           {/* Breadcrumb / Section context */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Overseas Education Operations
+              IIEC Consultancy Operations
             </span>
           </div>
 
@@ -413,6 +470,9 @@ export const AppLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* Interactive User Guide Modal */}
+      <UserGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </div>
   );
 };
