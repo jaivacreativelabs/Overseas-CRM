@@ -290,21 +290,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ))}
           </select>
 
-          <select
-            className="form-select"
-            style={{ width: '160px' }}
-            value={counsellorFilter}
-            onChange={(e) => setCounsellorFilter(e.target.value)}
-          >
-            <option value="">All Counsellors</option>
-            {counsellors.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-
-          {(search || statusFilter || sourceFilter || counsellorFilter || stageFilter) && (
+          {(search || statusFilter || sourceFilter || stageFilter) && (
             <Button
               variant="ghost"
               size="sm"
@@ -357,10 +343,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
           {
             header: 'CURRENT STAGE',
             render: (l) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
-          },
-          {
-            header: 'COUNSELLOR',
-            render: (l) => l.counsellorId?.name || <span style={{ color: 'var(--text-muted)' }}>Unassigned</span>,
           },
           {
             header: 'ACTIONS',
@@ -522,43 +504,35 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
               onChange={(e) => setCreateForm({ ...createForm, source: e.target.value as LeadSource })}
               options={Object.values(LeadSource).map((s) => ({ value: s, label: s.replace(/_/g, ' ') }))}
             />
-            <Select
-              label="Assign Counsellor"
-              value={createForm.counsellorId}
-              onChange={(e) => setCreateForm({ ...createForm, counsellorId: e.target.value })}
-              placeholder="Select Counsellor..."
-              options={counsellors.map((c) => ({ value: c._id, label: c.name }))}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Input
               label="Target Country"
               value={createForm.targetCountry}
               onChange={(e) => setCreateForm({ ...createForm, targetCountry: e.target.value })}
               placeholder="e.g. United Kingdom"
             />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Input
               label="Target Course"
               value={createForm.targetCourse}
               onChange={(e) => setCreateForm({ ...createForm, targetCourse: e.target.value })}
               placeholder="e.g. MSc Data Science"
             />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Input
               label="Target Intake"
               value={createForm.targetIntake}
               onChange={(e) => setCreateForm({ ...createForm, targetIntake: e.target.value })}
-            />
-            <Input
-              label="Estimated Budget"
-              value={createForm.budget}
-              onChange={(e) => setCreateForm({ ...createForm, budget: e.target.value })}
-              placeholder="e.g. £30,000 / $40,000"
+              placeholder="e.g. Fall 2026 / Spring 2027"
             />
           </div>
+
+          <Input
+            label="Estimated Budget"
+            value={createForm.budget}
+            onChange={(e) => setCreateForm({ ...createForm, budget: e.target.value })}
+            placeholder="e.g. £30,000 / $40,000"
+          />
 
           <Textarea
             label="Internal Notes"
@@ -679,13 +653,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             value={counsellingForm.googleMeetLink}
             onChange={(e) => setCounsellingForm({ ...counsellingForm, googleMeetLink: e.target.value })}
             placeholder="https://meet.google.com/..."
-          />
-
-          <Select
-            label="Assigned Counsellor"
-            value={counsellingForm.counsellorId}
-            onChange={(e) => setCounsellingForm({ ...counsellingForm, counsellorId: e.target.value })}
-            options={counsellors.map((c) => ({ value: c._id, label: c.name }))}
           />
 
           <Textarea

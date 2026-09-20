@@ -104,143 +104,6 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Actions Bar */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '12px',
-        }}
-      >
-        <div
-          onClick={() => navigate('/counselling')}
-          style={{
-            padding: '14px 16px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--primary)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border-color)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          <div style={{ padding: '8px', backgroundColor: '#EFF6FF', borderRadius: '8px', color: 'var(--primary)' }}>
-            <Calendar size={18} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Counselling Sessions</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Schedule & log meet calls</div>
-          </div>
-          <ArrowRight size={14} color="var(--text-muted)" />
-        </div>
-
-        <div
-          onClick={() => navigate('/documents')}
-          style={{
-            padding: '14px 16px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--primary)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border-color)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          <div style={{ padding: '8px', backgroundColor: '#ECFDF5', borderRadius: '8px', color: 'var(--success)' }}>
-            <FileCheck size={18} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Document Reviews</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Approve student files</div>
-          </div>
-          <ArrowRight size={14} color="var(--text-muted)" />
-        </div>
-
-        <div
-          onClick={() => navigate('/payments')}
-          style={{
-            padding: '14px 16px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--primary)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border-color)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          <div style={{ padding: '8px', backgroundColor: '#FFFBEB', borderRadius: '8px', color: 'var(--warning)' }}>
-            <CreditCard size={18} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Fee Payments</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Verify wire receipts</div>
-          </div>
-          <ArrowRight size={14} color="var(--text-muted)" />
-        </div>
-
-        <div
-          onClick={() => navigate('/tasks')}
-          style={{
-            padding: '14px 16px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-md)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'var(--primary)';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border-color)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
-        >
-          <div style={{ padding: '8px', backgroundColor: '#FEF2F2', borderRadius: '8px', color: 'var(--danger)' }}>
-            <CheckSquare size={18} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Follow-up Tasks</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{kpis.pendingTasks || 0} pending items</div>
-          </div>
-          <ArrowRight size={14} color="var(--text-muted)" />
-        </div>
-      </div>
-
       {/* KPI Cards Grid */}
       <div
         style={{
@@ -277,19 +140,6 @@ export const DashboardPage: React.FC = () => {
 
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>APPLICATIONS UNDERWAY</span>
-            <FileCheck size={18} color="var(--info)" />
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {kpis.activeApplications || 0}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Submitted & Under Review
-          </div>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>PENDING TASKS</span>
             <CheckSquare size={18} color="var(--warning)" />
           </div>
@@ -298,19 +148,6 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div style={{ fontSize: '11px', color: 'var(--warning)', marginTop: '4px' }}>
             Action items requiring attention
-          </div>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>VISAS APPROVED</span>
-            <Stamp size={18} color="var(--success)" />
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {kpis.approvedVisas || 0}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '4px' }}>
-            Ready for Departure
           </div>
         </div>
       </div>
