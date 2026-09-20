@@ -204,19 +204,22 @@ export const AppLayout: React.FC = () => {
                   <NavLink
                     key={item.path}
                     to={item.path}
-                    style={({ isActive }) => ({
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: sidebarCollapsed ? '9px 0' : '8px 12px',
-                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                      borderRadius: 'var(--radius-md)',
-                      color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                      backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
-                      fontWeight: isActive ? 600 : 500,
-                      fontSize: '13px',
-                      transition: 'all 0.15s ease',
-                    })}
+                    style={({ isActive }) => {
+                      const active = isActive || location.pathname.startsWith(item.path + '/');
+                      return {
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: sidebarCollapsed ? '9px 0' : '8px 12px',
+                        justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                        borderRadius: 'var(--radius-md)',
+                        color: active ? 'var(--primary)' : 'var(--text-secondary)',
+                        backgroundColor: active ? 'var(--primary-light)' : 'transparent',
+                        fontWeight: active ? 600 : 500,
+                        fontSize: '13px',
+                        transition: 'all 0.15s ease',
+                      };
+                    }}
                     title={sidebarCollapsed ? `${section.title}: ${item.label}` : undefined}
                   >
                     <Icon size={17} strokeWidth={2} />

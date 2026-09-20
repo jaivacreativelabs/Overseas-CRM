@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   User,
@@ -56,6 +56,8 @@ import { Input, Select, Textarea } from '../../components/Form';
 export const LeadDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isStudentRoute = location.pathname.startsWith('/students');
   const { success, error } = useToast();
   const { user, isStaff } = useAuth();
 
@@ -285,8 +287,13 @@ export const LeadDetailPage: React.FC = () => {
       {/* Back button & Student Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <Button variant="secondary" size="sm" icon={<ArrowLeft size={16} />} onClick={() => navigate('/leads')}>
-            Back
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<ArrowLeft size={16} />}
+            onClick={() => navigate(isStudentRoute ? '/students' : '/leads')}
+          >
+            Back to {isStudentRoute ? 'Students' : 'Leads'}
           </Button>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

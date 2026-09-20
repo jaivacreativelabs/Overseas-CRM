@@ -17,8 +17,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useAuth } from '../../context/AuthContext';
-import { Table } from '../../components/Table';
-import { Badge, StatusBadge } from '../../components/Badge';
+import { Badge } from '../../components/Badge';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -230,32 +229,6 @@ export const DashboardPage: React.FC = () => {
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Counsellor Workload Table */}
-      <div className="card">
-        <div className="card-header">
-          <h3 className="card-title">Counsellor Workload & Performance</h3>
-        </div>
-        <Table
-          columns={[
-            { header: 'COUNSELLOR NAME', accessor: 'name' },
-            { header: 'EMAIL', accessor: 'email' },
-            {
-              header: 'ASSIGNED LEADS',
-              render: (c: any) => <strong>{c.assignedLeads}</strong>,
-            },
-            {
-              header: 'PENDING TASKS',
-              render: (c: any) => (
-                <Badge variant={c.pendingTasks > 3 ? 'warning' : 'neutral'}>
-                  {c.pendingTasks} Pending
-                </Badge>
-              ),
-            },
-          ]}
-          data={data?.counsellorStats || []}
-        />
       </div>
     </div>
   );

@@ -315,7 +315,10 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             header: 'STUDENT NAME',
             render: (l) => (
               <div>
-                <div style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }} onClick={() => navigate(`/leads/${l._id}`)}>
+                <div
+                  style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
+                  onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
+                >
                   {l.name}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.email}</div>
@@ -355,7 +358,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                   title="View Student 360 Detail"
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/leads/${l._id}`);
+                    navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`);
                   }}
                   icon={<Eye size={14} />}
                 />

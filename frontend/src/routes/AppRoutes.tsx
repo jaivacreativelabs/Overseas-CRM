@@ -85,6 +85,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/leads/:id" element={<LeadDetailPage />} />
         <Route path="/students" element={<LeadsPage isStudentOnly={true} />} />
+        <Route path="/students/:id" element={<LeadDetailPage />} />
         <Route path="/counselling" element={<CounsellingPage />} />
         <Route path="/universities" element={<UniversitiesPage />} />
         <Route path="/documents" element={<DocumentsPage />} />
