@@ -1,0 +1,251 @@
+/* ==========================================================================
+   STUDENT PORTAL FEATURE - SCOPED MOBILE RESPONSIVENESS STYLES
+   ========================================================================== */
+
+/* Main Student Portal Container */
+.student-portal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Header Welcome Card */
+.student-welcome-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Responsive Welcome Typography */
+.student-welcome-title {
+  font-size: clamp(17px, 3.5vw, 20px);
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.student-welcome-subtext {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* Scrollable Touch-Friendly & Sticky Tab Bar */
+.student-tabs-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 16px;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE/Edge */
+  padding-bottom: 2px;
+}
+
+.student-tabs-header::-webkit-scrollbar {
+  display: none;
+  /* Chrome/Safari */
+}
+
+.student-tab-btn {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.student-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.student-tab-btn.active {
+  color: var(--primary, #0057F8);
+  border-bottom-color: var(--primary, #0057F8);
+  font-weight: 600;
+}
+
+/* Dashboard 2-Column Grid to 1-Column Stacking */
+.student-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+}
+
+/* Document & Action List Items on Mobile */
+.student-action-item {
+  padding: 12px 14px;
+  background-color: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Mobile Responsive Table Wrapper */
+.student-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Progress Stepper Mobile Summary Card & Accordion */
+.student-progress-summary-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.student-progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background-color: var(--bg-hover, #F3F4F6);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.student-progress-bar-fill {
+  height: 100%;
+  background-color: var(--primary, #0057F8);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.student-accordion-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  padding: 8px 0 0 0;
+  color: var(--primary, #0057F8);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Empty State Micro-Card */
+.student-empty-microcard {
+  padding: 24px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: var(--bg-subtle, #F9FAFB);
+  border: 1px dashed var(--border-color, #E5E7EB);
+  border-radius: 12px;
+}
+
+/* ==========================================================================
+   MOBILE SPECIFIC OVERRIDES (<= 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  .student-portal-container {
+    gap: 14px;
+  }
+
+  /* Header & Greeting Compact Single-Line on Mobile */
+  .student-welcome-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color, #E5E7EB);
+    gap: 12px;
+  }
+
+  .student-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .student-welcome-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .student-welcome-subtext {
+    font-size: 12px;
+    margin-top: 2px;
+  }
+
+  /* Sticky Horizontal Tab Sub-Header */
+  .student-tabs-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #FFFFFF;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border-color, #E5E7EB);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+  }
+
+  /* Standardized Card Rhythm */
+  .student-portal-container .card {
+    border-radius: 12px;
+    border: 1px solid var(--border-color, #E5E7EB);
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Grid 2-Col to 1-Col Stacking */
+  .student-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* Document / Action items vertical stacking */
+  .student-action-item {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px;
+  }
+
+  /* Full-width Touch Targets */
+  .student-card-btn-full {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+}

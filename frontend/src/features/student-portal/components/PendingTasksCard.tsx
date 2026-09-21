@@ -68,23 +68,13 @@ export const PendingTasksCard: React.FC<PendingTasksCardProps> = ({
           <div style={{ height: '48px', backgroundColor: 'var(--bg-hover)', borderRadius: 'var(--radius-md)' }} />
         </div>
       ) : pendingTasks.length === 0 ? (
-        /* Empty State */
-        <div
-          style={{
-            padding: '32px 16px',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-          }}
-        >
-          <CheckCircle2 size={42} style={{ color: 'var(--success)', opacity: 0.8 }} />
-          <div style={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            No pending tasks.
+        /* Empty State Micro-Card */
+        <div className="student-empty-microcard">
+          <CheckCircle2 size={32} style={{ color: 'var(--success)', opacity: 0.9 }} />
+          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            No pending tasks
           </div>
-          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: 0, maxWidth: '340px' }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, maxWidth: '320px', lineHeight: 1.4 }}>
             You are all caught up! Check back when your counsellor assigns new actions.
           </p>
         </div>

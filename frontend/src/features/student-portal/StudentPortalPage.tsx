@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import './student-portal.css';
 import {
   GraduationCap,
   FileText,
@@ -14,6 +15,8 @@ import {
   User,
   Phone,
   Mail,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -38,7 +41,7 @@ import {
 } from '../../types';
 import { PendingTasksCard } from './components/PendingTasksCard';
 import { CounsellorCard } from './components/CounsellorCard';
-import { StageStepper } from '../../components/StageStepper';
+import { StageStepper, STAGES_CONFIG } from '../../components/StageStepper';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
 import { Table } from '../../components/Table';
@@ -52,6 +55,7 @@ export const StudentPortalPage: React.FC = () => {
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'journey' | 'universities' | 'documents' | 'offers' | 'payments' | 'visa_travel' | 'messages' | 'help'>('journey');
+  const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
 
   const [shortlists, setShortlists] = useState<Shortlist[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -204,27 +208,22 @@ export const StudentPortalPage: React.FC = () => {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Loading your student application portal...</div>;
   }
 
+  const currentStageIndex = STAGES_CONFIG.findIndex((s) => s.stage === lead?.stage);
+  const activeStageNum = currentStageIndex >= 0 ? currentStageIndex + 1 : 1;
+  const progressPercentage = Math.round((activeStageNum / STAGES_CONFIG.length) * 100);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div className="student-portal-container">
       {/* Student Welcome & Profile Card */}
-      <div
-        className="card"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-        }}
-      >
-        <div>
+      <div className="card student-welcome-card">
+        <div className="student-header-top">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <h1 className="student-welcome-title">
               Welcome, {user?.name}!
             </h1>
             <Badge variant="primary">{lead?.stage?.replace(/_/g, ' ')}</Badge>
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+          <p className="student-welcome-subtext">
             Target Country: <strong>{lead?.targetCountry || 'International'}</strong> • Program: <strong>{lead?.targetCourse || 'Undecided'}</strong>
           </p>
         </div>
@@ -236,29 +235,29 @@ export const StudentPortalPage: React.FC = () => {
       </div>
 
       {/* Portal Tabs */}
-      <div className="tabs-header">
-        <button className={`tab-btn ${activeTab === 'journey' ? 'active' : ''}`} onClick={() => setActiveTab('journey')}>
+      <div className="student-tabs-header">
+        <button className={`student-tab-btn ${activeTab === 'journey' ? 'active' : ''}`} onClick={() => setActiveTab('journey')}>
           My Journey & Next Steps
         </button>
-        <button className={`tab-btn ${activeTab === 'universities' ? 'active' : ''}`} onClick={() => setActiveTab('universities')}>
+        <button className={`student-tab-btn ${activeTab === 'universities' ? 'active' : ''}`} onClick={() => setActiveTab('universities')}>
           Shortlisted Universities ({shortlists.length})
         </button>
-        <button className={`tab-btn ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
+        <button className={`student-tab-btn ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
           Upload Documents ({documents.length})
         </button>
-        <button className={`tab-btn ${activeTab === 'offers' ? 'active' : ''}`} onClick={() => setActiveTab('offers')}>
+        <button className={`student-tab-btn ${activeTab === 'offers' ? 'active' : ''}`} onClick={() => setActiveTab('offers')}>
           Offers & Acceptance ({offers.length})
         </button>
-        <button className={`tab-btn ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => setActiveTab('payments')}>
+        <button className={`student-tab-btn ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => setActiveTab('payments')}>
           Fee Payments ({payments.length})
         </button>
-        <button className={`tab-btn ${activeTab === 'visa_travel' ? 'active' : ''}`} onClick={() => setActiveTab('visa_travel')}>
+        <button className={`student-tab-btn ${activeTab === 'visa_travel' ? 'active' : ''}`} onClick={() => setActiveTab('visa_travel')}>
           Visa & Pre-Departure
         </button>
-        <button className={`tab-btn ${activeTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveTab('messages')}>
+        <button className={`student-tab-btn ${activeTab === 'messages' ? 'active' : ''}`} onClick={() => setActiveTab('messages')}>
           Message Counsellor ({messages.length})
         </button>
-        <button className={`tab-btn ${activeTab === 'help' ? 'active' : ''}`} onClick={() => setActiveTab('help')}>
+        <button className={`student-tab-btn ${activeTab === 'help' ? 'active' : ''}`} onClick={() => setActiveTab('help')}>
           ❓ Guide & FAQs
         </button>
       </div>
@@ -266,7 +265,46 @@ export const StudentPortalPage: React.FC = () => {
       {/* --- TAB 1: JOURNEY --- */}
       {activeTab === 'journey' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+          {/* Lifecycle Progress Stepper Summary Accordion Card */}
+          <div className="student-progress-summary-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Application Progress
+                </span>
+                <div style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                  Current: {lead?.stage?.replace(/_/g, ' ')} <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--primary)' }}>(Stage {activeStageNum} of {STAGES_CONFIG.length})</span>
+                </div>
+              </div>
+              <Badge variant="primary">
+                {progressPercentage}%
+              </Badge>
+            </div>
+
+            {/* Subtle Thin Horizontal Progress Bar */}
+            <div className="student-progress-bar-bg">
+              <div className="student-progress-bar-fill" style={{ width: `${progressPercentage}%` }} />
+            </div>
+
+            {/* Expandable Accordion Toggle */}
+            <button
+              type="button"
+              className="student-accordion-toggle"
+              onClick={() => setIsJourneyExpanded(!isJourneyExpanded)}
+            >
+              <span>{isJourneyExpanded ? 'Hide Full Stepper' : 'View Full Journey Stepper'}</span>
+              {isJourneyExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {/* Collapsible Stepper Content */}
+            {isJourneyExpanded && (
+              <div style={{ marginTop: '10px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+                <StageStepper currentStage={lead?.stage || StudentStage.PROFILE_EVALUATION} />
+              </div>
+            )}
+          </div>
+
+          <div className="student-grid-2col">
             <div className="card">
               <h3 className="card-title" style={{ marginBottom: '12px' }}>Current Stage Action Item</h3>
               <div style={{ padding: '16px', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 87, 248, 0.2)' }}>
@@ -291,27 +329,27 @@ export const StudentPortalPage: React.FC = () => {
 
                 {/* Direct CTA button to help user */}
                 {lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING && (
-                  <Button variant="primary" size="sm" onClick={() => setActiveTab('universities')}>
+                  <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setActiveTab('universities')}>
                     👉 Choose Preferred University
                   </Button>
                 )}
                 {lead?.stage === StudentStage.DOCUMENT_COLLECTION && (
-                  <Button variant="primary" size="sm" onClick={() => setActiveTab('documents')}>
+                  <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setActiveTab('documents')}>
                     👉 Upload Required Documents
                   </Button>
                 )}
                 {lead?.stage === StudentStage.OFFER_MANAGEMENT && (
-                  <Button variant="primary" size="sm" onClick={() => setActiveTab('offers')}>
+                  <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setActiveTab('offers')}>
                     👉 Review & Sign Offer Letter
                   </Button>
                 )}
                 {lead?.stage === StudentStage.FEE_PAYMENT && (
-                  <Button variant="primary" size="sm" onClick={() => setActiveTab('payments')}>
+                  <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setActiveTab('payments')}>
                     👉 Submit Fee Receipt Proof
                   </Button>
                 )}
                 {lead?.stage === StudentStage.VISA_PROCESSING && (
-                  <Button variant="primary" size="sm" onClick={() => setActiveTab('visa_travel')}>
+                  <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setActiveTab('visa_travel')}>
                     👉 View Visa & Travel Status
                   </Button>
                 )}
@@ -331,14 +369,7 @@ export const StudentPortalPage: React.FC = () => {
                     .map((d) => (
                       <div
                         key={d._id}
-                        style={{
-                          padding: '10px 14px',
-                          backgroundColor: 'var(--bg-subtle)',
-                          borderRadius: 'var(--radius-md)',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
+                        className="student-action-item"
                       >
                         <div>
                           <strong>{d.title}</strong>
@@ -347,6 +378,7 @@ export const StudentPortalPage: React.FC = () => {
                         <Button
                           variant="primary"
                           size="sm"
+                          className="student-card-btn-full"
                           onClick={() => {
                             setSelectedDoc(d);
                             setIsUploadDocOpen(true);
@@ -370,36 +402,38 @@ export const StudentPortalPage: React.FC = () => {
       {activeTab === 'universities' && (
         <div className="card">
           <h3 className="card-title" style={{ marginBottom: '14px' }}>Your Approved University Options</h3>
-          <Table
-            columns={[
-              { header: 'UNIVERSITY', accessor: 'universityName' },
-              { header: 'COURSE', accessor: 'courseTitle' },
-              { header: 'COUNTRY', accessor: 'country' },
-              { header: 'INTAKE', accessor: 'intake' },
-              {
-                header: 'ANNUAL FEE',
-                render: (s) => (s.annualFee ? `${s.currency} ${s.annualFee.toLocaleString()}` : '—'),
-              },
-              {
-                header: 'STATUS',
-                render: (s) => <StatusBadge status={s.status} />,
-              },
-              {
-                header: 'ACTION',
-                align: 'right',
-                render: (s) =>
-                  s.status !== 'SELECTED_BY_STUDENT' ? (
-                    <Button variant="primary" size="sm" onClick={() => handleSelectUniversity(s._id)}>
-                      Select This Choice
-                    </Button>
-                  ) : (
-                    <Badge variant="success">✓ Selected</Badge>
-                  ),
-              },
-            ]}
-            data={shortlists}
-            emptyMessage="Your counsellor is curating your personalized university shortlist."
-          />
+          <div className="student-table-responsive">
+            <Table
+              columns={[
+                { header: 'UNIVERSITY', accessor: 'universityName' },
+                { header: 'COURSE', accessor: 'courseTitle' },
+                { header: 'COUNTRY', accessor: 'country' },
+                { header: 'INTAKE', accessor: 'intake' },
+                {
+                  header: 'ANNUAL FEE',
+                  render: (s) => (s.annualFee ? `${s.currency} ${s.annualFee.toLocaleString()}` : '—'),
+                },
+                {
+                  header: 'STATUS',
+                  render: (s) => <StatusBadge status={s.status} />,
+                },
+                {
+                  header: 'ACTION',
+                  align: 'right',
+                  render: (s) =>
+                    s.status !== 'SELECTED_BY_STUDENT' ? (
+                      <Button variant="primary" size="sm" onClick={() => handleSelectUniversity(s._id)}>
+                        Select This Choice
+                      </Button>
+                    ) : (
+                      <Badge variant="success">✓ Selected</Badge>
+                    ),
+                },
+              ]}
+              data={shortlists}
+              emptyMessage="Your counsellor is curating your personalized university shortlist."
+            />
+          </div>
         </div>
       )}
 
@@ -407,62 +441,64 @@ export const StudentPortalPage: React.FC = () => {
       {activeTab === 'documents' && (
         <div className="card">
           <h3 className="card-title" style={{ marginBottom: '14px' }}>Document Checklist</h3>
-          <Table
-            columns={[
-              {
-                header: 'DOCUMENT',
-                render: (d) => (
-                  <div>
-                    <strong>{d.title}</strong>
-                    {d.isMandatory && <span style={{ color: 'var(--danger)', marginLeft: '4px' }}>*</span>}
-                  </div>
-                ),
-              },
-              {
-                header: 'STATUS',
-                render: (d) => <StatusBadge status={d.status} />,
-              },
-              {
-                header: 'ATTACHMENT',
-                render: (d) =>
-                  d.fileUrl ? (
-                    <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
-                      {d.originalFileName || 'View File'}
-                    </a>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Not Uploaded</span>
+          <div className="student-table-responsive">
+            <Table
+              columns={[
+                {
+                  header: 'DOCUMENT',
+                  render: (d) => (
+                    <div>
+                      <strong>{d.title}</strong>
+                      {d.isMandatory && <span style={{ color: 'var(--danger)', marginLeft: '4px' }}>*</span>}
+                    </div>
                   ),
-              },
-              {
-                header: 'FEEDBACK / REASON',
-                render: (d) =>
-                  d.status === DocumentStatus.REJECTED ? (
-                    <span style={{ color: 'var(--danger)', fontSize: '12px' }}>{d.rejectionReason}</span>
-                  ) : (
-                    '—'
+                },
+                {
+                  header: 'STATUS',
+                  render: (d) => <StatusBadge status={d.status} />,
+                },
+                {
+                  header: 'ATTACHMENT',
+                  render: (d) =>
+                    d.fileUrl ? (
+                      <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
+                        {d.originalFileName || 'View File'}
+                      </a>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>Not Uploaded</span>
+                    ),
+                },
+                {
+                  header: 'FEEDBACK / REASON',
+                  render: (d) =>
+                    d.status === DocumentStatus.REJECTED ? (
+                      <span style={{ color: 'var(--danger)', fontSize: '12px' }}>{d.rejectionReason}</span>
+                    ) : (
+                      '—'
+                    ),
+                },
+                {
+                  header: 'ACTION',
+                  align: 'right',
+                  render: (d) => (
+                    <Button
+                      variant={d.status === DocumentStatus.APPROVED ? 'ghost' : 'secondary'}
+                      size="sm"
+                      disabled={d.status === DocumentStatus.APPROVED}
+                      onClick={() => {
+                        setSelectedDoc(d);
+                        setIsUploadDocOpen(true);
+                      }}
+                    >
+                      {d.fileUrl ? 'Re-upload' : 'Upload'}
+                    </Button>
                   ),
-              },
-              {
-                header: 'ACTION',
-                align: 'right',
-                render: (d) => (
-                  <Button
-                    variant={d.status === DocumentStatus.APPROVED ? 'ghost' : 'secondary'}
-                    size="sm"
-                    disabled={d.status === DocumentStatus.APPROVED}
-                    onClick={() => {
-                      setSelectedDoc(d);
-                      setIsUploadDocOpen(true);
-                    }}
-                  >
-                    {d.fileUrl ? 'Re-upload' : 'Upload'}
-                  </Button>
-                ),
-              },
-            ]}
-            data={documents}
-            emptyMessage="No documents requested yet."
-          />
+                },
+              ]}
+              data={documents}
+              emptyMessage="No documents requested yet."
+            />
+          </div>
         </div>
       )}
 
@@ -470,52 +506,54 @@ export const StudentPortalPage: React.FC = () => {
       {activeTab === 'offers' && (
         <div className="card">
           <h3 className="card-title" style={{ marginBottom: '14px' }}>Official University Offer Letters</h3>
-          <Table
-            columns={[
-              { header: 'UNIVERSITY', accessor: 'universityName' },
-              { header: 'COURSE', accessor: 'courseTitle' },
-              { header: 'OFFER TYPE', accessor: 'offerType' },
-              {
-                header: 'OFFICIAL LETTER',
-                render: (o) => (
-                  <a href={o.originalOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 500 }}>
-                    Download Official Offer <ExternalLink size={12} />
-                  </a>
-                ),
-              },
-              {
-                header: 'SIGNED ACCEPTANCE',
-                render: (o) =>
-                  o.signedOfferUrl ? (
-                    <span style={{ color: 'var(--success)' }}>✓ Uploaded</span>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Pending</span>
+          <div className="student-table-responsive">
+            <Table
+              columns={[
+                { header: 'UNIVERSITY', accessor: 'universityName' },
+                { header: 'COURSE', accessor: 'courseTitle' },
+                { header: 'OFFER TYPE', accessor: 'offerType' },
+                {
+                  header: 'OFFICIAL LETTER',
+                  render: (o) => (
+                    <a href={o.originalOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 500 }}>
+                      Download Official Offer <ExternalLink size={12} />
+                    </a>
                   ),
-              },
-              {
-                header: 'STATUS',
-                render: (o) => <StatusBadge status={o.status} />,
-              },
-              {
-                header: 'ACTION',
-                align: 'right',
-                render: (o) => (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedOffer(o);
-                      setIsSignOfferOpen(true);
-                    }}
-                  >
-                    {o.signedOfferUrl ? 'Update Signed Copy' : 'Upload Signed Offer'}
-                  </Button>
-                ),
-              },
-            ]}
-            data={offers}
-            emptyMessage="No university offer letters available yet."
-          />
+                },
+                {
+                  header: 'SIGNED ACCEPTANCE',
+                  render: (o) =>
+                    o.signedOfferUrl ? (
+                      <span style={{ color: 'var(--success)' }}>✓ Uploaded</span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>Pending</span>
+                    ),
+                },
+                {
+                  header: 'STATUS',
+                  render: (o) => <StatusBadge status={o.status} />,
+                },
+                {
+                  header: 'ACTION',
+                  align: 'right',
+                  render: (o) => (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedOffer(o);
+                        setIsSignOfferOpen(true);
+                      }}
+                    >
+                      {o.signedOfferUrl ? 'Update Signed Copy' : 'Upload Signed Offer'}
+                    </Button>
+                  ),
+                },
+              ]}
+              data={offers}
+              emptyMessage="No university offer letters available yet."
+            />
+          </div>
         </div>
       )}
 
@@ -523,44 +561,46 @@ export const StudentPortalPage: React.FC = () => {
       {activeTab === 'payments' && (
         <div className="card">
           <h3 className="card-title" style={{ marginBottom: '14px' }}>Fee Deposit & Receipts</h3>
-          <Table
-            columns={[
-              { header: 'PAYMENT TITLE', accessor: 'title' },
-              {
-                header: 'AMOUNT DUE',
-                render: (p) => <strong>{p.currency} {p.amount.toLocaleString()}</strong>,
-              },
-              {
-                header: 'STATUS',
-                render: (p) => <StatusBadge status={p.status} />,
-              },
-              {
-                header: 'ACTION',
-                align: 'right',
-                render: (p) => (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={p.status === PaymentStatus.VERIFIED}
-                    onClick={() => {
-                      setSelectedPayment(p);
-                      setIsSubmitPaymentOpen(true);
-                    }}
-                  >
-                    {p.status === PaymentStatus.VERIFIED ? 'Verified ✓' : 'Submit Payment Proof'}
-                  </Button>
-                ),
-              },
-            ]}
-            data={payments}
-            emptyMessage="No payment requests generated yet."
-          />
+          <div className="student-table-responsive">
+            <Table
+              columns={[
+                { header: 'PAYMENT TITLE', accessor: 'title' },
+                {
+                  header: 'AMOUNT DUE',
+                  render: (p) => <strong>{p.currency} {p.amount.toLocaleString()}</strong>,
+                },
+                {
+                  header: 'STATUS',
+                  render: (p) => <StatusBadge status={p.status} />,
+                },
+                {
+                  header: 'ACTION',
+                  align: 'right',
+                  render: (p) => (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={p.status === PaymentStatus.VERIFIED}
+                      onClick={() => {
+                        setSelectedPayment(p);
+                        setIsSubmitPaymentOpen(true);
+                      }}
+                    >
+                      {p.status === PaymentStatus.VERIFIED ? 'Verified ✓' : 'Submit Payment Proof'}
+                    </Button>
+                  ),
+                },
+              ]}
+              data={payments}
+              emptyMessage="No payment requests generated yet."
+            />
+          </div>
         </div>
       )}
 
       {/* --- TAB 6: VISA & TRAVEL --- */}
       {activeTab === 'visa_travel' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        <div className="student-grid-2col">
           <div className="card">
             <h3 className="card-title" style={{ marginBottom: '12px' }}>Visa Filing Details</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
