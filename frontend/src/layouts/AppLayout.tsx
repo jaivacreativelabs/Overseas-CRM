@@ -69,7 +69,7 @@ export const AppLayout: React.FC = () => {
       await apiClient.put('/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
-    } catch (err) {}
+    } catch (err) { }
   };
 
   const allowedSections = NAVIGATION_SECTIONS.map((section) => ({
@@ -259,27 +259,29 @@ export const AppLayout: React.FC = () => {
             gap: '2px',
           }}
         >
-          <button
-            onClick={() => setIsGuideOpen(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: sidebarCollapsed ? '10px 0' : '9px 12px',
-              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-secondary)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13px',
-              width: '100%',
-              textAlign: 'left',
-            }}
-          >
-            <HelpCircle size={18} />
-            {!sidebarCollapsed && <span>User Guide & FAQs</span>}
-          </button>
+          {!isStudent && (
+            <button
+              onClick={() => setIsGuideOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: sidebarCollapsed ? '10px 0' : '9px 12px',
+                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-secondary)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '13px',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              <HelpCircle size={18} />
+              {!sidebarCollapsed && <span>User Guide & FAQs</span>}
+            </button>
+          )}
           <button
             onClick={() => {
               logout();
