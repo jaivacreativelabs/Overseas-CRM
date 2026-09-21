@@ -31,7 +31,12 @@ import {
   DocumentStatus,
   OfferStatus,
   PaymentStatus,
+  Task,
+  TaskStatus,
+  TaskPriority,
+  TaskType,
 } from '../../types';
+import { PendingTasksCard } from './components/PendingTasksCard';
 import { StageStepper } from '../../components/StageStepper';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
@@ -54,6 +59,7 @@ export const StudentPortalPage: React.FC = () => {
   const [visa, setVisa] = useState<VisaRecord | null>(null);
   const [travel, setTravel] = useState<TravelSupport | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newMessage, setNewMessage] = useState('');
 
   // Modals for student upload actions
@@ -78,7 +84,7 @@ export const StudentPortalPage: React.FC = () => {
       const currentLead = res.data?.[0];
       if (currentLead) {
         setLead(currentLead);
-        const [shortRes, docRes, offRes, payRes, visRes, travRes, msgRes] = await Promise.all([
+        const [shortRes, docRes, offRes, payRes, visRes, travRes, msgRes, taskRes] = await Promise.all([
           apiClient.get<Shortlist[]>(`/universities/shortlists/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<DocumentItem[]>(`/documents/lead/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<Offer[]>(`/offers/lead/${currentLead._id}`).catch(() => ({ data: [] })),
@@ -86,6 +92,7 @@ export const StudentPortalPage: React.FC = () => {
           apiClient.get<VisaRecord>(`/visa/lead/${currentLead._id}`).catch(() => ({ data: null })),
           apiClient.get<TravelSupport>(`/travel/lead/${currentLead._id}`).catch(() => ({ data: null })),
           apiClient.get<Message[]>(`/messages/lead/${currentLead._id}`).catch(() => ({ data: [] })),
+          apiClient.get<Task[]>(`/tasks`, { leadId: currentLead._id }).catch(() => ({ data: [] })),
         ]);
 
         setShortlists(shortRes.data || []);
@@ -95,6 +102,7 @@ export const StudentPortalPage: React.FC = () => {
         setVisa(visRes.data);
         setTravel(travRes.data);
         setMessages(msgRes.data || []);
+        setTasks(taskRes.data || []);
       }
     } catch (err: any) {
       error(err.message || 'Failed to load student portal');
@@ -259,99 +267,104 @@ export const StudentPortalPage: React.FC = () => {
 
       {/* --- TAB 1: JOURNEY --- */}
       {activeTab === 'journey' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: '12px' }}>Current Stage Action Item</h3>
-            <div style={{ padding: '16px', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 87, 248, 0.2)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px', marginBottom: '6px' }}>
-                Stage: {lead?.stage?.replace(/_/g, ' ')}
-              </div>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.5 }}>
-                {lead?.stage === StudentStage.PROFILE_EVALUATION
-                  ? 'Your counsellor is reviewing your academic transcripts and test scores to build your university recommendations.'
-                  : lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING
-                  ? 'Your university options are ready! Please review the shortlist and confirm your 1 preferred university.'
-                  : lead?.stage === StudentStage.DOCUMENT_COLLECTION
-                  ? 'Please upload your mandatory documents (Passport, Degree/Transcripts, English Test Score) for verification.'
-                  : lead?.stage === StudentStage.OFFER_MANAGEMENT
-                  ? 'Congratulations! Your university offer letter is ready. Download it, sign the acceptance page, and upload your signed copy.'
-                  : lead?.stage === StudentStage.FEE_PAYMENT
-                  ? 'Your offer is accepted! Please check the fee deposit details and upload your wire transfer receipt.'
-                  : lead?.stage === StudentStage.VISA_PROCESSING
-                  ? 'Your student visa filing is currently in progress with the embassy. We will notify you upon decision.'
-                  : 'Get ready for your pre-departure orientation and flight booking!'}
-              </p>
-
-              {/* Direct CTA button to help user */}
-              {lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING && (
-                <Button variant="primary" size="sm" onClick={() => setActiveTab('universities')}>
-                  👉 Choose Preferred University
-                </Button>
-              )}
-              {lead?.stage === StudentStage.DOCUMENT_COLLECTION && (
-                <Button variant="primary" size="sm" onClick={() => setActiveTab('documents')}>
-                  👉 Upload Required Documents
-                </Button>
-              )}
-              {lead?.stage === StudentStage.OFFER_MANAGEMENT && (
-                <Button variant="primary" size="sm" onClick={() => setActiveTab('offers')}>
-                  👉 Review & Sign Offer Letter
-                </Button>
-              )}
-              {lead?.stage === StudentStage.FEE_PAYMENT && (
-                <Button variant="primary" size="sm" onClick={() => setActiveTab('payments')}>
-                  👉 Submit Fee Receipt Proof
-                </Button>
-              )}
-              {lead?.stage === StudentStage.VISA_PROCESSING && (
-                <Button variant="primary" size="sm" onClick={() => setActiveTab('visa_travel')}>
-                  👉 View Visa & Travel Status
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: '12px' }}>Pending Documents & Actions</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {documents.filter((d) => d.status === DocumentStatus.REQUESTED).length === 0 ? (
-                <div style={{ color: 'var(--success)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <CheckCircle2 size={16} /> All requested documents are currently uploaded!
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '12px' }}>Current Stage Action Item</h3>
+              <div style={{ padding: '16px', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0, 87, 248, 0.2)' }}>
+                <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px', marginBottom: '6px' }}>
+                  Stage: {lead?.stage?.replace(/_/g, ' ')}
                 </div>
-              ) : (
-                documents
-                  .filter((d) => d.status === DocumentStatus.REQUESTED)
-                  .map((d) => (
-                    <div
-                      key={d._id}
-                      style={{
-                        padding: '10px 14px',
-                        backgroundColor: 'var(--bg-subtle)',
-                        borderRadius: 'var(--radius-md)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <div>
-                        <strong>{d.title}</strong>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.category}</div>
-                      </div>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedDoc(d);
-                          setIsUploadDocOpen(true);
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.5 }}>
+                  {lead?.stage === StudentStage.PROFILE_EVALUATION
+                    ? 'Your counsellor is reviewing your academic transcripts and test scores to build your university recommendations.'
+                    : lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING
+                      ? 'Your university options are ready! Please review the shortlist and confirm your 1 preferred university.'
+                      : lead?.stage === StudentStage.DOCUMENT_COLLECTION
+                        ? 'Please upload your mandatory documents (Passport, Degree/Transcripts, English Test Score) for verification.'
+                        : lead?.stage === StudentStage.OFFER_MANAGEMENT
+                          ? 'Congratulations! Your university offer letter is ready. Download it, sign the acceptance page, and upload your signed copy.'
+                          : lead?.stage === StudentStage.FEE_PAYMENT
+                            ? 'Your offer is accepted! Please check the fee deposit details and upload your wire transfer receipt.'
+                            : lead?.stage === StudentStage.VISA_PROCESSING
+                              ? 'Your student visa filing is currently in progress with the embassy. We will notify you upon decision.'
+                              : 'Get ready for your pre-departure orientation and flight booking!'}
+                </p>
+
+                {/* Direct CTA button to help user */}
+                {lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING && (
+                  <Button variant="primary" size="sm" onClick={() => setActiveTab('universities')}>
+                    👉 Choose Preferred University
+                  </Button>
+                )}
+                {lead?.stage === StudentStage.DOCUMENT_COLLECTION && (
+                  <Button variant="primary" size="sm" onClick={() => setActiveTab('documents')}>
+                    👉 Upload Required Documents
+                  </Button>
+                )}
+                {lead?.stage === StudentStage.OFFER_MANAGEMENT && (
+                  <Button variant="primary" size="sm" onClick={() => setActiveTab('offers')}>
+                    👉 Review & Sign Offer Letter
+                  </Button>
+                )}
+                {lead?.stage === StudentStage.FEE_PAYMENT && (
+                  <Button variant="primary" size="sm" onClick={() => setActiveTab('payments')}>
+                    👉 Submit Fee Receipt Proof
+                  </Button>
+                )}
+                {lead?.stage === StudentStage.VISA_PROCESSING && (
+                  <Button variant="primary" size="sm" onClick={() => setActiveTab('visa_travel')}>
+                    👉 View Visa & Travel Status
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '12px' }}>Pending Documents & Actions</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {documents.filter((d) => d.status === DocumentStatus.REQUESTED).length === 0 ? (
+                  <div style={{ color: 'var(--success)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={16} /> All requested documents are currently uploaded!
+                  </div>
+                ) : (
+                  documents
+                    .filter((d) => d.status === DocumentStatus.REQUESTED)
+                    .map((d) => (
+                      <div
+                        key={d._id}
+                        style={{
+                          padding: '10px 14px',
+                          backgroundColor: 'var(--bg-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                         }}
                       >
-                        Upload
-                      </Button>
-                    </div>
-                  ))
-              )}
+                        <div>
+                          <strong>{d.title}</strong>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.category}</div>
+                        </div>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedDoc(d);
+                            setIsUploadDocOpen(true);
+                          }}
+                        >
+                          Upload
+                        </Button>
+                      </div>
+                    ))
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Pending Tasks Section / Card */}
+          <PendingTasksCard tasks={tasks} loading={loading} />
         </div>
       )}
 
