@@ -229,9 +229,6 @@ export const StudentPortalPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 12-Stage Student Journey Progress Stepper */}
-      <StageStepper currentStage={lead?.stage || StudentStage.PROFILE_EVALUATION} />
-
       {/* Portal Tabs */}
       <div className="tabs-header">
         <button className={`tab-btn ${activeTab === 'journey' ? 'active' : ''}`} onClick={() => setActiveTab('journey')}>

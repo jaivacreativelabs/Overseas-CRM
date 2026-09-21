@@ -14,8 +14,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { NAVIGATION_SECTIONS } from '../routes/NavigationConfig';
 import { apiClient } from '../services/api-client';
-import { NotificationItem, UserRole } from '../types';
+import { NotificationItem, UserRole, Lead, StudentStage } from '../types';
 import { UserGuideModal } from '../components/UserGuide';
+import { VerticalStageStepper } from '../components/StageStepper';
 
 export const AppLayout: React.FC = () => {
   const { user, logout, isStaff, isStudent } = useAuth();
@@ -26,6 +27,7 @@ export const AppLayout: React.FC = () => {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [studentStage, setStudentStage] = useState<StudentStage>(StudentStage.PROFILE_EVALUATION);
 
   // If student is logged in, redirect them to student portal if accessing admin panel
   useEffect(() => {
@@ -33,6 +35,21 @@ export const AppLayout: React.FC = () => {
       navigate('/portal');
     }
   }, [isStudent, location.pathname, navigate]);
+
+  // Fetch student application stage if user is student
+  useEffect(() => {
+    const fetchStudentStage = async () => {
+      try {
+        const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
+        if (res.data?.[0]?.stage) {
+          setStudentStage(res.data[0].stage);
+        }
+      } catch (err) {
+        // silent fail
+      }
+    };
+    if (isStudent) fetchStudentStage();
+  }, [isStudent]);
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -160,7 +177,7 @@ export const AppLayout: React.FC = () => {
           )}
         </div>
 
-        {/* Grouped Navigation List */}
+        {/* Grouped Navigation List or Student Progress Timeline */}
         <nav
           style={{
             flex: 1,
@@ -171,61 +188,65 @@ export const AppLayout: React.FC = () => {
             gap: '8px',
           }}
         >
-          {allowedSections.map((section, sIdx) => (
-            <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {!sidebarCollapsed ? (
-                <div
-                  style={{
-                    fontSize: '10.5px',
-                    fontWeight: 700,
-                    color: 'var(--text-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.07em',
-                    padding: sIdx === 0 ? '4px 10px 3px' : '8px 10px 3px',
-                  }}
-                >
-                  {section.title}
-                </div>
-              ) : (
-                sIdx > 0 && (
+          {isStudent ? (
+            <VerticalStageStepper currentStage={studentStage} sidebarCollapsed={sidebarCollapsed} />
+          ) : (
+            allowedSections.map((section, sIdx) => (
+              <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {!sidebarCollapsed ? (
                   <div
                     style={{
-                      height: '1px',
-                      backgroundColor: 'var(--border-light)',
-                      margin: '6px 8px',
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      color: 'var(--text-muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.07em',
+                      padding: sIdx === 0 ? '4px 10px 3px' : '8px 10px 3px',
                     }}
-                  />
-                )
-              )}
-
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    style={({ isActive }) => ({
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: sidebarCollapsed ? '9px 0' : '8px 12px',
-                      justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                      borderRadius: 'var(--radius-md)',
-                      color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                      backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
-                      fontWeight: isActive ? 600 : 500,
-                      fontSize: '13px',
-                      transition: 'all 0.15s ease',
-                    })}
-                    title={sidebarCollapsed ? `${section.title}: ${item.label}` : undefined}
                   >
-                    <Icon size={17} strokeWidth={2} />
-                    {!sidebarCollapsed && <span>{item.label}</span>}
-                  </NavLink>
-                );
-              })}
-            </div>
-          ))}
+                    {section.title}
+                  </div>
+                ) : (
+                  sIdx > 0 && (
+                    <div
+                      style={{
+                        height: '1px',
+                        backgroundColor: 'var(--border-light)',
+                        margin: '6px 8px',
+                      }}
+                    />
+                  )
+                )}
+
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      style={({ isActive }) => ({
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: sidebarCollapsed ? '9px 0' : '8px 12px',
+                        justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                        borderRadius: 'var(--radius-md)',
+                        color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+                        backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
+                        fontWeight: isActive ? 600 : 500,
+                        fontSize: '13px',
+                        transition: 'all 0.15s ease',
+                      })}
+                      title={sidebarCollapsed ? `${section.title}: ${item.label}` : undefined}
+                    >
+                      <Icon size={17} strokeWidth={2} />
+                      {!sidebarCollapsed && <span>{item.label}</span>}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            ))
+          )}
         </nav>
 
         {/* Bottom Section: Help & Logout */}
