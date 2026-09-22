@@ -2,18 +2,19 @@ import React from 'react';
 import { Check, Lock } from 'lucide-react';
 import { StudentStage } from '../../types';
 
-interface StageStepperProps {
+export interface StageStepperProps {
   currentStage: StudentStage;
+  activeStage?: StudentStage;
   onStageClick?: (stage: StudentStage) => void;
 }
 
 export const STAGES_CONFIG: { stage: StudentStage; label: string; lockReason?: string }[] = [
   { stage: StudentStage.LEAD_CAPTURED, label: '1. Lead Captured' },
   { stage: StudentStage.PRELIMINARY_COUNSELLING, label: '2. Counselling' },
-  { stage: StudentStage.PROFILE_EVALUATION, label: '3. Profile Eval', lockReason: 'Requires completed preliminary counselling' },
+  { stage: StudentStage.PROFILE_EVALUATION, label: '3. Profile Evaluation', lockReason: 'Requires completed preliminary counselling' },
   { stage: StudentStage.UNIVERSITY_SHORTLISTING, label: '4. Universities', lockReason: 'Requires completed profile evaluation' },
   { stage: StudentStage.DOCUMENT_COLLECTION, label: '5. Documents', lockReason: 'Requires 1 selected university' },
-  { stage: StudentStage.APPLICATION_SUBMISSION, label: '6. Application', lockReason: 'Requires all mandatory documents approved' },
+  { stage: StudentStage.APPLICATION_SUBMISSION, label: '6. Applications', lockReason: 'Requires all mandatory documents approved' },
   { stage: StudentStage.OFFER_MANAGEMENT, label: '7. Offer Letter', lockReason: 'Requires submitted application and university decision' },
   { stage: StudentStage.FEE_PAYMENT, label: '8. Fee Payment', lockReason: 'Requires signed offer acceptance' },
   { stage: StudentStage.VISA_PROCESSING, label: '9. Visa Filing', lockReason: 'Requires verified fee deposit' },
@@ -22,7 +23,7 @@ export const STAGES_CONFIG: { stage: StudentStage; label: string; lockReason?: s
   { stage: StudentStage.ARRIVAL_CONFIRMED, label: '12. Arrival', lockReason: 'Requires departure confirmation' },
 ];
 
-export const StageStepper: React.FC<StageStepperProps> = ({ currentStage, onStageClick }) => {
+export const StageStepper: React.FC<StageStepperProps> = ({ currentStage, activeStage, onStageClick }) => {
   const currentIndex = STAGES_CONFIG.findIndex((s) => s.stage === currentStage);
 
   return (
@@ -40,24 +41,24 @@ export const StageStepper: React.FC<StageStepperProps> = ({ currentStage, onStag
           const isCompleted = index < currentIndex;
           const isCurrent = index === currentIndex;
           const isLocked = index > currentIndex;
+          const isSelected = activeStage ? item.stage === activeStage : false;
 
           return (
             <React.Fragment key={item.stage}>
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => onStageClick && onStageClick(item.stage)}
-                title={isLocked ? `Locked: ${item.lockReason}` : item.label}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onStageClick && onStageClick(item.stage);
+                  }
+                }}
+                title={isLocked ? `Stage: ${item.label.replace(/^\d+\.\s*/, '')} (Click to view details - ${item.lockReason})` : `Stage: ${item.label.replace(/^\d+\.\s*/, '')} (Click to view)`}
+                className={`crm-stage-step ${isCurrent ? 'is-current' : ''} ${isSelected && !isCurrent ? 'is-selected' : ''}`}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 10px',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: isCurrent ? 'var(--primary-light)' : 'transparent',
-                  border: isCurrent ? '1px solid rgba(0, 87, 248, 0.3)' : '1px solid transparent',
-                  cursor: isCompleted || isCurrent ? 'pointer' : 'not-allowed',
-                  opacity: isLocked ? 0.6 : 1,
-                  transition: 'all 0.15s ease',
-                  flexShrink: 0,
+                  opacity: isLocked ? 0.75 : 1,
                 }}
               >
                 <div
@@ -70,8 +71,14 @@ export const StageStepper: React.FC<StageStepperProps> = ({ currentStage, onStag
                 <span
                   style={{
                     fontSize: '12px',
-                    fontWeight: isCurrent ? 600 : 500,
-                    color: isCurrent ? 'var(--primary)' : isCompleted ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontWeight: isCurrent || isSelected ? 600 : 500,
+                    color: isCurrent
+                      ? 'var(--primary)'
+                      : isCompleted
+                      ? 'var(--text-primary)'
+                      : isSelected
+                      ? 'var(--primary)'
+                      : 'var(--text-muted)',
                   }}
                 >
                   {item.label.replace(/^\d+\.\s*/, '')}

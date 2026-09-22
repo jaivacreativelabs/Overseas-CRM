@@ -2,16 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
-  PhoneCall,
-  Calendar,
-  CheckCircle,
-  XCircle,
-  RotateCcw,
-  MoreVertical,
-  Filter,
   Eye,
-  Trash2,
-  Archive,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -20,7 +11,7 @@ import { Lead, LeadSource, LeadStatus, StudentStage, User } from '../../types';
 import { Table, Pagination, SearchInput } from '../../components/Table';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
-import { Drawer, Modal, ConfirmDialog } from '../../components/Modal';
+import { Drawer } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
 
 export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly = false }) => {
@@ -39,11 +30,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
 
   // Drawers & Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
-  const [isCounsellingModalOpen, setIsCounsellingModalOpen] = useState(false);
-  const [isClosedLostModalOpen, setIsClosedLostModalOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Form states
@@ -60,30 +46,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     counsellorId: '',
     notes: '',
   });
-
-  const [contactForm, setContactForm] = useState<{
-    method: 'PHONE' | 'WHATSAPP' | 'EMAIL' | 'IN_PERSON';
-    outcome: 'CONNECTED' | 'NO_ANSWER' | 'BUSY' | 'SWITCHED_OFF' | 'CALLBACK_REQUESTED' | 'INVALID_NUMBER' | 'WRONG_NUMBER';
-    notes: string;
-    callbackDate: string;
-    callbackTime: string;
-  }>({
-    method: 'PHONE',
-    outcome: 'CONNECTED',
-    notes: '',
-    callbackDate: '',
-    callbackTime: '',
-  });
-
-  const [counsellingForm, setCounsellingForm] = useState({
-    scheduledDate: '',
-    scheduledTime: '',
-    googleMeetLink: '',
-    notes: '',
-    counsellorId: '',
-  });
-
-  const [closedLostReason, setClosedLostReason] = useState('Budget Constraints / Financial Limitations');
 
   const { success, error } = useToast();
   const { isAdmin, user } = useAuth();
@@ -148,89 +110,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
       fetchLeads();
     } catch (err: any) {
       error(err.message || 'Failed to create lead');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRecordContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedLead) return;
-    setActionLoading(true);
-    try {
-      await apiClient.post(`/leads/${selectedLead._id}/contact-attempts`, contactForm);
-      success('Contact attempt recorded.');
-      setIsContactModalOpen(false);
-      fetchLeads();
-    } catch (err: any) {
-      error(err.message || 'Failed to record contact attempt');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleScheduleCounselling = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedLead) return;
-    setActionLoading(true);
-    try {
-      await apiClient.post(`/leads/${selectedLead._id}/counselling`, counsellingForm);
-      success('Preliminary counselling scheduled.');
-      setIsCounsellingModalOpen(false);
-      fetchLeads();
-    } catch (err: any) {
-      error(err.message || 'Failed to schedule counselling');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleConvertToInterested = async (lead: Lead) => {
-    try {
-      await apiClient.post(`/leads/${lead._id}/convert-interested`);
-      success(`Converted ${lead.name} to Student! Student Portal account provisioned.`);
-      fetchLeads();
-    } catch (err: any) {
-      error(err.message || 'Conversion failed. Please ensure counselling session took place.');
-    }
-  };
-
-  const handleMarkClosedLost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedLead) return;
-    setActionLoading(true);
-    try {
-      await apiClient.post(`/leads/${selectedLead._id}/closed-lost`, { reason: closedLostReason });
-      success('Lead marked as Closed Lost.');
-      setIsClosedLostModalOpen(false);
-      fetchLeads();
-    } catch (err: any) {
-      error(err.message || 'Failed to update lead');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleReopen = async (lead: Lead) => {
-    try {
-      await apiClient.post(`/leads/${lead._id}/reopen`);
-      success('Closed Lost lead reopened successfully.');
-      fetchLeads();
-    } catch (err: any) {
-      error(err.message || 'Failed to reopen lead');
-    }
-  };
-
-  const handleDeleteLead = async () => {
-    if (!selectedLead) return;
-    setActionLoading(true);
-    try {
-      await apiClient.delete(`/leads/${selectedLead._id}`);
-      success('Lead permanently deleted.');
-      setIsDeleteConfirmOpen(false);
-      fetchLeads();
-    } catch (err: any) {
-      error(err.message || 'Failed to delete lead');
     } finally {
       setActionLoading(false);
     }
@@ -314,7 +193,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
           {
             header: 'STUDENT NAME',
             render: (l) => (
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div
                   style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
                   onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
@@ -322,10 +201,10 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                   {l.name}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.email}</div>
+                {l.phone && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.phone}</div>}
               </div>
             ),
           },
-          { header: 'PHONE', accessor: 'phone' },
           {
             header: 'TARGET COUNTRY / COURSE',
             render: (l) => (
@@ -334,10 +213,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{l.targetCourse || 'Undecided'}</div>
               </div>
             ),
-          },
-          {
-            header: 'SOURCE',
-            render: (l) => <Badge variant="neutral">{l.source.replace(/_/g, ' ')}</Badge>,
           },
           {
             header: 'STATUS',
@@ -351,92 +226,18 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             header: 'ACTIONS',
             align: 'right',
             render: (l) => (
-              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  title="View Student 360 Detail"
+                  icon={<Eye size={14} />}
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`);
                   }}
-                  icon={<Eye size={14} />}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Record Contact Attempt"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedLead(l);
-                    setIsContactModalOpen(true);
-                  }}
-                  icon={<PhoneCall size={14} />}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Schedule Preliminary Counselling"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedLead(l);
-                    setCounsellingForm((prev) => ({
-                      ...prev,
-                      counsellorId: l.counsellorId?._id || user?._id || '',
-                    }));
-                    setIsCounsellingModalOpen(true);
-                  }}
-                  icon={<Calendar size={14} />}
-                />
-                {l.status !== LeadStatus.INTERESTED && l.status !== LeadStatus.CLOSED_LOST && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Mark Interested (Converts to Student)"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleConvertToInterested(l);
-                    }}
-                    icon={<CheckCircle size={14} color="var(--success)" />}
-                  />
-                )}
-                {l.status !== LeadStatus.CLOSED_LOST ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Mark Closed Lost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedLead(l);
-                      setIsClosedLostModalOpen(true);
-                    }}
-                    icon={<XCircle size={14} color="var(--danger)" />}
-                  />
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Reopen Closed Lost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleReopen(l);
-                    }}
-                    icon={<RotateCcw size={14} color="var(--primary)" />}
-                  />
-                )}
-                {isAdmin && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    title="Delete Lead"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedLead(l);
-                      setIsDeleteConfirmOpen(true);
-                    }}
-                    icon={<Trash2 size={14} color="var(--danger)" />}
-                  />
-                )}
+                >
+                  View Lead
+                </Button>
               </div>
             ),
           },
@@ -545,175 +346,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
           />
         </form>
       </Drawer>
-
-      {/* --- Record Contact Attempt Modal --- */}
-      <Modal
-        isOpen={isContactModalOpen}
-        onClose={() => setIsContactModalOpen(false)}
-        title={`Record Contact Attempt: ${selectedLead?.name}`}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsContactModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleRecordContact} loading={actionLoading}>
-              Save Attempt (Immutable)
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleRecordContact}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <Select
-              label="Contact Method"
-              value={contactForm.method}
-              onChange={(e) => setContactForm({ ...contactForm, method: e.target.value as any })}
-              options={[
-                { value: 'PHONE', label: 'Phone Call' },
-                { value: 'WHATSAPP', label: 'WhatsApp' },
-                { value: 'EMAIL', label: 'Email' },
-                { value: 'IN_PERSON', label: 'In-Person Branch Meeting' },
-              ]}
-            />
-            <Select
-              label="Call / Meeting Outcome"
-              value={contactForm.outcome}
-              onChange={(e) => setContactForm({ ...contactForm, outcome: e.target.value as any })}
-              options={[
-                { value: 'CONNECTED', label: 'Connected / Spoke with Student' },
-                { value: 'CALLBACK_REQUESTED', label: 'Call Back Requested (Auto Task)' },
-                { value: 'NO_ANSWER', label: 'No Answer / Ringing' },
-                { value: 'BUSY', label: 'Line Busy' },
-                { value: 'SWITCHED_OFF', label: 'Switched Off' },
-                { value: 'INVALID_NUMBER', label: 'Invalid / Disconnected Number' },
-              ]}
-            />
-          </div>
-
-          {contactForm.outcome === 'CALLBACK_REQUESTED' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
-              <Input
-                label="Callback Date *"
-                type="date"
-                value={contactForm.callbackDate}
-                onChange={(e) => setContactForm({ ...contactForm, callbackDate: e.target.value })}
-                required
-              />
-              <Input
-                label="Callback Time"
-                type="time"
-                value={contactForm.callbackTime}
-                onChange={(e) => setContactForm({ ...contactForm, callbackTime: e.target.value })}
-              />
-            </div>
-          )}
-
-          <Textarea
-            label="Call Notes & Discussion Details"
-            value={contactForm.notes}
-            onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
-            placeholder="Summary of student response..."
-          />
-        </form>
-      </Modal>
-
-      {/* --- Schedule Counselling Modal --- */}
-      <Modal
-        isOpen={isCounsellingModalOpen}
-        onClose={() => setIsCounsellingModalOpen(false)}
-        title={`Schedule Preliminary Counselling: ${selectedLead?.name}`}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsCounsellingModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleScheduleCounselling} loading={actionLoading}>
-              Schedule Session
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleScheduleCounselling}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <Input
-              label="Session Date *"
-              type="date"
-              value={counsellingForm.scheduledDate}
-              onChange={(e) => setCounsellingForm({ ...counsellingForm, scheduledDate: e.target.value })}
-              required
-            />
-            <Input
-              label="Session Time *"
-              type="time"
-              value={counsellingForm.scheduledTime}
-              onChange={(e) => setCounsellingForm({ ...counsellingForm, scheduledTime: e.target.value })}
-              required
-            />
-          </div>
-
-          <Input
-            label="Google Meet / Video Conference Link"
-            value={counsellingForm.googleMeetLink}
-            onChange={(e) => setCounsellingForm({ ...counsellingForm, googleMeetLink: e.target.value })}
-            placeholder="https://meet.google.com/..."
-          />
-
-          <Textarea
-            label="Agenda / Notes"
-            value={counsellingForm.notes}
-            onChange={(e) => setCounsellingForm({ ...counsellingForm, notes: e.target.value })}
-            placeholder="Topics to cover during the 1-on-1 preliminary session..."
-          />
-        </form>
-      </Modal>
-
-      {/* --- Closed Lost Modal --- */}
-      <Modal
-        isOpen={isClosedLostModalOpen}
-        onClose={() => setIsClosedLostModalOpen(false)}
-        title={`Mark Closed Lost: ${selectedLead?.name}`}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsClosedLostModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleMarkClosedLost} loading={actionLoading}>
-              Mark Closed Lost
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleMarkClosedLost}>
-          <Select
-            label="Reason for Closed Lost *"
-            value={closedLostReason}
-            onChange={(e) => setClosedLostReason(e.target.value)}
-            options={[
-              { value: 'Budget Constraints / Financial Limitations', label: 'Budget Constraints / Financial Limitations' },
-              { value: 'Chose Competitor Agency', label: 'Chose Competitor Agency' },
-              { value: 'Postponed / Decided Not to Study Abroad', label: 'Postponed / Decided Not to Study Abroad' },
-              { value: 'Visa Ineligible / Low Test Scores', label: 'Visa Ineligible / Low Test Scores' },
-              { value: 'Unresponsive After Multiple Follow-ups', label: 'Unresponsive After Multiple Follow-ups' },
-              { value: 'Personal / Family Emergency', label: 'Personal / Family Emergency' },
-            ]}
-          />
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
-            Note: You can reopen this record at any time to restore the previous stage and status.
-          </div>
-        </form>
-      </Modal>
-
-      {/* --- Delete Confirmation Dialog --- */}
-      <ConfirmDialog
-        isOpen={isDeleteConfirmOpen}
-        onClose={() => setIsDeleteConfirmOpen(false)}
-        onConfirm={handleDeleteLead}
-        title="Permanently Delete Lead"
-        message={`Are you sure you want to permanently delete ${selectedLead?.name}? This action is irreversible and recorded in the audit log.`}
-        isDanger
-        confirmText="Delete Permanently"
-        loading={actionLoading}
-      />
     </div>
   );
 };
