@@ -101,3 +101,5 @@ export const StageStepper: React.FC<StageStepperProps> = ({ currentStage, active
     </div>
   );
 };
+
+export { VerticalStageStepper } from './VerticalStageStepper';
