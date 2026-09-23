@@ -65,7 +65,7 @@ export const OffersPage: React.FC = () => {
             render: (o) => (
               <div
                 style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
-                onClick={() => navigate(`/leads/${o.leadId}`)}
+                onClick={() => navigate(`/students/${o.leadId}`)}
               >
                 {o.studentName}
               </div>

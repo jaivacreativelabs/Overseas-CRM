@@ -77,7 +77,7 @@ export const DocumentsPage: React.FC = () => {
             render: (d) => (
               <div
                 style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
-                onClick={() => navigate(`/leads/${d.leadId}`)}
+                onClick={() => navigate(`/students/${d.leadId}`)}
               >
                 {d.studentName}
               </div>
