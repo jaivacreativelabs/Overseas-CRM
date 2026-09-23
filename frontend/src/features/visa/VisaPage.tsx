@@ -69,7 +69,7 @@ export const VisaPage: React.FC = () => {
             render: (v) => (
               <div
                 style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
-                onClick={() => navigate(`/students/${v.leadId}`)}
+                onClick={() => navigate(`/leads/${v.leadId}`)}
               >
                 {v.studentName}
               </div>

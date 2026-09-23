@@ -22,7 +22,7 @@ export const AppLayout: React.FC = () => {
   const { user, logout, isStaff, isStudent } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -79,70 +79,10 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
-      <style>{`
-        @media (max-width: 768px) {
-          .app-sidebar-panel {
-            width: 100vw !important;
-            max-width: 100vw !important;
-            height: 100vh !important;
-          }
-        }
-
-        .app-notification-popover {
-          position: absolute;
-          top: 44px;
-          right: 0;
-          width: 330px;
-          max-width: calc(100vw - 24px);
-          background-color: #FFFFFF;
-          border: 1px solid var(--border-color);
-          border-radius: var(--radius-lg);
-          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
-          z-index: 1100;
-          overflow: hidden;
-        }
-
-        @media (max-width: 640px) {
-          .app-notification-popover {
-            position: fixed !important;
-            top: 62px !important;
-            left: 12px !important;
-            right: 12px !important;
-            width: auto !important;
-            max-width: none !important;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22) !important;
-          }
-
-          .app-user-profile-info {
-            display: none !important;
-          }
-        }
-      `}</style>
-
-      {/* Backdrop overlay when left panel is open */}
-      {!sidebarCollapsed && (
-        <div
-          onClick={() => setSidebarCollapsed(true)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.45)',
-            backdropFilter: 'blur(3px)',
-            zIndex: 999,
-            transition: 'opacity 0.2s ease',
-          }}
-        />
-      )}
-
-      {/* --- Full-Screen / Off-Canvas Left Sidebar Panel --- */}
+      {/* --- Fixed Left Sidebar --- */}
       <aside
-        className="app-sidebar-panel"
         style={{
-          width: '260px',
-          maxWidth: '100vw',
+          width: sidebarCollapsed ? '68px' : '250px',
           backgroundColor: '#FFFFFF',
           borderRight: '1px solid var(--border-color)',
           display: 'flex',
@@ -151,245 +91,29 @@ export const AppLayout: React.FC = () => {
           top: 0,
           bottom: 0,
           left: 0,
-          zIndex: 1000,
-          transform: sidebarCollapsed ? 'translateX(-100%)' : 'translateX(0)',
-          transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: sidebarCollapsed ? 'none' : '4px 0 24px rgba(0, 0, 0, 0.18)',
+          zIndex: 100,
+          transition: 'width 0.2s ease',
         }}
       >
-        {/* Brand Logo & Top Close Bar */}
+        {/* Brand Logo & Title */}
         <div
           style={{
             height: '56px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 16px',
+            justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+            padding: sidebarCollapsed ? '0' : '0 14px',
             borderBottom: '1px solid var(--border-color)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
-            <img
-              src="/logo.png"
-              alt="IIEC Logo"
-              style={{
-                height: '32px',
-                maxWidth: '135px',
-                objectFit: 'contain',
-                display: 'block',
-              }}
-            />
-            <span
-              style={{
-                fontSize: '10px',
-                fontWeight: 700,
-                color: '#D8232A',
-                backgroundColor: '#FEF2F2',
-                border: '1px solid #FECACA',
-                padding: '2px 5px',
-                borderRadius: '4px',
-                letterSpacing: '0.04em',
-              }}
-            >
-              CRM
-            </span>
-          </div>
-
-          <button
-            onClick={() => setSidebarCollapsed(true)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              cursor: 'pointer',
-              padding: '6px',
-              borderRadius: 'var(--radius-md)',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-            title="Close Panel"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Grouped Navigation List or Student Progress Timeline */}
-        <nav
-          style={{
-            flex: 1,
-            padding: '12px 10px',
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}
-        >
-          {isStudent ? (
-            <VerticalStageStepper currentStage={studentStage} sidebarCollapsed={false} />
-          ) : (
-            allowedSections.map((section, sIdx) => (
-              <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div
-                  style={{
-                    fontSize: '10.5px',
-                    fontWeight: 700,
-                    color: 'var(--text-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.07em',
-                    padding: sIdx === 0 ? '4px 10px 3px' : '8px 10px 3px',
-                  }}
-                >
-                  {section.title}
-                </div>
-
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setSidebarCollapsed(true)}
-                      style={({ isActive }) => ({
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '9px 12px',
-                        justifyContent: 'flex-start',
-                        borderRadius: 'var(--radius-md)',
-                        color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                        backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
-                        fontWeight: isActive ? 600 : 500,
-                        fontSize: '13.5px',
-                        transition: 'all 0.15s ease',
-                      })}
-                    >
-                      <Icon size={18} strokeWidth={2} />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  );
-                })}
-              </div>
-            ))
-          )}
-        </nav>
-
-        {/* Bottom Section: Help & Logout */}
-        <div
-          style={{
-            padding: '12px 10px',
-            borderTop: '1px solid var(--border-color)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
-          }}
-        >
-          {!isStudent && (
-            <button
-              onClick={() => {
-                setIsGuideOpen(true);
-                setSidebarCollapsed(true);
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '9px 12px',
-                justifyContent: 'flex-start',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--text-secondary)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '13.5px',
-                width: '100%',
-                textAlign: 'left',
-              }}
-            >
-              <HelpCircle size={18} />
-              <span>User Guide & FAQs</span>
-            </button>
-          )}
-          <button
-            onClick={() => {
-              logout();
-              navigate('/login');
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '9px 12px',
-              justifyContent: 'flex-start',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--danger)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '13.5px',
-              width: '100%',
-              textAlign: 'left',
-            }}
-          >
-            <LogOut size={18} />
-            <span>Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* --- Main Content Area --- */}
-      <div
-        style={{
-          flex: 1,
-          marginLeft: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          minWidth: 0,
-          width: '100%',
-        }}
-      >
-        {/* Top Header */}
-        <header
-          style={{
-            height: '56px',
-            backgroundColor: '#FFFFFF',
-            borderBottom: '1px solid var(--border-color)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 16px',
-            position: 'sticky',
-            top: 0,
-            zIndex: 90,
-          }}
-        >
-          {/* Left Header Actions: 3-Bars Hamburger Button & Title */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                padding: '7px 9px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-primary)',
-                transition: 'background-color 0.15s ease',
-              }}
-              title={sidebarCollapsed ? 'Open Left Panel' : 'Close Left Panel'}
-            >
-              <Menu size={20} />
-            </button>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          {!sidebarCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, overflow: 'hidden' }}>
               <img
                 src="/logo.png"
                 alt="IIEC Logo"
                 style={{
-                  height: '30px',
-                  maxWidth: '130px',
+                  height: '32px',
+                  maxWidth: '135px',
                   objectFit: 'contain',
                   display: 'block',
                 }}
@@ -409,6 +133,213 @@ export const AppLayout: React.FC = () => {
                 CRM
               </span>
             </div>
+          ) : (
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              onClick={() => setSidebarCollapsed(false)}
+              title="Expand Sidebar"
+            >
+              <img
+                src="/logo.png"
+                alt="IIEC"
+                style={{
+                  height: '22px',
+                  maxWidth: '32px',
+                  objectFit: 'contain',
+                }}
+              />
+            </div>
+          )}
+          {!sidebarCollapsed && (
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title="Collapse Sidebar"
+            >
+              <Menu size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Grouped Navigation List or Student Progress Timeline */}
+        <nav
+          style={{
+            flex: 1,
+            padding: '10px 8px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          {isStudent ? (
+            <VerticalStageStepper currentStage={studentStage} sidebarCollapsed={sidebarCollapsed} />
+          ) : (
+            allowedSections.map((section, sIdx) => (
+              <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {!sidebarCollapsed ? (
+                  <div
+                    style={{
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      color: 'var(--text-muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.07em',
+                      padding: sIdx === 0 ? '4px 10px 3px' : '8px 10px 3px',
+                    }}
+                  >
+                    {section.title}
+                  </div>
+                ) : (
+                  sIdx > 0 && (
+                    <div
+                      style={{
+                        height: '1px',
+                        backgroundColor: 'var(--border-light)',
+                        margin: '6px 8px',
+                      }}
+                    />
+                  )
+                )}
+
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      style={({ isActive }) => ({
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: sidebarCollapsed ? '9px 0' : '8px 12px',
+                        justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                        borderRadius: 'var(--radius-md)',
+                        color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
+                        backgroundColor: isActive ? 'var(--primary-light)' : 'transparent',
+                        fontWeight: isActive ? 600 : 500,
+                        fontSize: '13px',
+                        transition: 'all 0.15s ease',
+                      })}
+                      title={sidebarCollapsed ? `${section.title}: ${item.label}` : undefined}
+                    >
+                      <Icon size={17} strokeWidth={2} />
+                      {!sidebarCollapsed && <span>{item.label}</span>}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </nav>
+
+        {/* Bottom Section: Help & Logout */}
+        <div
+          style={{
+            padding: '12px 8px',
+            borderTop: '1px solid var(--border-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+          }}
+        >
+          {!isStudent && (
+            <button
+              onClick={() => setIsGuideOpen(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: sidebarCollapsed ? '10px 0' : '9px 12px',
+                justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--text-secondary)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '13px',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              <HelpCircle size={18} />
+              {!sidebarCollapsed && <span>User Guide & FAQs</span>}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: sidebarCollapsed ? '10px 0' : '9px 12px',
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--danger)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13px',
+              width: '100%',
+              textAlign: 'left',
+            }}
+          >
+            <LogOut size={18} />
+            {!sidebarCollapsed && <span>Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* --- Main Content Area --- */}
+      <div
+        style={{
+          flex: 1,
+          marginLeft: sidebarCollapsed ? '68px' : '250px',
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+          transition: 'margin-left 0.2s ease',
+        }}
+      >
+        {/* Top Header */}
+        <header
+          style={{
+            height: '56px',
+            backgroundColor: '#FFFFFF',
+            borderBottom: '1px solid var(--border-color)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 24px',
+            position: 'sticky',
+            top: 0,
+            zIndex: 90,
+          }}
+        >
+          {/* Breadcrumb / Section context */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              IIEC Consultancy Operations
+            </span>
           </div>
 
           {/* Right Header Actions */}
@@ -456,91 +387,70 @@ export const AppLayout: React.FC = () => {
 
               {/* Notification Popover */}
               {showNotifications && (
-                <>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '42px',
+                    right: 0,
+                    width: '320px',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-lg)',
+                    boxShadow: 'var(--shadow-lg)',
+                    zIndex: 200,
+                    overflow: 'hidden',
+                  }}
+                >
                   <div
-                    onClick={() => setShowNotifications(false)}
                     style={{
-                      position: 'fixed',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      zIndex: 1050,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      borderBottom: '1px solid var(--border-color)',
                     }}
-                  />
-                  <div className="app-notification-popover">
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 14px',
-                        borderBottom: '1px solid var(--border-color)',
-                        backgroundColor: 'var(--bg-subtle, #F9FAFB)',
-                      }}
-                    >
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        Notifications ({notifications.length})
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {unreadCount > 0 && (
-                          <button
-                            onClick={handleMarkAllRead}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--primary)',
-                              fontSize: '11px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Mark all read
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setShowNotifications(false)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--text-muted)',
-                            cursor: 'pointer',
-                            padding: '2px',
-                            display: 'flex',
-                            alignItems: 'center',
-                          }}
-                          title="Close Notifications"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    </div>
-                    <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                      {notifications.length === 0 ? (
-                        <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12.5px' }}>
-                          No notifications yet
-                        </div>
-                      ) : (
-                        notifications.map((notif) => (
-                          <div
-                            key={notif._id}
-                            style={{
-                              padding: '12px 14px',
-                              borderBottom: '1px solid var(--border-light)',
-                              backgroundColor: notif.isRead ? '#FFFFFF' : 'var(--primary-light, #F0F7FF)',
-                              transition: 'background-color 0.15s ease',
-                            }}
-                          >
-                            <div style={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--text-primary)', marginBottom: '3px', lineHeight: 1.3 }}>
-                              {notif.title}
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{notif.message}</div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                  >
+                    <span style={{ fontSize: '13px', fontWeight: 600 }}>Notifications</span>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--primary)',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Mark all as read
+                      </button>
+                    )}
                   </div>
-                </>
+                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif._id}
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: '1px solid var(--border-light)',
+                            backgroundColor: notif.isRead ? '#FFFFFF' : 'var(--bg-subtle)',
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)', marginBottom: '2px' }}>
+                            {notif.title}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{notif.message}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -562,7 +472,7 @@ export const AppLayout: React.FC = () => {
               >
                 {user?.name?.charAt(0) || 'U'}
               </div>
-              <div className="app-user-profile-info">
+              <div>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>
                   {user?.name}
                 </div>
