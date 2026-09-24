@@ -13,25 +13,31 @@ try {
 let isConnected = false;
 
 export const connectDatabase = async (): Promise<void> => {
+  if (mongoose.connection.readyState === 1) {
+    isConnected = true;
+    return;
+  }
+
   if (isConnected) {
     return;
   }
 
   try {
     mongoose.set('strictQuery', true);
-    logger.info(`Attempting database connection to: ${env.MONGODB_URI}`);
+    const maskedUri = env.MONGODB_URI ? env.MONGODB_URI.replace(/:([^:@]+)@/, ':****@') : 'undefined';
+    logger.info(`Attempting database connection to: ${maskedUri}`);
     
-    // Set a 5-second serverSelectionTimeoutMS so if local/remote MongoDB is unreachable, it fails quickly to memory fallback in dev
+    // Set a 7-second serverSelectionTimeoutMS
     await mongoose.connect(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 7000,
     });
 
     isConnected = true;
     logger.info('MongoDB Atlas / Database connection successfully established.');
   } catch (error: any) {
-    logger.warn(`Primary database connection failed (${error.message}). Attempting in-memory database fallback for local dev...`);
+    logger.warn(`Primary database connection failed (${error.message}).`);
     
-    if (env.NODE_ENV !== 'production') {
+    if (env.NODE_ENV !== 'production' && !process.env.VERCEL) {
       try {
         const { MongoMemoryServer } = await import('mongodb-memory-server');
         const mongod = await MongoMemoryServer.create();
@@ -45,7 +51,7 @@ export const connectDatabase = async (): Promise<void> => {
         throw error;
       }
     } else {
-      logger.error('Database connection failed in production mode:', error.message);
+      logger.error('Database connection failed in production / cloud mode:', error.message);
       throw error;
     }
   }

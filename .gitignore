@@ -82,3 +82,6 @@ build/
 # Uploads directory
 backend/uploads/
 uploads/
+
+# Vercel
+.vercel
