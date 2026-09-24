@@ -18,10 +18,6 @@
   "directories": {
     "doc": "docs"
   },
-  "workspaces": [
-    "backend",
-    "frontend"
-  ],
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm --prefix backend run dev",
@@ -33,9 +29,6 @@
     "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install"
   },
   "devDependencies": {
-    "@types/node": "^20.14.10",
-    "@vercel/node": "^3.2.14",
-    "concurrently": "^8.2.2",
-    "typescript": "^5.5.3"
+    "concurrently": "^8.2.2"
   }
 }
