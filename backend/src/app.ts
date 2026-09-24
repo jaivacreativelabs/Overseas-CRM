@@ -66,31 +66,26 @@ export const createApp = (): Express => {
     });
   });
 
-  // Mount API Feature Routes (supporting both /api/v1 and /v1 prefixes for Vercel Serverless)
-  const mountRoutes = (prefix: string) => {
-    app.use(`${prefix}/auth`, authRoutes);
-    app.use(`${prefix}/users`, userRoutes);
-    app.use(`${prefix}/leads`, leadRoutes);
-    app.use(`${prefix}/profile-evaluations`, profileRoutes);
-    app.use(`${prefix}/universities`, universityRoutes);
-    app.use(`${prefix}/documents`, documentRoutes);
-    app.use(`${prefix}/applications`, applicationRoutes);
-    app.use(`${prefix}/offers`, offerRoutes);
-    app.use(`${prefix}/payments`, paymentRoutes);
-    app.use(`${prefix}/visa`, visaRoutes);
-    app.use(`${prefix}/travel`, travelRoutes);
-    app.use(`${prefix}/orientation`, orientationRoutes);
-    app.use(`${prefix}/tasks`, taskRoutes);
-    app.use(`${prefix}/messages`, messageRoutes);
-    app.use(`${prefix}/notifications`, notificationRoutes);
-    app.use(`${prefix}/masters`, masterRoutes);
-    app.use(`${prefix}/reports`, reportRoutes);
-    app.use(`${prefix}/audit-logs`, auditRoutes);
-    app.use(`${prefix}/activities`, activityRoutes);
-  };
-
-  mountRoutes('/api/v1');
-  mountRoutes('/v1');
+  // Mount API v1 Feature Routes
+  app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1/users', userRoutes);
+  app.use('/api/v1/leads', leadRoutes);
+  app.use('/api/v1/profile-evaluations', profileRoutes);
+  app.use('/api/v1/universities', universityRoutes);
+  app.use('/api/v1/documents', documentRoutes);
+  app.use('/api/v1/applications', applicationRoutes);
+  app.use('/api/v1/offers', offerRoutes);
+  app.use('/api/v1/payments', paymentRoutes);
+  app.use('/api/v1/visa', visaRoutes);
+  app.use('/api/v1/travel', travelRoutes);
+  app.use('/api/v1/orientation', orientationRoutes);
+  app.use('/api/v1/tasks', taskRoutes);
+  app.use('/api/v1/messages', messageRoutes);
+  app.use('/api/v1/notifications', notificationRoutes);
+  app.use('/api/v1/masters', masterRoutes);
+  app.use('/api/v1/reports', reportRoutes);
+  app.use('/api/v1/audit-logs', auditRoutes);
+  app.use('/api/v1/activities', activityRoutes);
 
   // 404 Route handler
   app.use((req: Request, res: Response) => {
