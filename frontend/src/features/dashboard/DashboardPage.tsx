@@ -153,8 +153,13 @@ export const DashboardPage: React.FC = () => {
             <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>ACTIVE STUDENTS</span>
             <GraduationCap size={18} color="var(--success)" />
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {kpis.activeStudents || 0}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {kpis.activeStudents || 0}
+            </div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--success)' }}>
+              {kpis.totalLeads > 0 ? Math.round(((kpis.activeStudents || 0) / kpis.totalLeads) * 100) : 0}%
+            </div>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
             Interested & Processing
@@ -214,7 +219,12 @@ export const DashboardPage: React.FC = () => {
                   <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
                     {fs.stage.replace(/_/g, ' ')}
                   </span>
-                  <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{fs.count}</span>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{fs.count}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '11px', minWidth: '28px', textAlign: 'right' }}>
+                      ({kpis.totalLeads > 0 ? Math.round((fs.count / kpis.totalLeads) * 100) : 0}%)
+                    </span>
+                  </div>
                 </div>
                 <div
                   style={{
