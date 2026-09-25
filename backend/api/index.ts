@@ -15,6 +15,14 @@ const ensureConnected = async () => {
 };
 
 export default async function handler(req: any, res: any) {
+  // Respond to CORS preflight immediately without waiting for database
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+    return res.status(204).end();
+  }
+
   try {
     await ensureConnected();
   } catch (error) {
