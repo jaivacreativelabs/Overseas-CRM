@@ -1,9 +1,8 @@
-import { createApp } from '../backend/src/app';
-import { connectDatabase } from '../backend/src/config/database';
-import { seedDatabase } from '../backend/src/database/seeders/seed';
+const { createApp } = require('./backend/dist/app');
+const { connectDatabase } = require('./backend/dist/config/database');
+const { seedDatabase } = require('./backend/dist/database/seeders/seed');
 
 const app = createApp();
-
 let isInitialized = false;
 
 const ensureConnected = async () => {
@@ -14,7 +13,7 @@ const ensureConnected = async () => {
   }
 };
 
-export default async function handler(req: any, res: any) {
+module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
@@ -25,8 +24,8 @@ export default async function handler(req: any, res: any) {
   try {
     await ensureConnected();
   } catch (error) {
-    console.error('Database connection failed in serverless function:', error);
+    console.error('Database connection failed in serverless function:', error.message);
   }
   return app(req, res);
-}
+};
 
