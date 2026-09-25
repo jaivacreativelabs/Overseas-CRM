@@ -22,12 +22,46 @@ export const AppLayout: React.FC = () => {
   const { user, logout, isStaff, isStudent } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const getInitialSidebarState = (): boolean => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return true; // Auto-collapsed on mobile
+    }
+    const saved = localStorage.getItem('sidebar_collapsed');
+    return saved !== null ? saved === 'true' : false; // Default EXPANDED (false) on desktop/laptop
+  };
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(getInitialSidebarState);
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [studentStage, setStudentStage] = useState<StudentStage>(StudentStage.PROFILE_EVALUATION);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (window.innerWidth >= 768) {
+        localStorage.setItem('sidebar_collapsed', String(next));
+      }
+      return next;
+    });
+  };
+
+  const handleNavClick = () => {
+    if (window.innerWidth < 768) {
+      setSidebarCollapsed(true);
+    }
+  };
 
   // If student is logged in, redirect them to student portal if accessing admin panel
   useEffect(() => {
@@ -88,6 +122,12 @@ export const AppLayout: React.FC = () => {
           }
         }
 
+        @media (min-width: 769px) {
+          .app-sidebar-backdrop {
+            display: none !important;
+          }
+        }
+
         .app-notification-popover {
           position: absolute;
           top: 44px;
@@ -119,9 +159,10 @@ export const AppLayout: React.FC = () => {
         }
       `}</style>
 
-      {/* Backdrop overlay when left panel is open */}
-      {!sidebarCollapsed && (
+      {/* Backdrop overlay when left panel is open on mobile */}
+      {!sidebarCollapsed && isMobile && (
         <div
+          className="app-sidebar-backdrop"
           onClick={() => setSidebarCollapsed(true)}
           style={{
             position: 'fixed',
@@ -137,7 +178,7 @@ export const AppLayout: React.FC = () => {
         />
       )}
 
-      {/* --- Full-Screen / Off-Canvas Left Sidebar Panel --- */}
+      {/* --- Left Sidebar Panel --- */}
       <aside
         className="app-sidebar-panel"
         style={{
@@ -154,7 +195,7 @@ export const AppLayout: React.FC = () => {
           zIndex: 1000,
           transform: sidebarCollapsed ? 'translateX(-100%)' : 'translateX(0)',
           transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: sidebarCollapsed ? 'none' : '4px 0 24px rgba(0, 0, 0, 0.18)',
+          boxShadow: isMobile ? (sidebarCollapsed ? 'none' : '4px 0 24px rgba(0, 0, 0, 0.18)') : 'none',
         }}
       >
         {/* Brand Logo & Top Close Bar */}
@@ -196,7 +237,7 @@ export const AppLayout: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setSidebarCollapsed(true)}
+            onClick={toggleSidebar}
             style={{
               background: 'none',
               border: 'none',
@@ -248,7 +289,7 @@ export const AppLayout: React.FC = () => {
                     <NavLink
                       key={item.path}
                       to={item.path}
-                      onClick={() => setSidebarCollapsed(true)}
+                      onClick={handleNavClick}
                       style={({ isActive }) => ({
                         display: 'flex',
                         alignItems: 'center',
@@ -287,7 +328,7 @@ export const AppLayout: React.FC = () => {
             <button
               onClick={() => {
                 setIsGuideOpen(true);
-                setSidebarCollapsed(true);
+                handleNavClick();
               }}
               style={{
                 display: 'flex',
@@ -340,7 +381,8 @@ export const AppLayout: React.FC = () => {
       <div
         style={{
           flex: 1,
-          marginLeft: 0,
+          marginLeft: isMobile ? 0 : (sidebarCollapsed ? 0 : '260px'),
+          transition: 'margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           display: 'flex',
           flexDirection: 'column',
           minWidth: 0,
@@ -365,7 +407,7 @@ export const AppLayout: React.FC = () => {
           {/* Left Header Actions: 3-Bars Hamburger Button & Title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={toggleSidebar}
               style={{
                 background: 'none',
                 border: '1px solid var(--border-color)',
