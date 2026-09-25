@@ -3,11 +3,13 @@ import dns from 'dns';
 import { env } from './env';
 import { logger } from '../utils/logger';
 
-// Ensure standard public DNS servers are used for resolving MongoDB SRV records on Windows
-try {
-  dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
-} catch {
-  // Ignore if custom DNS cannot be set
+// Ensure standard public DNS servers are used for resolving MongoDB SRV records on Windows local development
+if (process.platform === 'win32' && env.NODE_ENV !== 'production') {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+  } catch {
+    // Ignore if custom DNS cannot be set
+  }
 }
 
 let isConnected = false;
