@@ -6,7 +6,6 @@ import morgan from 'morgan';
 import path from 'path';
 
 import { errorHandler } from './middleware/error.middleware';
-import { uploadDir } from './middleware/upload.middleware';
 import { ApiResponse } from './utils/api-response';
 
 // Feature Route Modules
@@ -47,11 +46,9 @@ export const createApp = (): Express => {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan('dev'));
 
-  // Static uploads directory
-  try {
-    app.use('/uploads', express.static(uploadDir));
-  } catch {
-    // Graceful fallback for serverless
+  // Static uploads directory — only serve locally (Vercel serverless filesystem is read-only)
+  if (process.env.NODE_ENV !== 'production') {
+    app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
   }
 
   // Health check
