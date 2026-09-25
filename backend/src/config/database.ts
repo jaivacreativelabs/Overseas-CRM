@@ -13,7 +13,8 @@ try {
 let isConnected = false;
 
 export const connectDatabase = async (): Promise<void> => {
-  if (isConnected) {
+  if (isConnected || mongoose.connection.readyState === 1) {
+    isConnected = true;
     return;
   }
 
