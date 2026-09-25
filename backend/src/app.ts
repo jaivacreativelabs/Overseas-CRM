@@ -33,7 +33,7 @@ export const createApp = (): Express => {
   const app = express();
 
   // Security & standard middleware
-  app.use(helmet({ crossOriginResourcePolicy: false }));
+  app.use(helmet({ crossOriginResourcePolicy: false, hidePoweredBy: false }));
   const corsOptions = {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
