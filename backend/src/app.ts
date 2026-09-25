@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import path from 'path';
 
 import { errorHandler } from './middleware/error.middleware';
+import { uploadDir } from './middleware/upload.middleware';
 import { ApiResponse } from './utils/api-response';
 
 // Feature Route Modules
@@ -47,7 +48,11 @@ export const createApp = (): Express => {
   app.use(morgan('dev'));
 
   // Static uploads directory
-  app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+  try {
+    app.use('/uploads', express.static(uploadDir));
+  } catch {
+    // Graceful fallback for serverless
+  }
 
   // Health check
   app.get('/health', (req: Request, res: Response) => {
