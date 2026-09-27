@@ -347,10 +347,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ),
           },
           {
-            header: 'SOURCE',
-            render: (l) => <Badge variant="neutral">{l.source.replace(/_/g, ' ')}</Badge>,
-          },
-          {
             header: 'STATUS',
             render: (l) => <StatusBadge status={l.status} />,
           },

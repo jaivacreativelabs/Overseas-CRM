@@ -20,6 +20,8 @@ import {
   Lock,
   ExternalLink,
   Upload,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -86,7 +88,21 @@ export const LeadDetailPage: React.FC = () => {
   const [docReviewStatus, setDocReviewStatus] = useState<DocumentStatus.APPROVED | DocumentStatus.REJECTED>(DocumentStatus.APPROVED);
   const [docRejectionReason, setDocRejectionReason] = useState('');
 
+  // Rich University & Course Detail Modal
+  const [isUnivDetailsOpen, setIsUnivDetailsOpen] = useState(false);
+  const [selectedUnivItem, setSelectedUnivItem] = useState<Shortlist | null>(null);
+
+  // Application Status Modal
+  const [isAppStatusModalOpen, setIsAppStatusModalOpen] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [appStatusForm, setAppStatusForm] = useState({
+    status: ApplicationStatus.UNDER_REVIEW,
+    rejectionReason: '',
+    notes: '',
+  });
+
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [offerFile, setOfferFile] = useState<File | null>(null);
   const [offerForm, setOfferForm] = useState({
     applicationId: '',
     offerType: 'CONDITIONAL' as const,
@@ -202,7 +218,29 @@ export const LeadDetailPage: React.FC = () => {
     }
   };
 
-  // Create offer
+  // Update application status
+  const handleUpdateAppStatus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedApp) return;
+    if (appStatusForm.status === ApplicationStatus.REJECTED && !appStatusForm.rejectionReason.trim()) {
+      error('Please provide a reason for rejecting the application.');
+      return;
+    }
+    try {
+      await apiClient.put(`/applications/${selectedApp._id}/status`, {
+        status: appStatusForm.status,
+        rejectionReason: appStatusForm.status === ApplicationStatus.REJECTED ? appStatusForm.rejectionReason : undefined,
+        notes: appStatusForm.notes,
+      });
+      success(`Application status updated to ${appStatusForm.status}. History permanently recorded.`);
+      setIsAppStatusModalOpen(false);
+      fetchLeadDetails();
+    } catch (err: any) {
+      error(err.message || 'Failed to update application status');
+    }
+  };
+
+  // Create & upload original offer letter
   const handleCreateOffer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || !offerForm.applicationId) {
@@ -210,9 +248,23 @@ export const LeadDetailPage: React.FC = () => {
       return;
     }
     try {
-      await apiClient.post(`/offers/lead/${id}/original`, offerForm);
+      if (offerFile) {
+        const formData = new FormData();
+        formData.append('file', offerFile);
+        formData.append('applicationId', offerForm.applicationId);
+        formData.append('offerType', offerForm.offerType);
+        formData.append('tuitionFee', offerForm.tuitionFee.toString());
+        formData.append('depositAmount', offerForm.depositAmount.toString());
+        formData.append('currency', offerForm.currency);
+        if (offerForm.conditions) formData.append('conditions', offerForm.conditions);
+
+        await apiClient.post(`/offers/lead/${id}/original`, formData);
+      } else {
+        await apiClient.post(`/offers/lead/${id}/original`, offerForm);
+      }
       success('Offer letter uploaded & issued to student.');
       setIsOfferModalOpen(false);
+      setOfferFile(null);
       fetchLeadDetails();
     } catch (err: any) {
       error(err.message || 'Failed to upload offer');
@@ -227,6 +279,18 @@ export const LeadDetailPage: React.FC = () => {
       fetchLeadDetails();
     } catch (err: any) {
       error(err.message || 'Failed to review offer');
+    }
+  };
+
+  const handleUploadSignedOffer = async (offerId: string, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await apiClient.post(`/offers/${offerId}/signed`, formData);
+      success('Signed Offer Letter uploaded successfully!');
+      fetchLeadDetails();
+    } catch (err: any) {
+      error(err.message || 'Failed to upload signed offer letter');
     }
   };
 
@@ -303,6 +367,14 @@ export const LeadDetailPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FileText size={14} />}
+            onClick={() => window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
+          >
+            Download All Details
+          </Button>
           {lead.status !== LeadStatus.INTERESTED && (
             <Button
               variant="primary"
@@ -528,10 +600,12 @@ export const LeadDetailPage: React.FC = () => {
       {activeTab === 'universities' && (
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">Curated University Shortlist</h3>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Student selects 1 approved choice to unlock document submission.
-            </span>
+            <div>
+              <h3 className="card-title">Curated University Shortlist</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Click "View Full Details" to inspect complete entry criteria, fees, deadlines, scholarships, and accommodation.
+              </p>
+            </div>
           </div>
 
           <Table
@@ -542,7 +616,7 @@ export const LeadDetailPage: React.FC = () => {
               { header: 'INTAKE', accessor: 'intake' },
               {
                 header: 'ANNUAL FEE',
-                render: (s) => (s.annualFee ? `${s.currency || '$'} ${s.annualFee}` : '—'),
+                render: (s) => (s.annualFee ? `${s.currency || '$'} ${s.annualFee.toLocaleString()}` : '—'),
               },
               {
                 header: 'VISIBILITY',
@@ -555,6 +629,24 @@ export const LeadDetailPage: React.FC = () => {
               {
                 header: 'STATUS',
                 render: (s) => <StatusBadge status={s.status} />,
+              },
+              {
+                header: 'ACTIONS',
+                align: 'right',
+                render: (s) => (
+                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUnivItem(s);
+                        setIsUnivDetailsOpen(true);
+                      }}
+                    >
+                      View Full Details
+                    </Button>
+                  </div>
+                ),
               },
             ]}
             data={shortlist}
@@ -634,60 +726,104 @@ export const LeadDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 5: Applications */}
+      {/* Tab 5: Applications & Application History */}
       {activeTab === 'applications' && (
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">University Applications</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Rule: Exactly 1 active application permitted at a time.
-              </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <h3 className="card-title">Active University Application</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Current active pipeline stage. Exactly 1 active application permitted at a time.
+                </p>
+              </div>
             </div>
+
+            <Table
+              columns={[
+                { header: 'UNIVERSITY', accessor: 'universityName' },
+                { header: 'COURSE', accessor: 'courseTitle' },
+                { header: 'APP NUMBER', accessor: 'applicationNumber' },
+                {
+                  header: 'SUBMITTED DATE',
+                  render: (a) => new Date(a.submissionDate).toLocaleDateString(),
+                },
+                {
+                  header: 'STATUS',
+                  render: (a) => <StatusBadge status={a.status} />,
+                },
+                {
+                  header: 'ACTIONS',
+                  align: 'right',
+                  render: (a) =>
+                    isStaff && (
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedApp(a);
+                          setAppStatusForm({
+                            status: a.status,
+                            rejectionReason: a.rejectionReason || '',
+                            notes: a.notes || '',
+                          });
+                          setIsAppStatusModalOpen(true);
+                        }}
+                      >
+                        Update Application Status
+                      </Button>
+                    ),
+                },
+              ]}
+              data={applications.filter((a) => a.status !== ApplicationStatus.REJECTED)}
+              emptyMessage="No active application in progress."
+            />
           </div>
 
-          <Table
-            columns={[
-              { header: 'UNIVERSITY', accessor: 'universityName' },
-              { header: 'COURSE', accessor: 'courseTitle' },
-              { header: 'APP NUMBER', accessor: 'applicationNumber' },
-              {
-                header: 'SUBMITTED DATE',
-                render: (a) => new Date(a.submissionDate).toLocaleDateString(),
-              },
-              {
-                header: 'STATUS',
-                render: (a) => <StatusBadge status={a.status} />,
-              },
-              {
-                header: 'ACTIONS',
-                align: 'right',
-                render: (a) =>
-                  isStaff &&
-                  a.status !== ApplicationStatus.OFFER_RECEIVED && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          await apiClient.put(`/applications/${a._id}/status`, {
-                            status: ApplicationStatus.OFFER_RECEIVED,
-                          });
-                          success('Application marked as Offer Received!');
-                          fetchLeadDetails();
-                        } catch (err: any) {
-                          error(err.message);
-                        }
-                      }}
-                    >
-                      Mark Offer Received
-                    </Button>
-                  ),
-              },
-            ]}
-            data={applications}
-            emptyMessage="No applications submitted yet."
-          />
+          {/* Application History Table */}
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <h3 className="card-title">Permanent Application History</h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Full permanent audit log of all current and previous applications (including rejected applications).
+                </p>
+              </div>
+            </div>
+
+            <Table
+              columns={[
+                { header: 'UNIVERSITY', accessor: 'universityName' },
+                { header: 'COURSE', accessor: 'courseTitle' },
+                { header: 'APP NUMBER', accessor: 'applicationNumber' },
+                {
+                  header: 'SUBMITTED DATE',
+                  render: (a) => new Date(a.submissionDate).toLocaleDateString(),
+                },
+                {
+                  header: 'DECISION DATE',
+                  render: (a) => (a.decisionDate ? new Date(a.decisionDate).toLocaleDateString() : 'Pending'),
+                },
+                {
+                  header: 'STATUS',
+                  render: (a) => <StatusBadge status={a.status} />,
+                },
+                {
+                  header: 'REJECTION REASON / REMARKS',
+                  render: (a) =>
+                    a.status === ApplicationStatus.REJECTED ? (
+                      <span style={{ color: 'var(--danger)', fontWeight: 600, fontSize: '12px' }}>
+                        ❌ {a.rejectionReason}
+                      </span>
+                    ) : (
+                      a.notes || '—'
+                    ),
+                },
+              ]}
+              data={applications}
+              emptyMessage="No application history recorded yet."
+            />
+          </div>
         </div>
       )}
 
@@ -723,20 +859,134 @@ export const LeadDetailPage: React.FC = () => {
               {
                 header: 'ORIGINAL OFFER',
                 render: (o) => (
-                  <a href={o.originalOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
-                    {o.originalOfferFileName}
-                  </a>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500 }}>{o.originalOfferFileName || 'Original Offer'}</span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <a
+                        href={o.originalOfferUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--primary)',
+                          textDecoration: 'none',
+                          fontWeight: 500,
+                        }}
+                      >
+                        <Eye size={12} /> View
+                      </a>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Download size={12} />}
+                        onClick={() => window.open(`http://localhost:5000/api/v1/offers/${o._id}/download/original`, '_blank')}
+                      >
+                        Download
+                      </Button>
+                    </div>
+                  </div>
                 ),
               },
               {
                 header: 'SIGNED OFFER',
                 render: (o) =>
                   o.signedOfferUrl ? (
-                    <a href={o.signedOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--success)' }}>
-                      {o.signedOfferFileName || 'Signed Offer'}
-                    </a>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle2 size={14} /> Signed Offer Letter
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        {o.signedOfferFileName || 'signed_offer.pdf'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <a
+                          href={o.signedOfferUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--success)',
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            backgroundColor: 'var(--bg-subtle)',
+                          }}
+                        >
+                          <Eye size={12} /> View
+                        </a>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Download size={12} />}
+                          onClick={() => window.open(`http://localhost:5000/api/v1/offers/${o._id}/download/signed`, '_blank')}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Uploaded: {o.signedUploadedAt ? new Date(o.signedUploadedAt).toLocaleString() : new Date(o.createdAt).toLocaleString()}
+                      </div>
+                      <input
+                        type="file"
+                        id={`upload-signed-lead-${o._id}`}
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) handleUploadSignedOffer(o._id, e.target.files[0]);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--primary)',
+                          fontSize: '11px',
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          padding: 0,
+                          marginTop: '2px',
+                        }}
+                        onClick={() => document.getElementById(`upload-signed-lead-${o._id}`)?.click()}
+                      >
+                        Re-upload Signed Offer
+                      </button>
+                    </div>
                   ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Pending Signature</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic', fontWeight: 500 }}>
+                        Signed Offer Letter Not Available
+                      </span>
+                      <input
+                        type="file"
+                        id={`upload-signed-lead-${o._id}`}
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) handleUploadSignedOffer(o._id, e.target.files[0]);
+                        }}
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Upload size={12} />}
+                        onClick={() => document.getElementById(`upload-signed-lead-${o._id}`)?.click()}
+                      >
+                        Upload Signed Offer Letter
+                      </Button>
+                    </div>
                   ),
               },
               {
@@ -1116,23 +1366,177 @@ export const LeadDetailPage: React.FC = () => {
         </form>
       </Modal>
 
+      {/* --- University & Course Complete Specifications Modal --- */}
+      <Modal
+        isOpen={isUnivDetailsOpen}
+        onClose={() => setIsUnivDetailsOpen(false)}
+        title={`Complete University & Course Specifications: ${selectedUnivItem?.universityName}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsUnivDetailsOpen(false)}>
+              Close
+            </Button>
+            {selectedUnivItem && selectedUnivItem.status !== 'SELECTED_BY_STUDENT' && (
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  try {
+                    await apiClient.post(`/universities/shortlists/${id}/select/${selectedUnivItem._id}`);
+                    success(`Selected ${selectedUnivItem.courseTitle} at ${selectedUnivItem.universityName}!`);
+                    setIsUnivDetailsOpen(false);
+                    fetchLeadDetails();
+                  } catch (err: any) {
+                    error(err.message || 'Selection failed');
+                  }
+                }}
+              >
+                Confirm University Selection
+              </Button>
+            )}
+          </>
+        }
+      >
+        {selectedUnivItem && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
+            {/* University Profile */}
+            <div style={{ padding: '16px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary)' }}>{selectedUnivItem.universityName}</h4>
+                <Badge variant="primary">{selectedUnivItem.country}</Badge>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px', marginTop: '10px' }}>
+                <div><span style={{ color: 'var(--text-muted)' }}>Location / City:</span> <strong>{(selectedUnivItem.universityId as any)?.city || selectedUnivItem.country}</strong></div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Official Website:</span>{' '}
+                  {(selectedUnivItem.universityId as any)?.website ? (
+                    <a href={(selectedUnivItem.universityId as any).website} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                      {(selectedUnivItem.universityId as any).website} <ExternalLink size={12} />
+                    </a>
+                  ) : (
+                    'N/A'
+                  )}
+                </div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Global Ranking:</span> <strong>#{(selectedUnivItem.universityId as any)?.ranking || 'Top 100 Global'}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Shortlist Status:</span> <StatusBadge status={selectedUnivItem.status} /></div>
+              </div>
+            </div>
+
+            {/* Course & Academic Specifications */}
+            <div style={{ padding: '16px', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
+                Program: {selectedUnivItem.courseTitle}
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '13px', marginBottom: '14px' }}>
+                <div><span style={{ color: 'var(--text-muted)' }}>Intake:</span> <strong>{selectedUnivItem.intake}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Duration:</span> <strong>{(selectedUnivItem.courseId as any)?.durationMonths || 12} Months</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Tuition Fee:</span> <strong>{selectedUnivItem.currency || '$'} {selectedUnivItem.annualFee?.toLocaleString() || 'N/A'} / Year</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Application Fee:</span> <strong>{(selectedUnivItem.courseId as any)?.applicationFee ? `${selectedUnivItem.currency || '$'} ${(selectedUnivItem.courseId as any).applicationFee}` : 'Waived / Free'}</strong></div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Academic & GPA Requirements:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.academicRequirements || (selectedUnivItem.courseId as any)?.eligibilityRequirements || 'Minimum 60% or 3.0 GPA in relevant Bachelor’s degree from a recognized institution.'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>English Proficiency Requirements:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.englishRequirements || 'IELTS Overall 6.5 (Minimum 6.0 in all bands) / PTE 58 Academic / TOEFL iBT 88.'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Application Deadlines:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.deadlines || 'Fall Intake: July 15 • Spring Intake: November 30 (Early submission recommended for visa processing).'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Scholarships & Financial Aid:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.scholarshipInfo || (selectedUnivItem.universityId as any)?.scholarshipInfo || 'International Merit Scholarships up to £3,000 / $5,000 available based on academic transcript evaluation.'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Accommodation & Living Info:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.accommodationInfo || (selectedUnivItem.universityId as any)?.accommodationInfo || 'Guaranteed on-campus university hall residence for 1st year international students + private off-campus student flats.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* --- Update Application Status Modal --- */}
+      <Modal
+        isOpen={isAppStatusModalOpen}
+        onClose={() => setIsAppStatusModalOpen(false)}
+        title={`Update Application Status: ${selectedApp?.universityName}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsAppStatusModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleUpdateAppStatus}>
+              Save Status Update
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleUpdateAppStatus}>
+          <Select
+            label="Application Status *"
+            value={appStatusForm.status}
+            onChange={(e) => setAppStatusForm({ ...appStatusForm, status: e.target.value as ApplicationStatus })}
+            options={[
+              { value: ApplicationStatus.SUBMITTED, label: 'Application Submitted' },
+              { value: ApplicationStatus.UNDER_REVIEW, label: 'Under Review by Admissions' },
+              { value: ApplicationStatus.OFFER_RECEIVED, label: 'Offer Received (Unlocks Offer Upload)' },
+              { value: ApplicationStatus.REJECTED, label: 'Rejected (Retained Permanently in History)' },
+            ]}
+          />
+          {appStatusForm.status === ApplicationStatus.REJECTED && (
+            <Textarea
+              label="Mandatory Rejection Reason *"
+              value={appStatusForm.rejectionReason}
+              onChange={(e) => setAppStatusForm({ ...appStatusForm, rejectionReason: e.target.value })}
+              placeholder="Provide official rejection reason from university admissions..."
+              required
+            />
+          )}
+          <Textarea
+            label="Additional Notes / Portal Info"
+            value={appStatusForm.notes}
+            onChange={(e) => setAppStatusForm({ ...appStatusForm, notes: e.target.value })}
+            placeholder="Portal application reference, username, or notes..."
+          />
+        </form>
+      </Modal>
+
       {/* --- Upload Offer Modal --- */}
       <Modal
         isOpen={isOfferModalOpen}
         onClose={() => setIsOfferModalOpen(false)}
-        title="Upload University Offer Letter"
+        title="Upload Official University Offer Letter"
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsOfferModalOpen(false)}>
               Cancel
             </Button>
             <Button variant="primary" onClick={handleCreateOffer}>
-              Issue Offer
+              Upload & Issue Offer
             </Button>
           </>
         }
       >
-        <form onSubmit={handleCreateOffer}>
+        <form onSubmit={handleCreateOffer} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <Select
             label="Related Application *"
             value={offerForm.applicationId}
@@ -1140,6 +1544,27 @@ export const LeadDetailPage: React.FC = () => {
             options={applications.map((a) => ({ value: a._id, label: `${a.courseTitle} — ${a.universityName}` }))}
             placeholder="Select application..."
           />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Attach Offer Letter File (PDF / DOCX) *
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx"
+              onChange={(e) => setOfferFile(e.target.files?.[0] || null)}
+              style={{
+                padding: '8px',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-subtle)',
+              }}
+            />
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Attach the official original offer PDF received from the university.
+            </span>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Select
               label="Offer Type"
@@ -1157,18 +1582,106 @@ export const LeadDetailPage: React.FC = () => {
               onChange={(e) => setOfferForm({ ...offerForm, tuitionFee: parseFloat(e.target.value) })}
             />
           </div>
+
           <Input
             label="Required Deposit Amount"
             type="number"
             value={offerForm.depositAmount}
             onChange={(e) => setOfferForm({ ...offerForm, depositAmount: parseFloat(e.target.value) })}
           />
+
           <Textarea
-            label="Conditions / Notes"
+            label="Conditions / Requirements Notes"
             value={offerForm.conditions}
             onChange={(e) => setOfferForm({ ...offerForm, conditions: e.target.value })}
-            placeholder="e.g. Submit final degree certificate and passport scan..."
+            placeholder="e.g. Submit final semester marksheets and official IELTS score..."
           />
+        </form>
+      </Modal>
+
+      {/* --- Request Document Modal --- */}
+      <Modal
+        isOpen={isDocModalOpen}
+        onClose={() => setIsDocModalOpen(false)}
+        title="Request Document from Student"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsDocModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleRequestDoc}>
+              Send Request
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleRequestDoc}>
+          <Input
+            label="Document Title *"
+            value={docTitle}
+            onChange={(e) => setDocTitle(e.target.value)}
+            placeholder="e.g. Passport Copy, Degree Transcripts, IELTS Scorecard"
+            required
+          />
+          <Select
+            label="Category"
+            value={docCategory}
+            onChange={(e) => setDocCategory(e.target.value as any)}
+            options={[
+              { value: 'ACADEMIC', label: 'Academic Certificates' },
+              { value: 'IDENTITY', label: 'Identity / Passport' },
+              { value: 'FINANCIAL', label: 'Financial Statements / Affidavit' },
+              { value: 'LANGUAGE_TEST', label: 'Language Proficiency Test' },
+              { value: 'EXPERIENCE', label: 'Work Experience Letter' },
+              { value: 'OTHER', label: 'Other Document' },
+            ]}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', marginTop: '10px' }}>
+            <input
+              type="checkbox"
+              checked={docMandatory}
+              onChange={(e) => setDocMandatory(e.target.checked)}
+            />
+            Mandatory for stage progression
+          </label>
+        </form>
+      </Modal>
+
+      {/* --- Review Document Modal --- */}
+      <Modal
+        isOpen={isReviewDocOpen}
+        onClose={() => setIsReviewDocOpen(false)}
+        title={`Review Document: ${selectedDoc?.title}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsReviewDocOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleReviewDoc}>
+              Submit Review
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleReviewDoc}>
+          <Select
+            label="Decision *"
+            value={docReviewStatus}
+            onChange={(e) => setDocReviewStatus(e.target.value as any)}
+            options={[
+              { value: DocumentStatus.APPROVED, label: 'Approve Document' },
+              { value: DocumentStatus.REJECTED, label: 'Reject Document (Requires Reason)' },
+            ]}
+          />
+          {docReviewStatus === DocumentStatus.REJECTED && (
+            <Textarea
+              label="Rejection Reason *"
+              value={docRejectionReason}
+              onChange={(e) => setDocRejectionReason(e.target.value)}
+              placeholder="Explain what is missing or incorrect in the uploaded file..."
+              required
+            />
+          )}
         </form>
       </Modal>
 

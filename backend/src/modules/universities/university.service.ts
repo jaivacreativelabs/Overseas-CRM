@@ -80,7 +80,11 @@ export class UniversityService {
     if (isStudentView) {
       filter.isVisibleToStudent = true;
     }
-    return ShortlistModel.find(filter).sort({ createdAt: -1 }).lean();
+    return ShortlistModel.find(filter)
+      .populate('universityId')
+      .populate('courseId')
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   static async addToShortlist(

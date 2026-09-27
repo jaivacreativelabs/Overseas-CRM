@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import path from 'path';
+import fs from 'fs';
 
 import { errorHandler } from './middleware/error.middleware';
 import { ApiResponse } from './utils/api-response';
@@ -86,6 +87,18 @@ export const createApp = (): Express => {
   app.use('/api/v1/reports', reportRoutes);
   app.use('/api/v1/audit-logs', auditRoutes);
   app.use('/api/v1/activities', activityRoutes);
+
+  // Serve static frontend build (merged single-port application)
+  const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    app.get('*', (req: Request, res: Response, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
+        return next();
+      }
+      res.sendFile(path.resolve(frontendDist, 'index.html'));
+    });
+  }
 
   // 404 Route handler
   app.use((req: Request, res: Response) => {

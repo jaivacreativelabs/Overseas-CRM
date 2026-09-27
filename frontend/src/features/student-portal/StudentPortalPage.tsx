@@ -8,6 +8,8 @@ import {
   Plane,
   MessageSquare,
   Upload,
+  Download,
+  Eye,
   CheckCircle2,
   ExternalLink,
   Send,
@@ -23,6 +25,7 @@ import {
   StudentStage,
   DocumentItem,
   Shortlist,
+  Application,
   Offer,
   Payment,
   VisaRecord,
@@ -49,12 +52,17 @@ export const StudentPortalPage: React.FC = () => {
 
   const [shortlists, setShortlists] = useState<Shortlist[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [visa, setVisa] = useState<VisaRecord | null>(null);
   const [travel, setTravel] = useState<TravelSupport | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+
+  // Rich University Detail Modal
+  const [isUnivDetailsOpen, setIsUnivDetailsOpen] = useState(false);
+  const [selectedUnivItem, setSelectedUnivItem] = useState<Shortlist | null>(null);
 
   // Modals for student upload actions
   const [isUploadDocOpen, setIsUploadDocOpen] = useState(false);
@@ -64,6 +72,7 @@ export const StudentPortalPage: React.FC = () => {
   const [isSignOfferOpen, setIsSignOfferOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [signedOfferUrl, setSignedOfferUrl] = useState('');
+  const [signedOfferFile, setSignedOfferFile] = useState<File | null>(null);
 
   const [isSubmitPaymentOpen, setIsSubmitPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
@@ -78,9 +87,10 @@ export const StudentPortalPage: React.FC = () => {
       const currentLead = res.data?.[0];
       if (currentLead) {
         setLead(currentLead);
-        const [shortRes, docRes, offRes, payRes, visRes, travRes, msgRes] = await Promise.all([
+        const [shortRes, docRes, appRes, offRes, payRes, visRes, travRes, msgRes] = await Promise.all([
           apiClient.get<Shortlist[]>(`/universities/shortlists/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<DocumentItem[]>(`/documents/lead/${currentLead._id}`).catch(() => ({ data: [] })),
+          apiClient.get<Application[]>(`/applications/lead/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<Offer[]>(`/offers/lead/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<Payment[]>(`/payments/lead/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<VisaRecord>(`/visa/lead/${currentLead._id}`).catch(() => ({ data: null })),
@@ -90,6 +100,7 @@ export const StudentPortalPage: React.FC = () => {
 
         setShortlists(shortRes.data || []);
         setDocuments(docRes.data || []);
+        setApplications(appRes.data || []);
         setOffers(offRes.data || []);
         setPayments(payRes.data || []);
         setVisa(visRes.data);
@@ -141,12 +152,19 @@ export const StudentPortalPage: React.FC = () => {
     e.preventDefault();
     if (!selectedOffer) return;
     try {
-      await apiClient.post(`/offers/${selectedOffer._id}/signed`, {
-        signedOfferUrl,
-        signedOfferFileName: 'Signed_Acceptance_Copy.pdf',
-      });
+      if (signedOfferFile) {
+        const formData = new FormData();
+        formData.append('file', signedOfferFile);
+        await apiClient.post(`/offers/${selectedOffer._id}/signed`, formData);
+      } else {
+        await apiClient.post(`/offers/${selectedOffer._id}/signed`, {
+          signedOfferUrl,
+          signedOfferFileName: 'Signed_Acceptance_Copy.pdf',
+        });
+      }
       success('Signed offer uploaded! Awaiting counsellor acceptance.');
       setIsSignOfferOpen(false);
+      setSignedOfferFile(null);
       fetchStudentData();
     } catch (err: any) {
       error(err.message || 'Upload failed');
@@ -220,11 +238,21 @@ export const StudentPortalPage: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-          <User size={18} color="var(--primary)" />
-          <div style={{ fontSize: '12px' }}>
-            <div style={{ fontWeight: 600 }}>Assigned Counsellor</div>
-            <div style={{ color: 'var(--text-muted)' }}>{lead?.counsellorId?.name || 'Sarah Jenkins'}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<FileText size={14} />}
+            onClick={() => lead && window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
+          >
+            Download Summary Dossier
+          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
+            <User size={18} color="var(--primary)" />
+            <div style={{ fontSize: '12px' }}>
+              <div style={{ fontWeight: 600 }}>Assigned Counsellor</div>
+              <div style={{ color: 'var(--text-muted)' }}>{lead?.counsellorId?.name || 'Sarah Jenkins'}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -361,7 +389,15 @@ export const StudentPortalPage: React.FC = () => {
       {/* --- TAB 2: UNIVERSITIES --- */}
       {activeTab === 'universities' && (
         <div className="card">
-          <h3 className="card-title" style={{ marginBottom: '14px' }}>Your Approved University Options</h3>
+          <div className="card-header">
+            <div>
+              <h3 className="card-title">Your Approved University Options</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Click "View Details" to inspect complete course requirements, fees, deadlines, and accommodation before confirming.
+              </p>
+            </div>
+          </div>
+
           <Table
             columns={[
               { header: 'UNIVERSITY', accessor: 'universityName' },
@@ -370,7 +406,7 @@ export const StudentPortalPage: React.FC = () => {
               { header: 'INTAKE', accessor: 'intake' },
               {
                 header: 'ANNUAL FEE',
-                render: (s) => (s.annualFee ? `${s.currency} ${s.annualFee.toLocaleString()}` : '—'),
+                render: (s) => (s.annualFee ? `${s.currency || '$'} ${s.annualFee.toLocaleString()}` : '—'),
               },
               {
                 header: 'STATUS',
@@ -379,14 +415,27 @@ export const StudentPortalPage: React.FC = () => {
               {
                 header: 'ACTION',
                 align: 'right',
-                render: (s) =>
-                  s.status !== 'SELECTED_BY_STUDENT' ? (
-                    <Button variant="primary" size="sm" onClick={() => handleSelectUniversity(s._id)}>
-                      Select This Choice
+                render: (s) => (
+                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedUnivItem(s);
+                        setIsUnivDetailsOpen(true);
+                      }}
+                    >
+                      View Details
                     </Button>
-                  ) : (
-                    <Badge variant="success">✓ Selected</Badge>
-                  ),
+                    {s.status !== 'SELECTED_BY_STUDENT' ? (
+                      <Button variant="primary" size="sm" onClick={() => handleSelectUniversity(s._id)}>
+                        Select Choice
+                      </Button>
+                    ) : (
+                      <Badge variant="success">✓ Selected</Badge>
+                    )}
+                  </div>
+                ),
               },
             ]}
             data={shortlists}
@@ -461,27 +510,109 @@ export const StudentPortalPage: React.FC = () => {
       {/* --- TAB 4: OFFERS --- */}
       {activeTab === 'offers' && (
         <div className="card">
-          <h3 className="card-title" style={{ marginBottom: '14px' }}>Official University Offer Letters</h3>
+          <h3 className="card-title" style={{ marginBottom: '14px' }}>Official University Offer Letters & Signed Acceptances</h3>
           <Table
             columns={[
               { header: 'UNIVERSITY', accessor: 'universityName' },
               { header: 'COURSE', accessor: 'courseTitle' },
               { header: 'OFFER TYPE', accessor: 'offerType' },
               {
-                header: 'OFFICIAL LETTER',
+                header: '1. ORIGINAL OFFER LETTER',
                 render: (o) => (
-                  <a href={o.originalOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 500 }}>
-                    Download Official Offer <ExternalLink size={12} />
-                  </a>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <a
+                      href={o.originalOfferUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                    >
+                      <Eye size={14} /> View
+                    </a>
+                    <a
+                      href={`/api/v1/offers/${o._id}/download/original`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        color: 'var(--primary)',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '12px',
+                        padding: '4px 8px',
+                        backgroundColor: 'var(--bg-subtle)',
+                        borderRadius: '4px',
+                        border: '1px solid var(--border-color)',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <Download size={13} /> Download
+                    </a>
+                  </div>
                 ),
               },
               {
-                header: 'SIGNED ACCEPTANCE',
+                header: '2. SIGNED ACCEPTANCE COPY',
                 render: (o) =>
                   o.signedOfferUrl ? (
-                    <span style={{ color: 'var(--success)' }}>✓ Uploaded</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle2 size={14} /> Signed Offer Letter
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        {o.signedOfferFileName || 'signed_offer.pdf'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <a
+                          href={o.signedOfferUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            fontSize: '11px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-color)',
+                            color: 'var(--success)',
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            backgroundColor: 'var(--bg-subtle)',
+                          }}
+                        >
+                          <Eye size={12} /> View
+                        </a>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Download size={12} />}
+                          onClick={() => window.open(`http://localhost:5000/api/v1/offers/${o._id}/download/signed`, '_blank')}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Uploaded: {o.signedUploadedAt ? new Date(o.signedUploadedAt).toLocaleString() : new Date(o.createdAt).toLocaleString()}
+                      </div>
+                    </div>
                   ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Pending</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic', fontWeight: 500 }}>
+                        Signed Offer Letter Not Available
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Upload size={12} />}
+                        onClick={() => {
+                          setSelectedOffer(o);
+                          setIsSignOfferOpen(true);
+                        }}
+                      >
+                        Upload Signed Offer Letter
+                      </Button>
+                    </div>
                   ),
               },
               {
@@ -719,6 +850,115 @@ export const StudentPortalPage: React.FC = () => {
         </form>
       </Modal>
 
+      {/* --- Student University & Course Complete Details Modal --- */}
+      <Modal
+        isOpen={isUnivDetailsOpen}
+        onClose={() => setIsUnivDetailsOpen(false)}
+        title={`University & Course Specifications: ${selectedUnivItem?.universityName}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsUnivDetailsOpen(false)}>
+              Close
+            </Button>
+            {selectedUnivItem && selectedUnivItem.status !== 'SELECTED_BY_STUDENT' && (
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  if (!lead) return;
+                  try {
+                    await apiClient.post(`/universities/shortlists/${lead._id}/select/${selectedUnivItem._id}`);
+                    success(`Confirmed selection of ${selectedUnivItem.courseTitle} at ${selectedUnivItem.universityName}!`);
+                    setIsUnivDetailsOpen(false);
+                    fetchStudentData();
+                  } catch (err: any) {
+                    error(err.message || 'Selection failed');
+                  }
+                }}
+              >
+                Confirm University Choice
+              </Button>
+            )}
+          </>
+        }
+      >
+        {selectedUnivItem && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
+            {/* University Overview */}
+            <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary)' }}>{selectedUnivItem.universityName}</h4>
+                <Badge variant="primary">{selectedUnivItem.country}</Badge>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px', marginTop: '10px' }}>
+                <div><span style={{ color: 'var(--text-muted)' }}>Location / City:</span> <strong>{(selectedUnivItem.universityId as any)?.city || selectedUnivItem.country}</strong></div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Official Website:</span>{' '}
+                  {(selectedUnivItem.universityId as any)?.website ? (
+                    <a href={(selectedUnivItem.universityId as any).website} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                      {(selectedUnivItem.universityId as any).website} <ExternalLink size={12} />
+                    </a>
+                  ) : (
+                    'N/A'
+                  )}
+                </div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Global Ranking:</span> <strong>#{(selectedUnivItem.universityId as any)?.ranking || 'Top 100 Global'}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Status:</span> <StatusBadge status={selectedUnivItem.status} /></div>
+              </div>
+            </div>
+
+            {/* Course & Academic Specifications */}
+            <div style={{ padding: '14px', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
+                Program: {selectedUnivItem.courseTitle}
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '13px', marginBottom: '14px' }}>
+                <div><span style={{ color: 'var(--text-muted)' }}>Intake:</span> <strong>{selectedUnivItem.intake}</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Duration:</span> <strong>{(selectedUnivItem.courseId as any)?.durationMonths || 12} Months</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Tuition Fee:</span> <strong>{selectedUnivItem.currency || '$'} {selectedUnivItem.annualFee?.toLocaleString() || 'N/A'} / Year</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Application Fee:</span> <strong>{(selectedUnivItem.courseId as any)?.applicationFee ? `${selectedUnivItem.currency || '$'} ${(selectedUnivItem.courseId as any).applicationFee}` : 'Waived / Free'}</strong></div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Academic & GPA Criteria:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.academicRequirements || (selectedUnivItem.courseId as any)?.eligibilityRequirements || 'Minimum 60% or 3.0 GPA in relevant Bachelor’s degree.'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>English Proficiency Requirements:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.englishRequirements || 'IELTS Overall 6.5 (Minimum 6.0 in all bands) / PTE 58 Academic / TOEFL iBT 88.'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Application Deadlines:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.deadlines || 'Fall Intake: July 15 • Spring Intake: November 30 (Early submission recommended).'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Scholarship Opportunities:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.scholarshipInfo || (selectedUnivItem.universityId as any)?.scholarshipInfo || 'International Merit Scholarships up to £3,000 / $5,000 available.'}
+                  </p>
+                </div>
+
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>Accommodation Options:</strong>
+                  <p style={{ margin: '2px 0 0 0', color: 'var(--text-secondary)' }}>
+                    {(selectedUnivItem.courseId as any)?.accommodationInfo || (selectedUnivItem.universityId as any)?.accommodationInfo || 'On-campus dormitories + private student halls available.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* --- Student Upload Signed Offer Modal --- */}
       <Modal
         isOpen={isSignOfferOpen}
@@ -730,17 +970,37 @@ export const StudentPortalPage: React.FC = () => {
               Cancel
             </Button>
             <Button variant="primary" onClick={handleUploadSignedOffer}>
-              Upload Signed Copy
+              Submit Signed Copy
             </Button>
           </>
         }
       >
-        <form onSubmit={handleUploadSignedOffer}>
+        <form onSubmit={handleUploadSignedOffer} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Attach Signed Offer PDF / Image *
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+              onChange={(e) => setSignedOfferFile(e.target.files?.[0] || null)}
+              style={{
+                padding: '8px',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-subtle)',
+              }}
+            />
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Select the scanned copy of your signed offer acceptance declaration.
+            </span>
+          </div>
+
           <Input
-            label="Signed Offer PDF URL"
+            label="Or Enter Signed Offer Document URL / Path"
             value={signedOfferUrl}
             onChange={(e) => setSignedOfferUrl(e.target.value)}
-            required
+            placeholder="e.g. /uploads/signed_acceptance.pdf"
           />
         </form>
       </Modal>
