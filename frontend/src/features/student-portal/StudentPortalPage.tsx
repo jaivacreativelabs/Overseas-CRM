@@ -43,7 +43,6 @@ import {
   TaskType,
 } from '../../types';
 import { PendingTasksCard } from './components/PendingTasksCard';
-import { CounsellorCard } from './components/CounsellorCard';
 import { StageStepper, STAGES_CONFIG } from '../../components/StageStepper';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
@@ -255,13 +254,6 @@ export const StudentPortalPage: React.FC = () => {
           >
             Download Summary Dossier
           </Button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-            <User size={18} color="var(--primary)" />
-            <div style={{ fontSize: '12px' }}>
-              <div style={{ fontWeight: 600 }}>Assigned Counsellor</div>
-              <div style={{ color: 'var(--text-muted)' }}>{lead?.counsellorId?.name || 'Sarah Jenkins'}</div>
-            </div>
-          </div>
         </div>
       </div>
 
