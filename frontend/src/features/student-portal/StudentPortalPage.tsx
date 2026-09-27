@@ -661,41 +661,15 @@ export const StudentPortalPage: React.FC = () => {
                   ),
                 },
                 {
-                  header: 'SIGNED ACCEPTANCE',
-                  render: (o) =>
-                    o.signedOfferUrl ? (
-                      <span style={{ color: 'var(--success)' }}>✓ Uploaded</span>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>Pending</span>
-                    ),
-                },
-                {
                   header: 'STATUS',
                   render: (o) => <StatusBadge status={o.status} />,
-                },
-                {
-                  header: 'ACTION',
-                  align: 'right',
-                  render: (o) => (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedOffer(o);
-                        setIsSignOfferOpen(true);
-                      }}
-                    >
-                      {o.signedOfferUrl ? 'Update Signed Copy' : 'Upload Signed Offer'}
-                    </Button>
-                  ),
                 },
               ]}
               data={offers}
               emptyMessage="No university offer letters available yet."
             />
           </div>
-        </div>
-      )}
+        )}
 
       {/* --- TAB 5: PAYMENTS --- */}
       {activeTab === 'payments' && (

@@ -1680,8 +1680,8 @@ export const LeadDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 5: Applications & Application History */}
-      {activeTab === 'applications' && (
+      {/* University Applications */}
+      {((isCurrentProcess && currentProcessInfo.key === 'applications') || activeSection === 'applications') && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="card">
             <div className="card-header">
