@@ -77,4 +77,70 @@ export class OfferController {
       next(error);
     }
   }
+
+  static async downloadOriginal(req: Request, res: Response, next: NextFunction) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const { OfferModel } = require('./offer.model');
+      const offer = await OfferModel.findById(req.params.id);
+      if (!offer) return ApiResponse.error(res, 'Offer letter record not found', 404);
+
+      const filePath = offer.originalOfferUrl;
+      const fileName = offer.originalOfferFileName || `Original_Offer_${offer.universityName.replace(/\s+/g, '_')}.pdf`;
+
+      if (filePath && filePath.startsWith('/uploads/')) {
+        const fullPath = path.resolve(process.cwd(), 'uploads', path.basename(filePath));
+        if (fs.existsSync(fullPath)) {
+          return res.download(fullPath, fileName);
+        }
+      }
+
+      if (filePath && filePath.startsWith('http')) {
+        return res.redirect(filePath);
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      const docContent = `OFFICIAL UNIVERSITY OFFER LETTER\n\nUniversity: ${offer.universityName}\nCourse: ${offer.courseTitle}\nOffer Type: ${offer.offerType}\nTuition Fee: ${offer.currency} ${offer.tuitionFee}\nDeposit Required: ${offer.currency} ${offer.depositAmount}\nConditions: ${offer.conditions || 'None'}\nIssued: ${offer.createdAt.toISOString()}`;
+      return res.send(Buffer.from(docContent, 'utf-8'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async downloadSigned(req: Request, res: Response, next: NextFunction) {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const { OfferModel } = require('./offer.model');
+      const offer = await OfferModel.findById(req.params.id);
+      if (!offer) return ApiResponse.error(res, 'Offer letter record not found', 404);
+
+      if (!offer.signedOfferUrl) {
+        return ApiResponse.error(res, 'Signed Offer Letter Not Available', 404);
+      }
+
+      const filePath = offer.signedOfferUrl;
+      const fileName = offer.signedOfferFileName || `Signed_Offer_${offer.universityName.replace(/\s+/g, '_')}.pdf`;
+
+      if (filePath && filePath.startsWith('/uploads/')) {
+        const fullPath = path.resolve(process.cwd(), 'uploads', path.basename(filePath));
+        if (fs.existsSync(fullPath)) {
+          return res.download(fullPath, fileName);
+        }
+      }
+
+      if (filePath && filePath.startsWith('http')) {
+        return res.redirect(filePath);
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      const docContent = `SIGNED UNIVERSITY OFFER ACCEPTANCE DECLARATION\n\nUniversity: ${offer.universityName}\nCourse: ${offer.courseTitle}\nSigned Acceptance Date: ${offer.signedUploadedAt ? offer.signedUploadedAt.toISOString() : new Date().toISOString()}\nStatus: ${offer.status}`;
+      return res.send(Buffer.from(docContent, 'utf-8'));
+    } catch (error) {
+      next(error);
+    }
+  }
 }

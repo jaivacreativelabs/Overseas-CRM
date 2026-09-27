@@ -225,6 +225,10 @@ export interface University {
   website?: string;
   ranking?: number;
   logoUrl?: string;
+  description?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  generalRequirements?: string;
 }
 
 export interface Course {
@@ -236,20 +240,29 @@ export interface Course {
   level: string;
   durationMonths: number;
   annualFee: number;
+  applicationFee?: number;
   currency: string;
   intakes: string[];
+  eligibilityRequirements?: string;
+  academicRequirements?: string;
+  englishRequirements?: string;
+  deadlines?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  description?: string;
 }
 
 export interface Shortlist {
   _id: string;
   leadId: string;
-  universityId: string;
+  universityId: string | University;
   universityName: string;
-  courseId: string;
+  courseId: string | Course;
   courseTitle: string;
   country: string;
   intake: string;
   annualFee?: number;
+  applicationFee?: number;
   currency?: string;
   isVisibleToStudent: boolean;
   status: 'PROPOSED' | 'APPROVED_BY_COUNSELLOR' | 'SELECTED_BY_STUDENT' | 'REJECTED';
@@ -279,9 +292,9 @@ export interface DocumentItem {
 export interface Application {
   _id: string;
   leadId: string;
-  universityId: string;
+  universityId: string | University;
   universityName: string;
-  courseId: string;
+  courseId: string | Course;
   courseTitle: string;
   country: string;
   intake: string;
@@ -318,6 +331,7 @@ export interface Offer {
   reviewedByName?: string;
   uploadedByName: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Payment {

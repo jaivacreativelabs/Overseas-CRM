@@ -14,6 +14,8 @@ import {
 
 const router = Router();
 
+router.get('/:id/download-all-details', authenticate, LeadController.downloadAllDetails);
+
 router.use(authenticate, requireStaff);
 
 router.get('/', LeadController.getLeads);
