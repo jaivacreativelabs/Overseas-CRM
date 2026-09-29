@@ -10,10 +10,13 @@ export interface ICountry extends Document {
 export interface IUniversity extends Document {
   name: string;
   country: string;
+  state?: string;
   city?: string;
+  address?: string;
   website?: string;
   ranking?: number;
   logoUrl?: string;
+  bannerUrl?: string;
   description?: string;
   scholarshipInfo?: string;
   accommodationInfo?: string;
@@ -71,11 +74,14 @@ const countrySchema = new Schema<ICountry>({
 const universitySchema = new Schema<IUniversity>({
   name: { type: String, required: true, trim: true, index: true },
   country: { type: String, required: true, trim: true, index: true },
+  state: { type: String, trim: true },
   city: { type: String, trim: true },
+  address: { type: String, trim: true },
   website: { type: String, trim: true },
   ranking: { type: Number },
-  logoUrl: { type: String },
-  description: { type: String },
+  logoUrl: { type: String, trim: true },
+  bannerUrl: { type: String, trim: true },
+  description: { type: String, trim: true },
   scholarshipInfo: { type: String },
   accommodationInfo: { type: String },
   generalRequirements: { type: String },

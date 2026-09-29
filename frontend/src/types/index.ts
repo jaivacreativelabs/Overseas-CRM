@@ -221,14 +221,18 @@ export interface University {
   _id: string;
   name: string;
   country: string;
+  state?: string;
   city?: string;
+  address?: string;
   website?: string;
   ranking?: number;
   logoUrl?: string;
+  bannerUrl?: string;
   description?: string;
   scholarshipInfo?: string;
   accommodationInfo?: string;
   generalRequirements?: string;
+  isActive?: boolean;
 }
 
 export interface Course {
