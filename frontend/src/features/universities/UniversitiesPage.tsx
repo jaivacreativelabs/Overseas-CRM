@@ -445,7 +445,6 @@ export const UniversitiesPage: React.FC = () => {
                       backgroundColor: '#FFFFFF',
                       border: '1px solid var(--border-color)',
                       borderRadius: '14px',
-                      overflow: 'hidden',
                       boxShadow: 'var(--shadow-xs)',
                       display: 'flex',
                       flexDirection: 'column',
@@ -454,8 +453,18 @@ export const UniversitiesPage: React.FC = () => {
                     }}
                     className="university-card-item"
                   >
-                    {/* Cover Banner Image */}
-                    <div style={{ position: 'relative', height: '130px', width: '100%', backgroundColor: '#0F172A', overflow: 'hidden' }}>
+                    {/* Cover Banner Image Container (Isolated Overflow) */}
+                    <div
+                      style={{
+                        position: 'relative',
+                        height: '130px',
+                        width: '100%',
+                        backgroundColor: '#0F172A',
+                        borderTopLeftRadius: '13px',
+                        borderTopRightRadius: '13px',
+                        overflow: 'hidden',
+                      }}
+                    >
                       {u.bannerUrl ? (
                         <img
                           src={u.bannerUrl}
@@ -506,57 +515,59 @@ export const UniversitiesPage: React.FC = () => {
                           <span>#{u.ranking} Global</span>
                         </div>
                       )}
+                    </div>
 
-                      {/* University Logo / Avatar Badge */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          bottom: '-22px',
-                          left: '16px',
-                          width: '52px',
-                          height: '52px',
-                          borderRadius: '12px',
-                          border: '3px solid #FFFFFF',
-                          backgroundColor: '#FFFFFF',
-                          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          overflow: 'hidden',
-                          zIndex: 2,
-                        }}
-                      >
-                        {u.logoUrl ? (
-                          <img
-                            src={u.logoUrl}
-                            alt={u.name}
-                            style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '4px' }}
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              backgroundColor: 'var(--primary-light)',
-                              color: 'var(--primary)',
-                              fontWeight: 700,
-                              fontSize: '16px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            {u.name.substring(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
+                    {/* Pop-Out University Logo / Avatar Badge */}
+                    <div
+                      style={{
+                        marginTop: '-28px',
+                        marginLeft: '16px',
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '12px',
+                        backgroundColor: '#FFFFFF',
+                        padding: '4px',
+                        border: '2px solid #FFFFFF',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        zIndex: 10,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {u.logoUrl ? (
+                        <img
+                          src={u.logoUrl}
+                          alt={u.name}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }}
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--primary-light)',
+                            color: 'var(--primary)',
+                            fontWeight: 700,
+                            fontSize: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {u.name.substring(0, 2).toUpperCase()}
+                        </div>
+                      )}
                     </div>
 
                     {/* Card Content Body */}
-                    <div style={{ padding: '30px 16px 14px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ padding: '12px 16px 14px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div>
                         <h3
                           style={{
