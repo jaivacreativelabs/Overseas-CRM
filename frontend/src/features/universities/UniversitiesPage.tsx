@@ -13,7 +13,8 @@ import {
   Search,
   Filter,
   X,
-  Sparkles,
+  Upload,
+  Image as ImageIcon,
   CheckCircle2,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
@@ -25,6 +26,7 @@ import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
+import { UniversityDetailsModal } from './components/UniversityDetailsModal';
 
 const BANNER_GRADIENTS = [
   { from: '#1E293B', to: '#0F172A' },
@@ -33,6 +35,16 @@ const BANNER_GRADIENTS = [
   { from: '#B45309', to: '#78350F' },
   { from: '#6D28D9', to: '#4C1D95' },
   { from: '#BE185D', to: '#831843' },
+];
+
+const PRESET_FACILITIES = [
+  'Smart Classrooms',
+  'Digital Library',
+  'Research & Science Labs',
+  'Sports & Fitness Complex',
+  'Student Accommodation',
+  'Auditorium & Theatre',
+  'Innovation Hub',
 ];
 
 export const UniversitiesPage: React.FC = () => {
@@ -71,6 +83,12 @@ export const UniversitiesPage: React.FC = () => {
     logoUrl: '',
     bannerUrl: '',
     description: '',
+    overview: '',
+    establishedYear: '' as number | '',
+    acceptanceRate: '',
+    averageTuitionFee: '',
+    campusFacilities: [] as string[],
+    galleryPhotos: [] as string[],
   });
   const [uniFormErrors, setUniFormErrors] = useState<Record<string, string>>({});
 
@@ -112,6 +130,77 @@ export const UniversitiesPage: React.FC = () => {
     fetchData();
   }, []);
 
+  // Client-side image canvas compression (< 100 KB base64 JPEG)
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 800;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedBase64);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleGalleryPhotosSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    try {
+      const compressedList = await Promise.all(files.map(compressImage));
+      setUniForm((prev) => ({
+        ...prev,
+        galleryPhotos: [...prev.galleryPhotos, ...compressedList],
+      }));
+      success(`Added ${compressedList.length} photo(s) to classroom gallery.`);
+    } catch (err) {
+      error('Failed to process image files.');
+    }
+  };
+
+  const removeGalleryPhoto = (index: number) => {
+    setUniForm((prev) => ({
+      ...prev,
+      galleryPhotos: prev.galleryPhotos.filter((_, i) => i !== index),
+    }));
+  };
+
+  const toggleFacilityTag = (fac: string) => {
+    setUniForm((prev) => {
+      const exists = prev.campusFacilities.includes(fac);
+      return {
+        ...prev,
+        campusFacilities: exists
+          ? prev.campusFacilities.filter((f) => f !== fac)
+          : [...prev.campusFacilities, fac],
+      };
+    });
+  };
+
   const openAddUniModal = () => {
     setEditingUniversity(null);
     setUniForm({
@@ -125,6 +214,12 @@ export const UniversitiesPage: React.FC = () => {
       logoUrl: '',
       bannerUrl: '',
       description: '',
+      overview: '',
+      establishedYear: '',
+      acceptanceRate: '',
+      averageTuitionFee: '',
+      campusFacilities: [...PRESET_FACILITIES],
+      galleryPhotos: [],
     });
     setUniFormErrors({});
     setIsUniModalOpen(true);
@@ -143,6 +238,12 @@ export const UniversitiesPage: React.FC = () => {
       logoUrl: u.logoUrl || '',
       bannerUrl: u.bannerUrl || '',
       description: u.description || '',
+      overview: u.overview || '',
+      establishedYear: u.establishedYear !== undefined && u.establishedYear !== null ? u.establishedYear : '',
+      acceptanceRate: u.acceptanceRate || '',
+      averageTuitionFee: u.averageTuitionFee || '',
+      campusFacilities: u.campusFacilities || [...PRESET_FACILITIES],
+      galleryPhotos: u.galleryPhotos || [],
     });
     setUniFormErrors({});
     setIsUniModalOpen(true);
@@ -181,6 +282,12 @@ export const UniversitiesPage: React.FC = () => {
         logoUrl: uniForm.logoUrl.trim() || undefined,
         bannerUrl: uniForm.bannerUrl.trim() || undefined,
         description: uniForm.description.trim() || undefined,
+        overview: uniForm.overview.trim() || undefined,
+        establishedYear: uniForm.establishedYear !== '' ? Number(uniForm.establishedYear) : undefined,
+        acceptanceRate: uniForm.acceptanceRate.trim() || undefined,
+        averageTuitionFee: uniForm.averageTuitionFee.trim() || undefined,
+        campusFacilities: uniForm.campusFacilities,
+        galleryPhotos: uniForm.galleryPhotos,
       };
 
       if (editingUniversity) {
@@ -441,6 +548,7 @@ export const UniversitiesPage: React.FC = () => {
                 return (
                   <div
                     key={u._id}
+                    onClick={() => setSelectedUniForDetails(u)}
                     style={{
                       backgroundColor: '#FFFFFF',
                       border: '1px solid var(--border-color)',
@@ -449,6 +557,7 @@ export const UniversitiesPage: React.FC = () => {
                       display: 'flex',
                       flexDirection: 'column',
                       position: 'relative',
+                      cursor: 'pointer',
                       transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                     }}
                     className="university-card-item"
@@ -593,7 +702,7 @@ export const UniversitiesPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {u.description && (
+                      {(u.overview || u.description) && (
                         <p
                           style={{
                             fontSize: '12px',
@@ -606,7 +715,7 @@ export const UniversitiesPage: React.FC = () => {
                             overflow: 'hidden',
                           }}
                         >
-                          {u.description}
+                          {u.overview || u.description}
                         </p>
                       )}
 
@@ -653,6 +762,7 @@ export const UniversitiesPage: React.FC = () => {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                       }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       <Button
                         variant="secondary"
@@ -666,7 +776,10 @@ export const UniversitiesPage: React.FC = () => {
                       {isStaff && (
                         <div style={{ display: 'flex', gap: '6px' }}>
                           <button
-                            onClick={() => openEditUniModal(u)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditUniModal(u);
+                            }}
                             style={{
                               background: 'none',
                               border: '1px solid var(--border-color)',
@@ -683,7 +796,10 @@ export const UniversitiesPage: React.FC = () => {
                             <Edit2 size={13} />
                           </button>
                           <button
-                            onClick={() => setDeletingUniId(u._id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingUniId(u._id);
+                            }}
                             style={{
                               background: 'none',
                               border: '1px solid #FECACA',
@@ -772,19 +888,19 @@ export const UniversitiesPage: React.FC = () => {
         }
       >
         <form onSubmit={handleSaveUniversity} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Section 1: Media & Branding */}
+          {/* Section 1: Media & Branding (Banner, Logo, Gallery Uploads) */}
           <div style={{ padding: '12px 14px', backgroundColor: 'var(--bg-subtle, #F9FAFB)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              1. Media & Branding
+              1. Media, Banner & Multi-Photo Gallery
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <Input
-                label="Campus Photo / Banner Image URL"
+                label="Campus Photo / Cover Banner URL"
                 value={uniForm.bannerUrl}
                 onChange={(e) => setUniForm({ ...uniForm, bannerUrl: e.target.value })}
                 placeholder="https://images.unsplash.com/... or image link"
-                helperText="Provide a direct URL to a campus cover photo"
+                helperText="Direct URL to a campus cover photo"
               />
               {uniForm.bannerUrl && (
                 <div style={{ height: '70px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
@@ -807,13 +923,99 @@ export const UniversitiesPage: React.FC = () => {
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Logo Preview</span>
                 </div>
               )}
+
+              {/* Campus & Classroom Gallery Multi-Photo Upload */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '4px' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ImageIcon size={14} color="var(--primary)" />
+                  <span>Campus & Classroom Photo Gallery</span>
+                </label>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                  Select multiple photos (classrooms, auditoriums, labs). Images are client-side compressed (&lt; 100 KB base64).
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      backgroundColor: 'var(--primary-light)',
+                      color: 'var(--primary)',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      border: '1px dashed var(--primary)',
+                    }}
+                  >
+                    <Upload size={14} />
+                    <span>Upload Gallery Photos</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleGalleryPhotosSelect}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {uniForm.galleryPhotos.length} photo(s) selected
+                  </span>
+                </div>
+
+                {/* Uploaded Gallery Thumbnails Strip */}
+                {uniForm.galleryPhotos.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginTop: '10px', paddingBottom: '4px' }}>
+                    {uniForm.galleryPhotos.map((photo, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          position: 'relative',
+                          width: '70px',
+                          height: '50px',
+                          borderRadius: '6px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          border: '1px solid var(--border-color)',
+                        }}
+                      >
+                        <img src={photo} alt={`Upload ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryPhoto(i)}
+                          style={{
+                            position: 'absolute',
+                            top: '2px',
+                            right: '2px',
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          title="Remove image"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Section 2: Identity & Academic Info */}
+          {/* Section 2: Identity & Key Institutional Info */}
           <div style={{ padding: '12px 14px', backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              2. Identity & Overview
+              2. Identity & Academic Profile
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -844,20 +1046,73 @@ export const UniversitiesPage: React.FC = () => {
                 />
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                <Input
+                  label="Established Year"
+                  type="number"
+                  value={uniForm.establishedYear}
+                  onChange={(e) => setUniForm({ ...uniForm, establishedYear: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
+                  placeholder="e.g. 1868"
+                />
+                <Input
+                  label="Acceptance Rate"
+                  value={uniForm.acceptanceRate}
+                  onChange={(e) => setUniForm({ ...uniForm, acceptanceRate: e.target.value })}
+                  placeholder="e.g. 24%"
+                />
+                <Input
+                  label="Avg. Tuition Fee"
+                  value={uniForm.averageTuitionFee}
+                  onChange={(e) => setUniForm({ ...uniForm, averageTuitionFee: e.target.value })}
+                  placeholder="e.g. $32,000 / yr"
+                />
+              </div>
+
               <Textarea
-                label="Overview / Description"
-                value={uniForm.description}
-                onChange={(e) => setUniForm({ ...uniForm, description: e.target.value })}
-                placeholder="Brief summary of campus facilities, research focus, or academic reputation..."
-                rows={2}
+                label="Overview / About Institution"
+                value={uniForm.overview || uniForm.description}
+                onChange={(e) => setUniForm({ ...uniForm, overview: e.target.value, description: e.target.value })}
+                placeholder="Comprehensive overview of campus facilities, research prestige, or academic reputation..."
+                rows={3}
               />
+
+              {/* Campus Facilities Select Chips */}
+              <div>
+                <label className="form-label">Campus Highlights & Facilities</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                  {PRESET_FACILITIES.map((fac) => {
+                    const isSelected = uniForm.campusFacilities.includes(fac);
+                    return (
+                      <button
+                        key={fac}
+                        type="button"
+                        onClick={() => toggleFacilityTag(fac)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '16px',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                          backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--bg-subtle)',
+                          color: isSelected ? 'var(--primary)' : 'var(--text-secondary)',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {isSelected ? '✓ ' : '+ '}
+                        {fac}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Section 3: Detailed Location Information */}
           <div style={{ padding: '12px 14px', backgroundColor: 'var(--bg-subtle, #F9FAFB)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              3. Location Details
+              3. Detailed Location Information
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -899,94 +1154,13 @@ export const UniversitiesPage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* --- University Details Modal --- */}
-      {selectedUniForDetails && (
-        <Modal
-          isOpen={!!selectedUniForDetails}
-          onClose={() => setSelectedUniForDetails(null)}
-          title="University Institutional Profile"
-          footer={
-            <Button variant="secondary" onClick={() => setSelectedUniForDetails(null)}>
-              Close
-            </Button>
-          }
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ position: 'relative', height: '140px', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: '#0F172A' }}>
-              {selectedUniForDetails.bannerUrl ? (
-                <img src={selectedUniForDetails.bannerUrl} alt={selectedUniForDetails.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Building2 size={48} color="rgba(255,255,255,0.2)" />
-                </div>
-              )}
-              {selectedUniForDetails.ranking && (
-                <div style={{ position: 'absolute', top: '10px', right: '10px', backgroundColor: 'rgba(15,23,42,0.85)', color: '#F59E0B', border: '1px solid #F59E0B', borderRadius: '20px', padding: '3px 12px', fontSize: '12px', fontWeight: 700 }}>
-                  #{selectedUniForDetails.ranking} Global Rank
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                {selectedUniForDetails.name}
-              </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
-                <MapPin size={14} color="var(--primary)" />
-                <span>{[selectedUniForDetails.address, selectedUniForDetails.city, selectedUniForDetails.state, selectedUniForDetails.country].filter(Boolean).join(', ')}</span>
-              </div>
-            </div>
-
-            {selectedUniForDetails.description && (
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>About Institution</div>
-                <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>{selectedUniForDetails.description}</p>
-              </div>
-            )}
-
-            {selectedUniForDetails.website && (
-              <div>
-                <a
-                  href={selectedUniForDetails.website.startsWith('http') ? selectedUniForDetails.website : `https://${selectedUniForDetails.website}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Globe size={14} />
-                  <span>Visit Official Website</span>
-                  <ExternalLink size={12} />
-                </a>
-              </div>
-            )}
-
-            {/* Offered Programs */}
-            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                Offered Programs ({courses.filter((c) => c.universityId === selectedUniForDetails._id).length})
-              </div>
-              {courses.filter((c) => c.universityId === selectedUniForDetails._id).length === 0 ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No courses currently listed for this university.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
-                  {courses
-                    .filter((c) => c.universityId === selectedUniForDetails._id)
-                    .map((c) => (
-                      <div key={c._id} style={{ padding: '8px 10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '12.5px' }}>{c.title}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.level} • {c.durationMonths} Months</div>
-                        </div>
-                        <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--primary)' }}>
-                          {c.currency} {c.annualFee.toLocaleString()} / yr
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* --- Rich Play Store-Style University Details Modal --- */}
+      <UniversityDetailsModal
+        university={selectedUniForDetails}
+        isOpen={!!selectedUniForDetails}
+        onClose={() => setSelectedUniForDetails(null)}
+        courses={courses}
+      />
 
       {/* --- Delete Confirmation Modal --- */}
       {deletingUniId && (

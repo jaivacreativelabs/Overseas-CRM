@@ -229,6 +229,12 @@ export interface University {
   logoUrl?: string;
   bannerUrl?: string;
   description?: string;
+  galleryPhotos?: string[];
+  overview?: string;
+  campusFacilities?: string[];
+  establishedYear?: number;
+  acceptanceRate?: string;
+  averageTuitionFee?: string;
   scholarshipInfo?: string;
   accommodationInfo?: string;
   generalRequirements?: string;

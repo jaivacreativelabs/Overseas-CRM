@@ -18,6 +18,12 @@ export interface IUniversity extends Document {
   logoUrl?: string;
   bannerUrl?: string;
   description?: string;
+  galleryPhotos?: string[];
+  overview?: string;
+  campusFacilities?: string[];
+  establishedYear?: number;
+  acceptanceRate?: string;
+  averageTuitionFee?: string;
   scholarshipInfo?: string;
   accommodationInfo?: string;
   generalRequirements?: string;
@@ -82,6 +88,12 @@ const universitySchema = new Schema<IUniversity>({
   logoUrl: { type: String, trim: true },
   bannerUrl: { type: String, trim: true },
   description: { type: String, trim: true },
+  galleryPhotos: { type: [String], default: [] },
+  overview: { type: String, default: '' },
+  campusFacilities: { type: [String], default: [] },
+  establishedYear: { type: Number },
+  acceptanceRate: { type: String, default: '' },
+  averageTuitionFee: { type: String, default: '' },
   scholarshipInfo: { type: String },
   accommodationInfo: { type: String },
   generalRequirements: { type: String },
