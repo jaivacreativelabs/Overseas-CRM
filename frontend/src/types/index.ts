@@ -46,11 +46,9 @@ export enum StudentStage {
 }
 
 export enum DocumentStatus {
-  REQUESTED = 'REQUESTED',
-  UPLOADED = 'UPLOADED',
-  UNDER_REVIEW = 'UNDER_REVIEW',
-  APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
+  PENDING = 'PENDING',
+  SUCCESSFUL = 'SUCCESSFUL',
+  FAILED = 'FAILED',
 }
 
 export enum ApplicationStatus {

@@ -382,13 +382,13 @@ export const StudentPortalPage: React.FC = () => {
             <div className="card">
               <h3 className="card-title" style={{ marginBottom: '12px' }}>Pending Documents & Actions</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {documents.filter((d) => d.status === DocumentStatus.REQUESTED).length === 0 ? (
+                {documents.filter((d) => d.status === DocumentStatus.PENDING).length === 0 ? (
                   <div style={{ color: 'var(--success)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <CheckCircle2 size={16} /> All requested documents are currently uploaded!
                   </div>
                 ) : (
                   documents
-                    .filter((d) => d.status === DocumentStatus.REQUESTED)
+                    .filter((d) => d.status === DocumentStatus.PENDING)
                     .map((d) => (
                       <div
                         key={d._id}
@@ -513,7 +513,7 @@ export const StudentPortalPage: React.FC = () => {
                 {
                   header: 'FEEDBACK / REASON',
                   render: (d) =>
-                    d.status === DocumentStatus.REJECTED ? (
+                    d.status === DocumentStatus.FAILED ? (
                       <span style={{ color: 'var(--danger)', fontSize: '12px' }}>{d.rejectionReason}</span>
                     ) : (
                       '—'
@@ -524,9 +524,9 @@ export const StudentPortalPage: React.FC = () => {
                   align: 'right',
                   render: (d) => (
                     <Button
-                      variant={d.status === DocumentStatus.APPROVED ? 'ghost' : 'secondary'}
+                      variant={d.status === DocumentStatus.SUCCESSFUL ? 'ghost' : 'secondary'}
                       size="sm"
-                      disabled={d.status === DocumentStatus.APPROVED}
+                      disabled={d.status === DocumentStatus.SUCCESSFUL}
                       onClick={() => {
                         setSelectedDoc(d);
                         setIsUploadDocOpen(true);

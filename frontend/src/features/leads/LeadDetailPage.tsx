@@ -256,7 +256,7 @@ export const LeadDetailPage: React.FC = () => {
 
   const [isReviewDocOpen, setIsReviewDocOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
-  const [docReviewStatus, setDocReviewStatus] = useState<DocumentStatus.APPROVED | DocumentStatus.REJECTED>(DocumentStatus.APPROVED);
+  const [docReviewStatus, setDocReviewStatus] = useState<DocumentStatus.SUCCESSFUL | DocumentStatus.FAILED>(DocumentStatus.SUCCESSFUL);
   const [docRejectionReason, setDocRejectionReason] = useState('');
 
   // Rich University & Course Detail Modal
@@ -393,7 +393,7 @@ export const LeadDetailPage: React.FC = () => {
     try {
       await apiClient.put(`/documents/${selectedDoc._id}/review`, {
         status: docReviewStatus,
-        rejectionReason: docReviewStatus === DocumentStatus.REJECTED ? docRejectionReason : undefined,
+        rejectionReason: docReviewStatus === DocumentStatus.FAILED ? docRejectionReason : undefined,
       });
       success(`Document marked as ${docReviewStatus}.`);
       setIsReviewDocOpen(false);
@@ -1088,7 +1088,7 @@ export const LeadDetailPage: React.FC = () => {
               </div>
               <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, display: 'block', textTransform: 'uppercase' }}>Active Documents</span>
-                <strong style={{ marginTop: '2px', display: 'block' }}>{documents.length} document{documents.length === 1 ? '' : 's'} ({documents.filter(d => d.status === DocumentStatus.APPROVED).length} approved)</strong>
+                <strong style={{ marginTop: '2px', display: 'block' }}>{documents.length} document{documents.length === 1 ? '' : 's'} ({documents.filter(d => d.status === DocumentStatus.SUCCESSFUL).length} approved)</strong>
               </div>
             </div>
 
@@ -1664,7 +1664,7 @@ export const LeadDetailPage: React.FC = () => {
                         size="sm"
                         onClick={() => {
                           setSelectedDoc(d);
-                          setDocReviewStatus(DocumentStatus.APPROVED);
+                          setDocReviewStatus(DocumentStatus.SUCCESSFUL);
                           setIsReviewDocOpen(true);
                         }}
                       >
@@ -2196,11 +2196,11 @@ export const LeadDetailPage: React.FC = () => {
             value={docReviewStatus}
             onChange={(e) => setDocReviewStatus(e.target.value as any)}
             options={[
-              { value: DocumentStatus.APPROVED, label: 'Approve Document' },
-              { value: DocumentStatus.REJECTED, label: 'Reject Document (Requires Reason)' },
+              { value: DocumentStatus.SUCCESSFUL, label: 'Verify Document' },
+              { value: DocumentStatus.FAILED, label: 'Mark as Failed (Requires Reason)' },
             ]}
           />
-          {docReviewStatus === DocumentStatus.REJECTED && (
+          {docReviewStatus === DocumentStatus.FAILED && (
             <Textarea
               label="Rejection Reason *"
               value={docRejectionReason}
