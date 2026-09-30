@@ -130,8 +130,8 @@ export const UniversitiesPage: React.FC = () => {
     fetchData();
   }, []);
 
-  // Client-side image canvas compression (< 100 KB base64 JPEG)
-  const compressImage = (file: File): Promise<string> => {
+  // Client-side image canvas compression (< 120 KB base64 JPEG)
+  const compressImage = (file: File, maxDim = 800, quality = 0.75): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -142,7 +142,6 @@ export const UniversitiesPage: React.FC = () => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const maxDim = 800;
 
           if (width > maxDim || height > maxDim) {
             if (width > height) {
@@ -158,7 +157,7 @@ export const UniversitiesPage: React.FC = () => {
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
           resolve(compressedBase64);
         };
         img.onerror = (err) => reject(err);
@@ -167,11 +166,35 @@ export const UniversitiesPage: React.FC = () => {
     });
   };
 
+  const handleBannerFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    try {
+      const compressed = await compressImage(file, 800, 0.75);
+      setUniForm((prev) => ({ ...prev, bannerUrl: compressed }));
+      success('Campus cover photo uploaded.');
+    } catch (err) {
+      error('Failed to process cover photo.');
+    }
+  };
+
+  const handleLogoFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    try {
+      const compressed = await compressImage(file, 200, 0.8);
+      setUniForm((prev) => ({ ...prev, logoUrl: compressed }));
+      success('University logo uploaded.');
+    } catch (err) {
+      error('Failed to process logo image.');
+    }
+  };
+
   const handleGalleryPhotosSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const files = Array.from(e.target.files);
     try {
-      const compressedList = await Promise.all(files.map(compressImage));
+      const compressedList = await Promise.all(files.map((f) => compressImage(f, 800, 0.7)));
       setUniForm((prev) => ({
         ...prev,
         galleryPhotos: [...prev.galleryPhotos, ...compressedList],
@@ -894,35 +917,163 @@ export const UniversitiesPage: React.FC = () => {
               1. Media, Banner & Multi-Photo Gallery
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Input
-                label="Campus Photo / Cover Banner URL"
-                value={uniForm.bannerUrl}
-                onChange={(e) => setUniForm({ ...uniForm, bannerUrl: e.target.value })}
-                placeholder="https://images.unsplash.com/... or image link"
-                helperText="Direct URL to a campus cover photo"
-              />
-              {uniForm.bannerUrl && (
-                <div style={{ height: '70px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                  <img src={uniForm.bannerUrl} alt="Banner Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              )}
-
-              <Input
-                label="University Logo URL"
-                value={uniForm.logoUrl}
-                onChange={(e) => setUniForm({ ...uniForm, logoUrl: e.target.value })}
-                placeholder="https://... logo link"
-                helperText="Square image URL for logo avatar"
-              />
-              {uniForm.logoUrl && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '2px', backgroundColor: '#FFFFFF' }}>
-                    <img src={uniForm.logoUrl} alt="Logo Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Campus Cover Photo Upload */}
+              <div>
+                <label className="form-label" style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                  Campus Cover Photo
+                </label>
+                {uniForm.bannerUrl ? (
+                  <div style={{ position: 'relative', height: '90px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                    <img src={uniForm.bannerUrl} alt="Cover Banner Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
+                      <label
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                          color: '#FFFFFF',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Upload size={12} />
+                        <span>Change</span>
+                        <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleBannerFileSelect} style={{ display: 'none' }} />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setUniForm({ ...uniForm, bannerUrl: '' })}
+                        style={{
+                          padding: '4px 8px',
+                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                          color: '#FFFFFF',
+                          borderRadius: '4px',
+                          border: 'none',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <X size={12} />
+                        <span>Remove</span>
+                      </button>
+                    </div>
                   </div>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Logo Preview</span>
-                </div>
-              )}
+                ) : (
+                  <label
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      padding: '16px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1.5px dashed var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <Upload size={20} color="var(--primary)" />
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Upload Campus Cover Photo
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      PNG, JPG, or WEBP (Compressed &lt; 120 KB Base64)
+                    </span>
+                    <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleBannerFileSelect} style={{ display: 'none' }} />
+                  </label>
+                )}
+              </div>
+
+              {/* University Logo Avatar Upload */}
+              <div>
+                <label className="form-label" style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
+                  University Logo Avatar
+                </label>
+                {uniForm.logoUrl ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '56px', height: '56px', borderRadius: '12px', border: '2px solid var(--border-color)', padding: '3px', backgroundColor: '#FFFFFF', overflow: 'hidden', flexShrink: 0 }}>
+                      <img src={uniForm.logoUrl} alt="Logo Preview" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <label
+                        style={{
+                          padding: '6px 10px',
+                          backgroundColor: 'var(--primary-light)',
+                          color: 'var(--primary)',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Upload size={13} />
+                        <span>Change Logo</span>
+                        <input type="file" accept="image/png, image/jpeg, image/webp, image/svg+xml" onChange={handleLogoFileSelect} style={{ display: 'none' }} />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setUniForm({ ...uniForm, logoUrl: '' })}
+                        style={{
+                          padding: '6px 10px',
+                          backgroundColor: '#FEF2F2',
+                          color: 'var(--danger)',
+                          border: '1px solid #FECACA',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <X size={13} />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '10px 14px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1.5px dashed var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
+                      <Upload size={18} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        Upload Logo Image
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        PNG, JPG, WEBP, SVG (Compressed &lt; 30 KB Base64)
+                      </div>
+                    </div>
+                    <input type="file" accept="image/png, image/jpeg, image/webp, image/svg+xml" onChange={handleLogoFileSelect} style={{ display: 'none' }} />
+                  </label>
+                )}
+              </div>
 
               {/* Campus & Classroom Gallery Multi-Photo Upload */}
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '4px' }}>
