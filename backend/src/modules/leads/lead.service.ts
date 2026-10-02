@@ -650,7 +650,6 @@ export class LeadService {
 
     await ActivityService.log({
       leadId: lead._id.toString(),
-      actorId: 'system',
       actorName: 'Landing Page Webhook',
       actorRole: UserRole.ADMIN,
       action: 'LEAD_CAPTURED',
@@ -713,7 +712,6 @@ export class LeadService {
 
     await ActivityService.log({
       leadId: lead._id.toString(),
-      actorId: 'system',
       actorName: 'Meta Webhook',
       actorRole: UserRole.ADMIN,
       action: 'LEAD_CAPTURED',
