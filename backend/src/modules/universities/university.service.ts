@@ -33,14 +33,25 @@ export class UniversityService {
     return UniversityModel.find(filter).sort({ name: 1 }).lean();
   }
 
-  static async createUniversity(data: {
-    name: string;
-    country: string;
-    city?: string;
-    website?: string;
-    ranking?: number;
-  }): Promise<IUniversity> {
+  static async createUniversity(data: Partial<IUniversity>): Promise<IUniversity> {
     return UniversityModel.create(data);
+  }
+
+  static async updateUniversity(id: string, data: Partial<IUniversity>): Promise<IUniversity> {
+    const university = await UniversityModel.findByIdAndUpdate(id, data, { new: true });
+    if (!university) {
+      throw new NotFoundError('University not found');
+    }
+    return university;
+  }
+
+  static async deleteUniversity(id: string): Promise<void> {
+    const university = await UniversityModel.findById(id);
+    if (!university) {
+      throw new NotFoundError('University not found');
+    }
+    university.isActive = false;
+    await university.save();
   }
 
   // Masters: Courses
@@ -81,7 +92,11 @@ export class UniversityService {
     if (isStudentView) {
       filter.isVisibleToStudent = true;
     }
-    return ShortlistModel.find(filter).sort({ createdAt: -1 }).lean();
+    return ShortlistModel.find(filter)
+      .populate('universityId')
+      .populate('courseId')
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   static async addToShortlist(

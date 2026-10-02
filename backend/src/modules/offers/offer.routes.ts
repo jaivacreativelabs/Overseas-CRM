@@ -10,8 +10,10 @@ router.use(authenticate);
 
 router.get('/', requireStaff, OfferController.getAllOffers);
 router.get('/lead/:leadId', OfferController.getOffers);
-router.post('/lead/:leadId/original', requireAdmin, upload.single('file'), OfferController.uploadOriginal);
-router.post('/:id/signed', requireStudent, upload.single('file'), OfferController.uploadSigned);
+router.get('/:id/download/original', OfferController.downloadOriginal);
+router.get('/:id/download/signed', OfferController.downloadSigned);
+router.post('/lead/:leadId/original', requireStaff, upload.single('file'), OfferController.uploadOriginal);
+router.post('/:id/signed', upload.single('file'), OfferController.uploadSigned);
 router.put('/:id/review', requireStaff, OfferController.reviewSigned);
 
 export default router;

@@ -20,6 +20,7 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       break;
     case 'CONTACTED':
     case 'UNDER_REVIEW':
+    case 'PENDING':
     case 'PROOF_SUBMITTED':
     case 'SIGNED_UPLOADED':
       variant = 'warning';
@@ -27,6 +28,7 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     case 'INTERESTED':
     case 'APPROVED':
     case 'ACCEPTED':
+    case 'SUCCESSFUL':
     case 'VERIFIED':
     case 'COMPLETED':
     case 'SELECTED_BY_STUDENT':
@@ -35,6 +37,7 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       break;
     case 'NOT_INTERESTED':
     case 'CLOSED_LOST':
+    case 'FAILED':
     case 'REJECTED':
     case 'BLOCKED':
     case 'CANCELLED':

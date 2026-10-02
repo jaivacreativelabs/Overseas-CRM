@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import path from 'path';
+import fs from 'fs';
 
 import { errorHandler } from './middleware/error.middleware';
 import { ApiResponse } from './utils/api-response';
@@ -33,21 +34,23 @@ export const createApp = (): Express => {
   const app = express();
 
   // Security & standard middleware
-  app.use(helmet({ crossOriginResourcePolicy: false }));
-  app.use(
-    cors({
-      origin: '*',
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    })
-  );
+  app.use(helmet({ crossOriginResourcePolicy: false, hidePoweredBy: false }));
+  const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  };
+  app.use(cors(corsOptions));
+  app.options('*', cors(corsOptions));
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan('dev'));
 
-  // Static uploads directory
-  app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+  // Static uploads directory — only serve locally (Vercel serverless filesystem is read-only)
+  if (process.env.NODE_ENV !== 'production') {
+    app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+  }
 
   // Health check
   app.get('/health', (req: Request, res: Response) => {
@@ -86,6 +89,18 @@ export const createApp = (): Express => {
   app.use('/api/v1/reports', reportRoutes);
   app.use('/api/v1/audit-logs', auditRoutes);
   app.use('/api/v1/activities', activityRoutes);
+
+  // Serve static frontend build (merged single-port application)
+  const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    app.get('*', (req: Request, res: Response, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
+        return next();
+      }
+      res.sendFile(path.resolve(frontendDist, 'index.html'));
+    });
+  }
 
   // 404 Route handler
   app.use((req: Request, res: Response) => {

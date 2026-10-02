@@ -10,6 +10,8 @@ export enum AdminType {
 }
 
 export enum LeadSource {
+  META_ADS = 'Meta Ads',
+  LANDING_PAGE = 'Landing Page',
   WEBSITE = 'WEBSITE',
   INSTAGRAM = 'INSTAGRAM',
   FACEBOOK = 'FACEBOOK',
@@ -46,11 +48,11 @@ export enum StudentStage {
 }
 
 export enum DocumentStatus {
-  REQUESTED = 'REQUESTED',
-  UPLOADED = 'UPLOADED',
-  UNDER_REVIEW = 'UNDER_REVIEW',
+  PENDING = 'PENDING',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  SUCCESSFUL = 'SUCCESSFUL',
+  FAILED = 'FAILED',
 }
 
 export enum ApplicationStatus {
@@ -137,9 +139,17 @@ export interface Lead {
   targetCourse?: string;
   targetIntake?: string;
   budget?: string;
-  source: LeadSource;
-  status: LeadStatus;
-  stage: StudentStage;
+  source: LeadSource | string;
+  status: LeadStatus | string;
+  stage: StudentStage | string;
+  campaignName?: string;
+  preferredCountry?: string;
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  };
+  metaLeadId?: string;
   counsellorId?: { _id: string; name: string; email: string; phone?: string; avatar?: string };
   studentUserId?: { _id: string; name: string; email: string };
   closedLostReason?: string;
@@ -221,10 +231,24 @@ export interface University {
   _id: string;
   name: string;
   country: string;
+  state?: string;
   city?: string;
+  address?: string;
   website?: string;
   ranking?: number;
   logoUrl?: string;
+  bannerUrl?: string;
+  description?: string;
+  galleryPhotos?: string[];
+  overview?: string;
+  campusFacilities?: string[];
+  establishedYear?: number;
+  acceptanceRate?: string;
+  averageTuitionFee?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  generalRequirements?: string;
+  isActive?: boolean;
 }
 
 export interface Course {
@@ -236,20 +260,29 @@ export interface Course {
   level: string;
   durationMonths: number;
   annualFee: number;
+  applicationFee?: number;
   currency: string;
   intakes: string[];
+  eligibilityRequirements?: string;
+  academicRequirements?: string;
+  englishRequirements?: string;
+  deadlines?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  description?: string;
 }
 
 export interface Shortlist {
   _id: string;
   leadId: string;
-  universityId: string;
+  universityId: string | University;
   universityName: string;
-  courseId: string;
+  courseId: string | Course;
   courseTitle: string;
   country: string;
   intake: string;
   annualFee?: number;
+  applicationFee?: number;
   currency?: string;
   isVisibleToStudent: boolean;
   status: 'PROPOSED' | 'APPROVED_BY_COUNSELLOR' | 'SELECTED_BY_STUDENT' | 'REJECTED';
@@ -282,7 +315,7 @@ export interface Application {
   studentId?: any;
   universityId: string;
   universityName: string;
-  courseId: string;
+  courseId: string | Course;
   courseTitle: string;
   country: string;
   intake: string;

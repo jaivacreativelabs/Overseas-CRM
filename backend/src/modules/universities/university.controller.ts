@@ -41,6 +41,24 @@ export class UniversityController {
     }
   }
 
+  static async updateUniversity(req: Request, res: Response, next: NextFunction) {
+    try {
+      const university = await UniversityService.updateUniversity(req.params.id, req.body);
+      return ApiResponse.success(res, 'University updated', university);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteUniversity(req: Request, res: Response, next: NextFunction) {
+    try {
+      await UniversityService.deleteUniversity(req.params.id);
+      return ApiResponse.success(res, 'University removed');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getCourses(req: Request, res: Response, next: NextFunction) {
     try {
       const universityId = req.query.universityId as string;

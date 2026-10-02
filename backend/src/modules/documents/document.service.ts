@@ -35,7 +35,7 @@ export class DocumentService {
       category: data.category || 'ACADEMIC',
       description: data.description,
       isMandatory: data.isMandatory !== undefined ? data.isMandatory : true,
-      status: DocumentStatus.REQUESTED,
+      status: DocumentStatus.PENDING,
       requestedById: new Types.ObjectId(actorUserId),
       requestedByName: actorName,
     });
@@ -73,7 +73,7 @@ export class DocumentService {
     doc.originalFileName = fileData.originalFileName;
     doc.fileSize = fileData.fileSize;
     doc.mimeType = fileData.mimeType;
-    doc.status = DocumentStatus.UPLOADED;
+    doc.status = DocumentStatus.PENDING;
     doc.uploadedAt = new Date();
     doc.rejectionReason = undefined;
 
@@ -96,7 +96,7 @@ export class DocumentService {
   static async reviewDocument(
     documentId: string,
     data: {
-      status: DocumentStatus.APPROVED | DocumentStatus.REJECTED;
+      status: DocumentStatus.SUCCESSFUL | DocumentStatus.FAILED;
       rejectionReason?: string;
     },
     actorUserId: string,
@@ -106,14 +106,14 @@ export class DocumentService {
     const doc = await DocumentModel.findById(documentId);
     if (!doc) throw new NotFoundError('Document not found');
 
-    if (data.status === DocumentStatus.REJECTED && !data.rejectionReason) {
+    if (data.status === DocumentStatus.FAILED && !data.rejectionReason) {
       throw new ValidationError('A reason must be provided when rejecting a document.');
     }
 
     const beforeState = doc.toObject();
 
     doc.status = data.status;
-    doc.rejectionReason = data.status === DocumentStatus.REJECTED ? data.rejectionReason : undefined;
+    doc.rejectionReason = data.status === DocumentStatus.FAILED ? data.rejectionReason : undefined;
     doc.reviewedAt = new Date();
     doc.reviewedById = new Types.ObjectId(actorUserId);
     doc.reviewedByName = actorName;
@@ -122,7 +122,7 @@ export class DocumentService {
 
     // Check if all mandatory documents are approved
     const allDocs = await DocumentModel.find({ leadId: doc.leadId, isMandatory: true });
-    const allApproved = allDocs.length > 0 && allDocs.every((d) => d.status === DocumentStatus.APPROVED);
+    const allApproved = allDocs.length > 0 && allDocs.every((d) => d.status === DocumentStatus.SUCCESSFUL);
 
     const lead = await LeadModel.findById(doc.leadId);
     if (lead && allApproved && lead.stage === StudentStage.DOCUMENT_COLLECTION) {
@@ -148,7 +148,7 @@ export class DocumentService {
       actorName,
       actorRole,
       action: `DOCUMENT_${data.status}`,
-      title: `Document ${data.status === DocumentStatus.APPROVED ? 'Approved' : 'Rejected'}`,
+      title: `Document ${data.status === DocumentStatus.SUCCESSFUL ? 'Approved' : 'Rejected'}`,
       description: `${doc.title} was ${data.status.toLowerCase()}.${data.rejectionReason ? ` Reason: ${data.rejectionReason}` : ''}`,
     });
 

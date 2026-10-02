@@ -27,6 +27,8 @@ export class ApplicationService {
 
   static async getApplicationsForLead(leadId: string): Promise<any[]> {
     return ApplicationModel.find({ leadId: new Types.ObjectId(leadId) })
+      .populate('universityId')
+      .populate('courseId')
       .sort({ createdAt: -1 })
       .lean();
   }

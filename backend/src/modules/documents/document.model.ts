@@ -39,7 +39,7 @@ const documentSchema = new Schema<IDocument>(
     status: {
       type: String,
       enum: Object.values(DocumentStatus),
-      default: DocumentStatus.REQUESTED,
+      default: DocumentStatus.PENDING,
       index: true,
     },
     fileUrl: { type: String },
