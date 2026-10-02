@@ -13,9 +13,17 @@ export interface ILead extends Document {
   targetCourse?: string;
   targetIntake?: string;
   budget?: string;
-  source: LeadSource;
-  status: LeadStatus;
+  source: LeadSource | string;
+  status: LeadStatus | string;
   stage: StudentStage;
+  campaignName?: string;
+  preferredCountry?: string;
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  };
+  metaLeadId?: string;
   counsellorId?: Types.ObjectId;
   studentUserId?: Types.ObjectId;
   closedLostReason?: string;
@@ -41,9 +49,17 @@ const leadSchema = new Schema<ILead>(
     targetCourse: { type: String, trim: true },
     targetIntake: { type: String, trim: true },
     budget: { type: String, trim: true },
-    source: { type: String, enum: Object.values(LeadSource), default: LeadSource.WEBSITE, index: true },
+    source: { type: String, default: 'Manual', index: true },
     status: { type: String, enum: Object.values(LeadStatus), default: LeadStatus.NEW, index: true },
     stage: { type: String, enum: Object.values(StudentStage), default: StudentStage.LEAD_CAPTURED, index: true },
+    campaignName: { type: String, default: '' },
+    preferredCountry: { type: String, default: '' },
+    utmParams: {
+      utm_source: { type: String },
+      utm_medium: { type: String },
+      utm_campaign: { type: String },
+    },
+    metaLeadId: { type: String, sparse: true, index: true },
     counsellorId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     studentUserId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     closedLostReason: { type: String },

@@ -5,6 +5,7 @@ import {
   Eye,
   PhoneCall,
   MessageSquare,
+  RefreshCw,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -21,6 +22,10 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<any>({ total: 0, totalPages: 1, limit: 20 });
+
+  // Real-time sync & polling state
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date>(new Date());
+  const [secondsAgo, setSecondsAgo] = useState(0);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -53,8 +58,8 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
 
-  const fetchLeads = useCallback(async () => {
-    setLoading(true);
+  const fetchLeads = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       const res = await apiClient.get<Lead[]>('/leads', {
         page,
@@ -68,15 +73,42 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
       });
       setLeads(res.data || []);
       if (res.meta) setMeta(res.meta);
+      setLastSyncedAt(new Date());
+      setSecondsAgo(0);
     } catch (err: any) {
-      error(err.message || 'Failed to fetch leads');
+      if (!isSilent) error(err.message || 'Failed to fetch leads');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [page, search, statusFilter, sourceFilter, stageFilter, counsellorFilter, isStudentOnly, error]);
 
   useEffect(() => {
     fetchLeads();
+  }, [fetchLeads]);
+
+  // Timer for seconds ago calculation
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastSyncedAt.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lastSyncedAt]);
+
+  // Auto-refresh polling every 30s + window focus refresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchLeads(true);
+    }, 30000);
+
+    const handleFocus = () => {
+      fetchLeads(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [fetchLeads]);
 
   useEffect(() => {
@@ -117,6 +149,83 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     }
   };
 
+  const renderSourceBadge = (l: Lead) => {
+    const source = l.source;
+    const isMeta = source === LeadSource.META_ADS || source === 'Meta Ads';
+    const isLanding = source === LeadSource.LANDING_PAGE || source === 'Landing Page';
+
+    if (isMeta) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '11px',
+              fontWeight: 600,
+              backgroundColor: '#1877F215',
+              color: '#1877F2',
+              border: '1px solid #1877F240',
+              width: 'fit-content',
+            }}
+          >
+            Meta Ads
+          </span>
+          {l.campaignName && (
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{l.campaignName}</span>
+          )}
+        </div>
+      );
+    }
+
+    if (isLanding) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '11px',
+              fontWeight: 600,
+              backgroundColor: '#7C3AED15',
+              color: '#7C3AED',
+              border: '1px solid #7C3AED40',
+              width: 'fit-content',
+            }}
+          >
+            Landing Page
+          </span>
+          {l.campaignName && (
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{l.campaignName}</span>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '2px 8px',
+          borderRadius: '12px',
+          fontSize: '11px',
+          fontWeight: 500,
+          backgroundColor: '#f1f5f9',
+          color: '#475569',
+          border: '1px solid #cbd5e1',
+          width: 'fit-content',
+        }}
+      >
+        {source ? source.replace(/_/g, ' ') : 'Website'}
+      </span>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Top Header */}
@@ -131,11 +240,25 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
               : 'Track inquiries, record contact attempts, schedule counselling, and qualify students.'}
           </p>
         </div>
-        {!isStudentOnly && (
-          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsCreateOpen(true)}>
-            Create Lead
-          </Button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+            <span>Last synced: {secondsAgo < 5 ? 'Just now' : `${secondsAgo}s ago`}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw size={14} className={loading ? 'animate-spin' : ''} />}
+              onClick={() => fetchLeads()}
+              title="Sync now"
+            >
+              Sync Now
+            </Button>
+          </div>
+          {!isStudentOnly && (
+            <Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsCreateOpen(true)}>
+              Create Lead
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filter & Search Bar */}
@@ -309,8 +432,29 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ),
           },
           {
+            header: 'SOURCE',
+            render: (l) => renderSourceBadge(l),
+          },
+          {
             header: 'STATUS',
-            render: (l) => <StatusBadge status={l.status} />,
+            render: (l) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {l.status === 'NEW' && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: '#22c55e',
+                      boxShadow: '0 0 6px #22c55e',
+                    }}
+                    title="New Lead"
+                  />
+                )}
+                <StatusBadge status={l.status} />
+              </div>
+            ),
           },
           {
             header: 'ASSIGNED COUNSELLOR',

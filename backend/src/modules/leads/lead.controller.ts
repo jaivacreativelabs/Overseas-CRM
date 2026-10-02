@@ -393,4 +393,89 @@ export class LeadController {
       next(error);
     }
   }
+
+  static async captureLandingPageLead(req: Request, res: Response, next: NextFunction) {
+    try {
+      const token = req.headers['x-crm-client-token'];
+      const expectedToken = process.env.LANDING_PAGE_SECRET_TOKEN || 'jaiva_landing_page_secret_2026';
+      
+      // Optional header verification if header is present or token is required
+      if (token && token !== expectedToken) {
+        return ApiResponse.error(res, 'Invalid API client token', 403);
+      }
+
+      const { name, email, phone, preferredCountry, targetCountry, targetCourse, budget, campaignName, utmParams, notes } = req.body;
+
+      if (!name || !email || !phone) {
+        return ApiResponse.error(res, 'Name, email, and phone are required fields.', 400);
+      }
+
+      const result = await LeadService.captureLandingPageLead({
+        name,
+        email,
+        phone,
+        preferredCountry: preferredCountry || targetCountry,
+        targetCourse,
+        budget,
+        campaignName,
+        utmParams,
+        notes,
+      });
+
+      return ApiResponse.created(
+        res,
+        result.isDuplicate ? 'Lead entry updated (existing duplicate found within 24h)' : 'Landing page lead captured successfully',
+        result.lead
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async verifyMetaWebhook(req: Request, res: Response) {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    const verifyToken = process.env.META_VERIFY_TOKEN || 'jaiva_meta_token_2026';
+
+    if (mode === 'subscribe' && token === verifyToken) {
+      return res.status(200).send(challenge);
+    }
+    return res.status(403).send('Verification failed');
+  }
+
+  static async handleMetaWebhook(req: Request, res: Response) {
+    try {
+      const entry = req.body.entry?.[0];
+      const change = entry?.changes?.[0]?.value;
+
+      if (change && change.leadgen_id) {
+        await LeadService.ingestMetaLead({
+          metaLeadId: change.leadgen_id,
+          name: req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
+          email: req.body.email || `lead_${change.leadgen_id}@meta.com`,
+          phone: req.body.phone || '0000000000',
+          campaignName: req.body.campaignName || change.form_id || 'Meta Ad Campaign',
+        });
+      } else if (req.body.email || req.body.name) {
+        await LeadService.ingestMetaLead({
+          metaLeadId: req.body.metaLeadId || req.body.id || `meta_${Date.now()}`,
+          name: req.body.name || 'Meta Ad Lead',
+          email: req.body.email || `meta_${Date.now()}@lead.com`,
+          phone: req.body.phone || '0000000000',
+          preferredCountry: req.body.preferredCountry || req.body.targetCountry,
+          targetCourse: req.body.targetCourse,
+          campaignName: req.body.campaignName || 'Meta Instant Form',
+          notes: req.body.notes,
+        });
+      }
+
+      return res.status(200).send('EVENT_RECEIVED');
+    } catch (error) {
+      // Always return 200 to prevent Meta webhook retry loop
+      return res.status(200).send('EVENT_RECEIVED');
+    }
+  }
 }
+

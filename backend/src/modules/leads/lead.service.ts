@@ -479,7 +479,7 @@ export class LeadService {
       throw new NotFoundError('Lead not found');
     }
 
-    lead.previousStatus = lead.status;
+    lead.previousStatus = lead.status as LeadStatus;
     lead.previousStage = lead.stage;
     lead.status = LeadStatus.CLOSED_LOST;
     lead.closedLostReason = reason;
@@ -595,5 +595,132 @@ export class LeadService {
       entityId: leadId,
       before: lead.toObject(),
     });
+  }
+
+  static async captureLandingPageLead(data: {
+    name: string;
+    email: string;
+    phone: string;
+    city?: string;
+    state?: string;
+    preferredCountry?: string;
+    targetCountry?: string;
+    targetCourse?: string;
+    budget?: string;
+    campaignName?: string;
+    utmParams?: any;
+    notes?: string;
+  }): Promise<{ lead: ILead; isDuplicate: boolean }> {
+    const emailClean = data.email.toLowerCase().trim();
+    const phoneClean = data.phone.trim();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const existing = await LeadModel.findOne({
+      isArchived: false,
+      createdAt: { $gte: twentyFourHoursAgo },
+      $or: [{ email: emailClean }, { phone: phoneClean }],
+    });
+
+    if (existing) {
+      if (data.campaignName && !existing.campaignName) existing.campaignName = data.campaignName;
+      if (data.utmParams && !existing.utmParams) existing.utmParams = data.utmParams;
+      await existing.save();
+      return { lead: existing, isDuplicate: true };
+    }
+
+    const countryVal = data.preferredCountry || data.targetCountry || 'International';
+
+    const lead = await LeadModel.create({
+      name: data.name.trim(),
+      email: emailClean,
+      phone: phoneClean,
+      city: data.city,
+      state: data.state,
+      targetCountry: countryVal,
+      preferredCountry: countryVal,
+      targetCourse: data.targetCourse,
+      budget: data.budget,
+      source: 'Landing Page',
+      status: LeadStatus.NEW,
+      stage: StudentStage.LEAD_CAPTURED,
+      campaignName: data.campaignName || '',
+      utmParams: data.utmParams || {},
+      notes: data.notes || 'Captured via Web Landing Page Form',
+    });
+
+    await ActivityService.log({
+      leadId: lead._id.toString(),
+      actorId: 'system',
+      actorName: 'Landing Page Webhook',
+      actorRole: UserRole.ADMIN,
+      action: 'LEAD_CAPTURED',
+      title: 'Landing Page Lead Ingested',
+      description: `New lead from landing page: ${data.name} (${data.email})`,
+    });
+
+    return { lead, isDuplicate: false };
+  }
+
+  static async ingestMetaLead(data: {
+    metaLeadId?: string;
+    name: string;
+    email: string;
+    phone: string;
+    preferredCountry?: string;
+    targetCourse?: string;
+    campaignName?: string;
+    notes?: string;
+  }): Promise<{ lead: ILead; isDuplicate: boolean }> {
+    const emailClean = data.email.toLowerCase().trim();
+    const phoneClean = data.phone.trim();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    let existing: ILead | null = null;
+
+    if (data.metaLeadId) {
+      existing = await LeadModel.findOne({ metaLeadId: data.metaLeadId, isArchived: false });
+    }
+
+    if (!existing) {
+      existing = await LeadModel.findOne({
+        isArchived: false,
+        createdAt: { $gte: twentyFourHoursAgo },
+        $or: [{ email: emailClean }, { phone: phoneClean }],
+      });
+    }
+
+    if (existing) {
+      if (data.metaLeadId) existing.metaLeadId = data.metaLeadId;
+      if (data.campaignName && !existing.campaignName) existing.campaignName = data.campaignName;
+      await existing.save();
+      return { lead: existing, isDuplicate: true };
+    }
+
+    const lead = await LeadModel.create({
+      name: data.name.trim(),
+      email: emailClean,
+      phone: phoneClean,
+      targetCountry: data.preferredCountry || 'International',
+      preferredCountry: data.preferredCountry || 'International',
+      targetCourse: data.targetCourse,
+      source: 'Meta Ads',
+      status: LeadStatus.NEW,
+      stage: StudentStage.LEAD_CAPTURED,
+      metaLeadId: data.metaLeadId,
+      campaignName: data.campaignName || 'Meta Instant Form',
+      notes: data.notes || 'Ingested automatically via Meta Ads Webhook',
+    });
+
+    await ActivityService.log({
+      leadId: lead._id.toString(),
+      actorId: 'system',
+      actorName: 'Meta Webhook',
+      actorRole: UserRole.ADMIN,
+      action: 'LEAD_CAPTURED',
+      title: 'Meta Ads Lead Ingested',
+      description: `New Meta Ad Lead: ${data.name} (${data.email})`,
+    });
+
+    return { lead, isDuplicate: false };
   }
 }

@@ -77,7 +77,7 @@ type ActiveSection =
   | 'payments'
   | 'visa_travel';
 
-const getCurrentProcessInfo = (stage?: StudentStage) => {
+const getCurrentProcessInfo = (stage?: StudentStage | string) => {
   switch (stage) {
     case StudentStage.LEAD_CAPTURED:
     case StudentStage.PRELIMINARY_COUNSELLING:
@@ -259,7 +259,7 @@ export const LeadDetailPage: React.FC = () => {
 
   const [isReviewDocOpen, setIsReviewDocOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
-  const [docReviewStatus, setDocReviewStatus] = useState<DocumentStatus.SUCCESSFUL | DocumentStatus.FAILED>(DocumentStatus.SUCCESSFUL);
+  const [docReviewStatus, setDocReviewStatus] = useState<DocumentStatus>(DocumentStatus.APPROVED);
   const [docRejectionReason, setDocRejectionReason] = useState('');
 
   // Rich University & Course Detail Modal
@@ -1048,7 +1048,7 @@ export const LeadDetailPage: React.FC = () => {
         </div>
       ) : (
         <StageStepper
-          currentStage={lead.stage}
+          currentStage={lead.stage as StudentStage}
           activeStage={activeStage}
           onStageClick={handleStageClick}
         />

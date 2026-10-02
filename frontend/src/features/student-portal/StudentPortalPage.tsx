@@ -322,7 +322,7 @@ export const StudentPortalPage: React.FC = () => {
             {/* Collapsible Stepper Content */}
             {isJourneyExpanded && (
               <div style={{ marginTop: '10px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
-                <StageStepper currentStage={lead?.stage || StudentStage.PROFILE_EVALUATION} />
+                <StageStepper currentStage={(lead?.stage as StudentStage) || StudentStage.PROFILE_EVALUATION} />
               </div>
             )}
           </div>

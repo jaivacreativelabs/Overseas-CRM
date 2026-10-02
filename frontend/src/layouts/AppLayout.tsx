@@ -76,7 +76,7 @@ export const AppLayout: React.FC = () => {
       try {
         const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
         if (res.data?.[0]?.stage) {
-          setStudentStage(res.data[0].stage);
+          setStudentStage(res.data[0].stage as StudentStage);
         }
       } catch (err) {
         // silent fail

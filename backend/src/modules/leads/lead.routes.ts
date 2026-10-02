@@ -14,6 +14,11 @@ import {
 
 const router = Router();
 
+// Public Lead Ingestion & Webhook Endpoints (unauthenticated)
+router.post('/capture', LeadController.captureLandingPageLead);
+router.get('/webhook/meta', LeadController.verifyMetaWebhook);
+router.post('/webhook/meta', LeadController.handleMetaWebhook);
+
 router.get('/:id/download-all-details', authenticate, LeadController.downloadAllDetails);
 
 router.use(authenticate, requireStaff);

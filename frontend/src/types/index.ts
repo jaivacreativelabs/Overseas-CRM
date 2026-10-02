@@ -10,6 +10,8 @@ export enum AdminType {
 }
 
 export enum LeadSource {
+  META_ADS = 'Meta Ads',
+  LANDING_PAGE = 'Landing Page',
   WEBSITE = 'WEBSITE',
   INSTAGRAM = 'INSTAGRAM',
   FACEBOOK = 'FACEBOOK',
@@ -47,6 +49,8 @@ export enum StudentStage {
 
 export enum DocumentStatus {
   PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
   SUCCESSFUL = 'SUCCESSFUL',
   FAILED = 'FAILED',
 }
@@ -135,9 +139,17 @@ export interface Lead {
   targetCourse?: string;
   targetIntake?: string;
   budget?: string;
-  source: LeadSource;
-  status: LeadStatus;
-  stage: StudentStage;
+  source: LeadSource | string;
+  status: LeadStatus | string;
+  stage: StudentStage | string;
+  campaignName?: string;
+  preferredCountry?: string;
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  };
+  metaLeadId?: string;
   counsellorId?: { _id: string; name: string; email: string; phone?: string; avatar?: string };
   studentUserId?: { _id: string; name: string; email: string };
   closedLostReason?: string;
