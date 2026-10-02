@@ -49,6 +49,7 @@ export enum StudentStage {
 
 export enum DocumentStatus {
   PENDING = 'PENDING',
+  REQUESTED = 'REQUESTED',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   SUCCESSFUL = 'SUCCESSFUL',
@@ -139,9 +140,9 @@ export interface Lead {
   targetCourse?: string;
   targetIntake?: string;
   budget?: string;
-  source: LeadSource | string;
-  status: LeadStatus | string;
-  stage: StudentStage | string;
+  source: LeadSource;
+  status: LeadStatus;
+  stage: StudentStage;
   campaignName?: string;
   preferredCountry?: string;
   utmParams?: {
@@ -275,9 +276,9 @@ export interface Course {
 export interface Shortlist {
   _id: string;
   leadId: string;
-  universityId: string | University;
+  universityId: any;
   universityName: string;
-  courseId: string | Course;
+  courseId: any;
   courseTitle: string;
   country: string;
   intake: string;
