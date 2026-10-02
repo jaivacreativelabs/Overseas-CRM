@@ -28,6 +28,8 @@ import {
   Video,
   Eye,
   Download,
+  ChevronDown,
+  MoreHorizontal,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -220,6 +222,7 @@ export const LeadDetailPage: React.FC = () => {
   const [closedLostReason, setClosedLostReason] = useState('Budget Constraints / Financial Limitations');
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -648,153 +651,408 @@ export const LeadDetailPage: React.FC = () => {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Student / Lead record not found.</div>;
   }
 
+  const isConverted = lead.status === LeadStatus.INTERESTED || Boolean(lead.studentUserId) || isStudentRoute;
   const currentProcessInfo = getCurrentProcessInfo(lead.stage);
   const isOverview = activeSection === 'overview';
   const isDocuments = activeSection === 'documents';
   const isCurrentProcess = activeSection === 'currentProcess' || activeSection === currentProcessInfo.key;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Back button & Student Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', background: 'var(--bg-surface)', padding: '16px 20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<ArrowLeft size={16} />}
-            onClick={() => navigate(isStudentRoute ? '/students' : '/leads')}
-          >
-            Back to {isStudentRoute ? 'Students' : 'Leads'}
-          </Button>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{lead.name}</h1>
-              <StatusBadge status={lead.status} />
-              <Badge variant="primary">{lead.stage.replace(/_/g, ' ')}</Badge>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Top Breadcrumb Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+        <button
+          type="button"
+          onClick={() => navigate(isStudentRoute ? '/students' : '/leads')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            fontWeight: 500,
+            fontSize: '13px',
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--primary)')}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)')}
+        >
+          <ArrowLeft size={14} /> Back to {isStudentRoute ? 'Students' : 'Leads'}
+        </button>
+        <span style={{ color: 'var(--border-dark)' }}>/</span>
+        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{lead.name}</span>
+      </div>
+
+      {/* Executive Entity Profile Card */}
+      <div
+        style={{
+          background: 'var(--bg-surface)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border-color)',
+          padding: '20px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '20px',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        {/* Left Column: Identity Block + Toolbar underneath */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', flex: 1, minWidth: '300px' }}>
+          {/* Identity Block */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0057F8 0%, #154D96 100%)',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: '17px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(0, 87, 248, 0.25)',
+              }}
+            >
+              {(lead.name || 'L')
+                .split(' ')
+                .map((n: string) => n[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase()}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', flexWrap: 'wrap' }}>
-              <span><Mail size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{lead.email}</span>
-              <span><Phone size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{lead.phone}</span>
-              <span><MapPin size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{lead.city || 'India'}</span>
-              <span><strong>Source:</strong> <Badge variant="neutral">{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}</Badge></span>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.01em' }}>
+                  {lead.name}
+                </h1>
+                <StatusBadge status={lead.status} />
+                <Badge variant="primary">{lead.stage.replace(/_/g, ' ')}</Badge>
+              </div>
+
+              {/* Subtitle Contact & Target Row */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  fontSize: '12.5px',
+                  color: 'var(--text-secondary)',
+                  flexWrap: 'wrap',
+                  marginTop: '2px',
+                }}
+              >
+                {lead.email && (
+                  <a
+                    href={`mailto:${lead.email}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--primary)')}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)')}
+                  >
+                    <Mail size={13} color="var(--primary)" />
+                    <span>{lead.email}</span>
+                  </a>
+                )}
+
+                {lead.targetCountry && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>•</span>
+                    <Building2 size={13} color="var(--primary)" />
+                    <span>
+                      Target: <strong>{lead.targetCountry}</strong>
+                      {lead.targetCourse ? ` (${lead.targetCourse})` : ''}
+                    </span>
+                  </div>
+                )}
+
+                {lead.source && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>•</span>
+                    <span>Source: <strong>{String(lead.source).replace(/_/g, ' ')}</strong></span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Toolbar Row: WhatsApp, Call, Log Note, Schedule, More */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {!isStudentRoute && lead.phone && (
+              <>
+                {/* WhatsApp 1-Click Action */}
+                <a
+                  href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Chat / Call on WhatsApp"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 13px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: '#25D366',
+                    color: '#FFFFFF',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    textDecoration: 'none',
+                    boxShadow: '0 2px 6px rgba(37, 211, 102, 0.25)',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = '#1EBE5D')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = '#25D366')}
+                >
+                  <MessageSquare size={15} />
+                  <span>WhatsApp</span>
+                </a>
+
+                {/* Direct Phone Call Action */}
+                <a
+                  href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                  title={`Call ${lead.name}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 13px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--primary)',
+                    color: '#FFFFFF',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    textDecoration: 'none',
+                    boxShadow: '0 2px 6px rgba(0, 87, 248, 0.25)',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--primary-hover)')}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.backgroundColor = 'var(--primary)')}
+                >
+                  <PhoneCall size={15} />
+                  <span>Call</span>
+                </a>
+              </>
+            )}
+
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<PhoneCall size={14} />}
+              onClick={() => setIsContactModalOpen(true)}
+            >
+              Log Note
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Calendar size={14} />}
+              onClick={() => {
+                setCounsellingForm({
+                  scheduledDate: new Date().toISOString().split('T')[0],
+                  scheduledTime: '11:00',
+                  googleMeetLink: '',
+                  notes: '',
+                  counsellorId: lead.counsellorId?._id || user?._id || '',
+                });
+                setIsCounsellingModalOpen(true);
+              }}
+            >
+              Schedule
+            </Button>
+
+            {/* More Actions Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<MoreHorizontal size={15} />}
+                onClick={() => setIsMoreActionsOpen(!isMoreActionsOpen)}
+              >
+                More <ChevronDown size={13} />
+              </Button>
+
+              {isMoreActionsOpen && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                    onClick={() => setIsMoreActionsOpen(false)}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: 'calc(100% + 6px)',
+                      width: '200px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderRadius: 'var(--radius-md)',
+                      boxShadow: 'var(--shadow-lg)',
+                      border: '1px solid var(--border-color)',
+                      zIndex: 50,
+                      padding: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ justifyContent: 'flex-start', width: '100%', gap: '8px' }}
+                      onClick={() => {
+                        setIsMoreActionsOpen(false);
+                        setEditForm({
+                          name: lead.name || '',
+                          email: lead.email || '',
+                          phone: lead.phone || '',
+                          city: lead.city || '',
+                          targetCountry: lead.targetCountry || '',
+                          targetCourse: lead.targetCourse || '',
+                          targetIntake: lead.targetIntake || 'Fall 2026',
+                          budget: lead.budget || '',
+                          source: (lead.source as any) || LeadSource.WEBSITE,
+                          counsellorId: lead.counsellorId?._id || '',
+                          notes: lead.notes || '',
+                        });
+                        setIsEditModalOpen(true);
+                      }}
+                    >
+                      <Edit3 size={14} /> Edit Lead Info
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ justifyContent: 'flex-start', width: '100%', gap: '8px' }}
+                      onClick={() => {
+                        setIsMoreActionsOpen(false);
+                        window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank');
+                      }}
+                    >
+                      <FileText size={14} /> Download Dossier
+                    </button>
+
+                    <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '2px 0' }} />
+
+                    {lead.status !== LeadStatus.CLOSED_LOST ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ justifyContent: 'flex-start', width: '100%', gap: '8px', color: 'var(--danger)' }}
+                        onClick={() => {
+                          setIsMoreActionsOpen(false);
+                          setIsClosedLostModalOpen(true);
+                        }}
+                      >
+                        <XCircle size={14} /> Mark Closed Lost
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ justifyContent: 'flex-start', width: '100%', gap: '8px', color: 'var(--primary)' }}
+                        onClick={() => {
+                          setIsMoreActionsOpen(false);
+                          handleReopen();
+                        }}
+                      >
+                        <RotateCcw size={14} /> Reopen Lead
+                      </button>
+                    )}
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ justifyContent: 'flex-start', width: '100%', gap: '8px', color: 'var(--danger)' }}
+                        onClick={() => {
+                          setIsMoreActionsOpen(false);
+                          setIsDeleteConfirmOpen(true);
+                        }}
+                      >
+                        <Trash2 size={14} /> Delete Lead
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Organized Lead Actions Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<PhoneCall size={14} />}
-            onClick={() => setIsContactModalOpen(true)}
-          >
-            Call / Contact
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Calendar size={14} />}
-            onClick={() => {
-              setCounsellingForm({
-                scheduledDate: new Date().toISOString().split('T')[0],
-                scheduledTime: '11:00',
-                googleMeetLink: '',
-                notes: '',
-                counsellorId: lead.counsellorId?._id || user?._id || '',
-              });
-              setIsCounsellingModalOpen(true);
-            }}
-          >
-            Schedule Counselling
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Edit3 size={14} />}
-            onClick={() => {
-              setEditForm({
-                name: lead.name || '',
-                email: lead.email || '',
-                phone: lead.phone || '',
-                city: lead.city || '',
-                targetCountry: lead.targetCountry || '',
-                targetCourse: lead.targetCourse || '',
-                targetIntake: lead.targetIntake || 'Fall 2026',
-                budget: lead.budget || '',
-                source: (lead.source as any) || LeadSource.WEBSITE,
-                counsellorId: lead.counsellorId?._id || '',
-                notes: lead.notes || '',
-              });
-              setIsEditModalOpen(true);
-            }}
-          >
-            Edit Lead
-          </Button>
-
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<FileText size={14} />}
-            onClick={() => window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
-          >
-            Download All Details
-          </Button>
-
-          {lead.status !== LeadStatus.INTERESTED && lead.status !== LeadStatus.CLOSED_LOST && (
+        {/* Right Section: Vertically Centered "Convert to Student" Button */}
+        {lead.status !== LeadStatus.INTERESTED && lead.status !== LeadStatus.CLOSED_LOST && (
+          <div style={{ display: 'flex', alignItems: 'center', alignSelf: 'center', flexShrink: 0 }}>
             <Button
               variant="primary"
-              size="sm"
-              icon={<CheckCircle2 size={14} />}
+              size="md"
+              icon={<CheckCircle2 size={16} />}
               onClick={handleConvertToStudent}
               loading={actionLoading}
+              style={{
+                boxShadow: '0 2px 8px rgba(0, 87, 248, 0.25)',
+                fontWeight: 600,
+                padding: '10px 18px',
+                fontSize: '13.5px',
+              }}
             >
               Convert to Student
             </Button>
-          )}
-
-          {lead.status !== LeadStatus.CLOSED_LOST ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<XCircle size={14} color="var(--danger)" />}
-              onClick={() => setIsClosedLostModalOpen(true)}
-            >
-              Mark Closed Lost
-            </Button>
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<RotateCcw size={14} color="var(--primary)" />}
-              onClick={handleReopen}
-              loading={actionLoading}
-            >
-              Reopen Lead
-            </Button>
-          )}
-
-          {isAdmin && (
-            <Button
-              variant="danger"
-              size="sm"
-              icon={<Trash2 size={14} />}
-              onClick={() => setIsDeleteConfirmOpen(true)}
-            >
-              Delete Lead
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* 12-Stage Student Journey Stepper */}
-      <StageStepper
-        currentStage={lead.stage}
-        activeStage={activeStage}
-        onStageClick={handleStageClick}
-      />
+      {/* 12-Stage Student Journey Stepper (Active for Enrolled Students, Locked for Raw Leads) */}
+      {!isConverted ? (
+        <div
+          style={{
+            background: 'var(--bg-surface)',
+            border: '1px dashed var(--border-dark)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+          }}
+        >
+          <div
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--bg-subtle)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Lock size={18} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)' }}>
+              Student Application Journey (Locked)
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Complete counselling and click <strong>"Convert to Student"</strong> in the top-right corner to unlock university shortlisting, documents checklist, applications, and visa tracking.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <StageStepper
+          currentStage={lead.stage}
+          activeStage={activeStage}
+          onStageClick={handleStageClick}
+        />
+      )}
 
       {/* Navigation Tabs Header: Overview | [Current Process] | Documents */}
       <div className="tabs-header" role="tablist">
@@ -2515,11 +2773,11 @@ export const LeadDetailPage: React.FC = () => {
             value={docReviewStatus}
             onChange={(e) => setDocReviewStatus(e.target.value as any)}
             options={[
-              { value: DocumentStatus.APPROVED, label: 'Approve Document' },
-              { value: DocumentStatus.REJECTED, label: 'Reject Document (Requires Reason)' },
+              { value: DocumentStatus.SUCCESSFUL, label: 'Approve Document' },
+              { value: DocumentStatus.FAILED, label: 'Reject Document (Requires Reason)' },
             ]}
           />
-          {docReviewStatus === DocumentStatus.REJECTED && (
+          {docReviewStatus === DocumentStatus.FAILED && (
             <Textarea
               label="Rejection Reason *"
               value={docRejectionReason}

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Eye,
+  PhoneCall,
+  MessageSquare,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -137,8 +139,8 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="filter-toolbar">
-        <div className="filter-group">
+      <div className="filter-toolbar" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="filter-group" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
           <SearchInput value={search} onChange={setSearch} placeholder="Search by name, email, phone, city..." />
 
           <select
@@ -155,9 +157,25 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ))}
           </select>
 
+          {counsellors.length > 0 && (
+            <select
+              className="form-select"
+              style={{ width: '160px' }}
+              value={counsellorFilter}
+              onChange={(e) => setCounsellorFilter(e.target.value)}
+            >
+              <option value="">All Counsellors</option>
+              {counsellors.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <select
             className="form-select"
-            style={{ width: '150px' }}
+            style={{ width: '140px' }}
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value)}
           >
@@ -169,7 +187,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ))}
           </select>
 
-          {(search || statusFilter || sourceFilter || stageFilter) && (
+          {(search || statusFilter || sourceFilter || stageFilter || counsellorFilter) && (
             <Button
               variant="ghost"
               size="sm"
@@ -191,26 +209,102 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
       <Table
         columns={[
           {
-            header: 'STUDENT NAME',
-            render: (l) => (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div
-                  style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
-                  onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
-                >
-                  {l.name}
+            header: 'LEAD / CONTACT',
+            render: (l) => {
+              const initials = (l.name || 'L')
+                .split(' ')
+                .map((n: string) => n[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase();
+              const cleanPhone = (l.phone || '').replace(/[^0-9+]/g, '');
+              const waNumber = cleanPhone.replace(/^\+/, '');
+
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--primary-light)',
+                      color: 'var(--primary)',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      border: '1px solid rgba(0, 87, 248, 0.2)',
+                    }}
+                  >
+                    {initials}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div
+                      style={{ fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer', fontSize: '13.5px' }}
+                      onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
+                      onMouseEnter={(e) => ((e.target as HTMLElement).style.color = 'var(--primary)')}
+                      onMouseLeave={(e) => ((e.target as HTMLElement).style.color = 'var(--text-primary)')}
+                    >
+                      {l.name}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{l.phone || 'No phone'}</span>
+                      {cleanPhone && (
+                        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                          <a
+                            href={`https://wa.me/${waNumber}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Chat on WhatsApp"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              color: '#25D366',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 4px',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(37, 211, 102, 0.1)',
+                            }}
+                          >
+                            <MessageSquare size={12} />
+                          </a>
+                          <a
+                            href={`tel:${cleanPhone}`}
+                            title="Call Lead"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              color: 'var(--primary)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 4px',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--primary-light)',
+                            }}
+                          >
+                            <PhoneCall size={12} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{l.email}</div>
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.email}</div>
-                {l.phone && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.phone}</div>}
-              </div>
-            ),
+              );
+            },
           },
           {
-            header: 'TARGET COUNTRY / COURSE',
+            header: 'TARGET COUNTRY & INTEREST',
             render: (l) => (
-              <div>
-                <div style={{ fontWeight: 500 }}>{l.targetCountry || 'Any Country'}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{l.targetCourse || 'Undecided'}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px' }}>
+                  {l.targetCountry || 'Undecided'}
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                  {l.targetCourse || 'General Inquiry'}
+                  {l.targetIntake ? ` • ${l.targetIntake}` : ''}
+                </div>
               </div>
             ),
           },
@@ -219,14 +313,55 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             render: (l) => <StatusBadge status={l.status} />,
           },
           {
-            header: 'CURRENT STAGE',
-            render: (l) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
+            header: 'ASSIGNED COUNSELLOR',
+            render: (l) => (
+              <div>
+                {l.counsellorId ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        backgroundColor: '#E2E8F0',
+                        color: '#475569',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {(l.counsellorId.name || 'C')[0].toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                      {l.counsellorId.name}
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Unassigned
+                  </span>
+                )}
+              </div>
+            ),
+          },
+          {
+            header: 'DATE ADDED',
+            render: (l) => {
+              const d = l.createdAt ? new Date(l.createdAt) : null;
+              return (
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                </div>
+              );
+            },
           },
           {
             header: 'ACTIONS',
             align: 'right',
             render: (l) => (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
                 <Button
                   variant="secondary"
                   size="sm"
