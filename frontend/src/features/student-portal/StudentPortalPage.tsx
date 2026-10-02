@@ -17,6 +17,8 @@ import {
   Mail,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
+  Building2,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -26,6 +28,8 @@ import {
   StudentStage,
   DocumentItem,
   Shortlist,
+  Application,
+  ApplicationStatus,
   Offer,
   Payment,
   VisaRecord,
@@ -54,11 +58,12 @@ export const StudentPortalPage: React.FC = () => {
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'journey' | 'universities' | 'documents' | 'offers' | 'payments' | 'visa_travel' | 'messages' | 'help'>('journey');
+  const [activeTab, setActiveTab] = useState<'journey' | 'universities' | 'documents' | 'applications' | 'offers' | 'payments' | 'visa_travel' | 'messages' | 'help'>('journey');
   const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
 
   const [shortlists, setShortlists] = useState<Shortlist[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [visa, setVisa] = useState<VisaRecord | null>(null);
@@ -74,6 +79,7 @@ export const StudentPortalPage: React.FC = () => {
 
   const [isSignOfferOpen, setIsSignOfferOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+  const [signedOfferFile, setSignedOfferFile] = useState<File | null>(null);
   const [signedOfferUrl, setSignedOfferUrl] = useState('');
 
   const [isSubmitPaymentOpen, setIsSubmitPaymentOpen] = useState(false);
@@ -89,9 +95,10 @@ export const StudentPortalPage: React.FC = () => {
       const currentLead = res.data?.[0];
       if (currentLead) {
         setLead(currentLead);
-        const [shortRes, docRes, offRes, payRes, visRes, travRes, msgRes, taskRes] = await Promise.all([
+        const [shortRes, docRes, appRes, offRes, payRes, visRes, travRes, msgRes, taskRes] = await Promise.all([
           apiClient.get<Shortlist[]>(`/universities/shortlists/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<DocumentItem[]>(`/documents/lead/${currentLead._id}`).catch(() => ({ data: [] })),
+          apiClient.get<Application[]>(`/applications/lead/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<Offer[]>(`/offers/lead/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<Payment[]>(`/payments/lead/${currentLead._id}`).catch(() => ({ data: [] })),
           apiClient.get<VisaRecord>(`/visa/lead/${currentLead._id}`).catch(() => ({ data: null })),
@@ -102,6 +109,7 @@ export const StudentPortalPage: React.FC = () => {
 
         setShortlists(shortRes.data || []);
         setDocuments(docRes.data || []);
+        setApplications(appRes.data || []);
         setOffers(offRes.data || []);
         setPayments(payRes.data || []);
         setVisa(visRes.data);
@@ -154,12 +162,19 @@ export const StudentPortalPage: React.FC = () => {
     e.preventDefault();
     if (!selectedOffer) return;
     try {
-      await apiClient.post(`/offers/${selectedOffer._id}/signed`, {
-        signedOfferUrl,
-        signedOfferFileName: 'Signed_Acceptance_Copy.pdf',
-      });
+      if (signedOfferFile) {
+        const fd = new FormData();
+        fd.append('file', signedOfferFile);
+        await apiClient.post(`/offers/${selectedOffer._id}/signed`, fd);
+      } else {
+        await apiClient.post(`/offers/${selectedOffer._id}/signed`, {
+          signedOfferUrl: signedOfferUrl || '/uploads/signed_offer.pdf',
+          signedOfferFileName: 'Signed_Acceptance_Copy.pdf',
+        });
+      }
       success('Signed offer uploaded! Awaiting counsellor acceptance.');
       setIsSignOfferOpen(false);
+      setSignedOfferFile(null);
       fetchStudentData();
     } catch (err: any) {
       error(err.message || 'Upload failed');
@@ -245,6 +260,9 @@ export const StudentPortalPage: React.FC = () => {
         <button className={`student-tab-btn ${activeTab === 'documents' ? 'active' : ''}`} onClick={() => setActiveTab('documents')}>
           Upload Documents ({documents.length})
         </button>
+        <button className={`student-tab-btn ${activeTab === 'applications' ? 'active' : ''}`} onClick={() => setActiveTab('applications')}>
+          My Applications ({applications.length})
+        </button>
         <button className={`student-tab-btn ${activeTab === 'offers' ? 'active' : ''}`} onClick={() => setActiveTab('offers')}>
           Offers & Acceptance ({offers.length})
         </button>
@@ -318,13 +336,15 @@ export const StudentPortalPage: React.FC = () => {
                       ? 'Your university options are ready! Please review the shortlist and confirm your 1 preferred university.'
                       : lead?.stage === StudentStage.DOCUMENT_COLLECTION
                         ? 'Please upload your mandatory documents (Passport, Degree/Transcripts, English Test Score) for verification.'
-                        : lead?.stage === StudentStage.OFFER_MANAGEMENT
-                          ? 'Congratulations! Your university offer letter is ready. Download it, sign the acceptance page, and upload your signed copy.'
-                          : lead?.stage === StudentStage.FEE_PAYMENT
-                            ? 'Your offer is accepted! Please check the fee deposit details and upload your wire transfer receipt.'
-                            : lead?.stage === StudentStage.VISA_PROCESSING
-                              ? 'Your student visa filing is currently in progress with the embassy. We will notify you upon decision.'
-                              : 'Get ready for your pre-departure orientation and flight booking!'}
+                        : lead?.stage === StudentStage.APPLICATION_SUBMISSION
+                          ? 'Your application has been officially submitted to your chosen university! We are actively tracking the admissions office decision.'
+                          : lead?.stage === StudentStage.OFFER_MANAGEMENT
+                            ? 'Congratulations! Your university offer letter is ready. Download it, sign the acceptance page, and upload your signed copy.'
+                            : lead?.stage === StudentStage.FEE_PAYMENT
+                              ? 'Your offer is accepted! Please check the fee deposit details and upload your wire transfer receipt.'
+                              : lead?.stage === StudentStage.VISA_PROCESSING
+                                ? 'Your student visa filing is currently in progress with the embassy. We will notify you upon decision.'
+                                : 'Get ready for your pre-departure orientation and flight booking!'}
                 </p>
 
                 {/* Direct CTA button to help user */}
@@ -336,6 +356,11 @@ export const StudentPortalPage: React.FC = () => {
                 {lead?.stage === StudentStage.DOCUMENT_COLLECTION && (
                   <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setActiveTab('documents')}>
                     👉 Upload Required Documents
+                  </Button>
+                )}
+                {lead?.stage === StudentStage.APPLICATION_SUBMISSION && (
+                  <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setActiveTab('applications')}>
+                    👉 Track University Application
                   </Button>
                 )}
                 {lead?.stage === StudentStage.OFFER_MANAGEMENT && (
@@ -502,58 +527,301 @@ export const StudentPortalPage: React.FC = () => {
         </div>
       )}
 
+      {/* --- TAB: APPLICATIONS --- */}
+      {activeTab === 'applications' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <h3 className="card-title">My University Applications</h3>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Track your official admission applications submitted to foreign universities.
+                </p>
+              </div>
+            </div>
+
+            {applications.length === 0 ? (
+              <div style={{ padding: '36px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                No active university applications lodged yet. Once your mandatory documents are verified, your counsellor will submit your official application.
+              </div>
+            ) : (
+              <div className="student-table-responsive">
+                <Table
+                  columns={[
+                    {
+                      header: 'UNIVERSITY & COUNTRY',
+                      render: (a: Application) => (
+                        <div>
+                          <strong>{a.universityName}</strong>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{a.country}</div>
+                        </div>
+                      ),
+                    },
+                    {
+                      header: 'COURSE & INTAKE',
+                      render: (a: Application) => (
+                        <div>
+                          <div style={{ fontWeight: 500 }}>{a.courseTitle}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{a.intake}</div>
+                        </div>
+                      ),
+                    },
+                    {
+                      header: 'APPLICATION NUMBER',
+                      render: (a: Application) =>
+                        a.applicationNumber ? (
+                          <code style={{ fontSize: '11.5px', backgroundColor: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px' }}>
+                            {a.applicationNumber}
+                          </code>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Under Generation</span>
+                        ),
+                    },
+                    {
+                      header: 'SUBMITTED DATE',
+                      render: (a: Application) =>
+                        a.submissionDate ? new Date(a.submissionDate).toLocaleDateString() : '—',
+                    },
+                    {
+                      header: 'STATUS',
+                      render: (a: Application) => <StatusBadge status={a.status} />,
+                    },
+                    {
+                      header: 'NEXT ACTION',
+                      align: 'right',
+                      render: (a: Application) => {
+                        if (a.status === ApplicationStatus.OFFER_RECEIVED) {
+                          return (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              icon={<Award size={13} />}
+                              onClick={() => setActiveTab('offers')}
+                            >
+                              View Offer Letter →
+                            </Button>
+                          );
+                        }
+                        if (a.status === ApplicationStatus.REJECTED) {
+                          return (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setActiveTab('universities')}
+                            >
+                              Choose Another University →
+                            </Button>
+                          );
+                        }
+                        return (
+                          <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>
+                            Admissions in progress...
+                          </span>
+                        );
+                      },
+                    },
+                  ]}
+                  data={applications}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Rejection Notification & Guidance Banner */}
+          {applications.some((a) => a.status === ApplicationStatus.REJECTED) && (
+            <div
+              style={{
+                padding: '16px',
+                backgroundColor: 'var(--danger-bg)',
+                border: '1px solid var(--danger-border)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <h4 style={{ color: 'var(--danger)', fontSize: '13.5px', fontWeight: 600, margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={16} /> University Application Notice
+              </h4>
+              {applications
+                .filter((a) => a.status === ApplicationStatus.REJECTED)
+                .map((a) => (
+                  <div key={a._id} style={{ fontSize: '12.5px', color: 'var(--danger-text)', marginBottom: '8px' }}>
+                    <strong>{a.universityName}</strong>: {a.rejectionReason || 'Application was not accepted for this intake.'}
+                  </div>
+                ))}
+              <div style={{ marginTop: '10px' }}>
+                <Button variant="secondary" size="sm" onClick={() => setActiveTab('universities')}>
+                  👉 Select Another University from Shortlist
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* --- TAB 4: OFFERS --- */}
       {activeTab === 'offers' && (
-        <div className="card">
-          <h3 className="card-title" style={{ marginBottom: '14px' }}>Official University Offer Letters</h3>
-          <div className="student-table-responsive">
-            <Table
-              columns={[
-                { header: 'UNIVERSITY', accessor: 'universityName' },
-                { header: 'COURSE', accessor: 'courseTitle' },
-                { header: 'OFFER TYPE', accessor: 'offerType' },
-                {
-                  header: 'OFFICIAL LETTER',
-                  render: (o) => (
-                    <a href={o.originalOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 500 }}>
-                      Download Official Offer <ExternalLink size={12} />
-                    </a>
-                  ),
-                },
-                {
-                  header: 'SIGNED ACCEPTANCE',
-                  render: (o) =>
-                    o.signedOfferUrl ? (
-                      <span style={{ color: 'var(--success)' }}>✓ Uploaded</span>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>Pending</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="card">
+            <div className="card-header">
+              <div>
+                <h3 className="card-title">Official University Offer Letters</h3>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  Download official admission letters, sign acceptance declarations, and upload signed copies to proceed to fee payment.
+                </p>
+              </div>
+            </div>
+
+            <div className="student-table-responsive">
+              <Table
+                columns={[
+                  {
+                    header: 'UNIVERSITY & COURSE',
+                    render: (o: Offer) => (
+                      <div>
+                        <strong>{o.universityName}</strong>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{o.courseTitle}</div>
+                      </div>
                     ),
-                },
-                {
-                  header: 'STATUS',
-                  render: (o) => <StatusBadge status={o.status} />,
-                },
-                {
-                  header: 'ACTION',
-                  align: 'right',
-                  render: (o) => (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedOffer(o);
-                        setIsSignOfferOpen(true);
-                      }}
-                    >
-                      {o.signedOfferUrl ? 'Update Signed Copy' : 'Upload Signed Offer'}
-                    </Button>
-                  ),
-                },
-              ]}
-              data={offers}
-              emptyMessage="No university offer letters available yet."
-            />
+                  },
+                  {
+                    header: 'OFFER TYPE',
+                    render: (o: Offer) => (
+                      <Badge variant={o.offerType === 'UNCONDITIONAL' ? 'success' : 'neutral'}>
+                        {o.offerType}
+                      </Badge>
+                    ),
+                  },
+                  {
+                    header: 'TUITION & DEPOSIT',
+                    render: (o: Offer) => (
+                      <div>
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {o.currency} {o.depositAmount.toLocaleString()}
+                        </strong>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
+                          Tuition: {o.currency} {o.tuitionFee.toLocaleString()}
+                        </span>
+                        {o.deadlineDate && (
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block' }}>
+                            Accept by: {new Date(o.deadlineDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
+                    header: 'OFFICIAL LETTER',
+                    render: (o: Offer) => (
+                      <a
+                        href={o.originalOfferUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'var(--primary)', fontWeight: 500, fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Award size={13} /> Download Letter <ExternalLink size={11} />
+                      </a>
+                    ),
+                  },
+                  {
+                    header: 'SIGNED ACCEPTANCE',
+                    render: (o: Offer) =>
+                      o.signedOfferUrl ? (
+                        <a
+                          href={o.signedOfferUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: 'var(--success)', fontWeight: 500, fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          View Signed Copy <ExternalLink size={11} />
+                        </a>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Pending Upload</span>
+                      ),
+                  },
+                  {
+                    header: 'STATUS',
+                    render: (o: Offer) => <StatusBadge status={o.status} />,
+                  },
+                  {
+                    header: 'ACTION',
+                    align: 'right',
+                    render: (o: Offer) => (
+                      <Button
+                        variant={o.status === OfferStatus.REJECTED ? 'danger' : 'primary'}
+                        size="sm"
+                        disabled={o.status === OfferStatus.ACCEPTED}
+                        onClick={() => {
+                          setSelectedOffer(o);
+                          setSignedOfferUrl(o.signedOfferUrl || '');
+                          setIsSignOfferOpen(true);
+                        }}
+                      >
+                        {o.status === OfferStatus.ACCEPTED
+                          ? 'Accepted ✓'
+                          : o.status === OfferStatus.REJECTED
+                            ? 'Re-upload Signed Copy'
+                            : o.signedOfferUrl
+                              ? 'Update Signed Copy'
+                              : 'Upload Signed Offer'}
+                      </Button>
+                    ),
+                  },
+                ]}
+                data={offers}
+                emptyMessage="No university offer letters available yet. Once admission is granted, your letter will appear here."
+              />
+            </div>
           </div>
+
+          {/* Offer Conditions Card if conditions exist */}
+          {offers.some((o) => o.conditions) && (
+            <div className="card">
+              <h4 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                📋 University Offer Conditions & Instructions
+              </h4>
+              {offers
+                .filter((o) => o.conditions)
+                .map((o) => (
+                  <div
+                    key={o._id}
+                    style={{
+                      padding: '12px 14px',
+                      backgroundColor: 'var(--bg-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-light)',
+                      marginBottom: '8px',
+                      fontSize: '12.5px',
+                      color: 'var(--text-secondary)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <strong>{o.universityName} ({o.courseTitle}):</strong> {o.conditions}
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {/* Signed Offer Rejection Feedback if rejected */}
+          {offers.some((o) => o.status === OfferStatus.REJECTED) && (
+            <div
+              style={{
+                padding: '16px',
+                backgroundColor: 'var(--danger-bg)',
+                border: '1px solid var(--danger-border)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <h4 style={{ color: 'var(--danger)', fontSize: '13.5px', fontWeight: 600, margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={16} /> Signed Acceptance Feedback
+              </h4>
+              {offers
+                .filter((o) => o.status === OfferStatus.REJECTED)
+                .map((o) => (
+                  <div key={o._id} style={{ fontSize: '12.5px', color: 'var(--danger-text)', marginBottom: '8px' }}>
+                    <strong>{o.universityName}</strong>: {o.rejectionReason || o.reviewNotes || 'Your signed acceptance was rejected by your counsellor. Please review the instructions and re-upload.'}
+                  </div>
+                ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -770,11 +1038,20 @@ export const StudentPortalPage: React.FC = () => {
       {/* --- Student Upload Signed Offer Modal --- */}
       <Modal
         isOpen={isSignOfferOpen}
-        onClose={() => setIsSignOfferOpen(false)}
+        onClose={() => {
+          setIsSignOfferOpen(false);
+          setSignedOfferFile(null);
+        }}
         title="Upload Signed Acceptance Letter"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsSignOfferOpen(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsSignOfferOpen(false);
+                setSignedOfferFile(null);
+              }}
+            >
               Cancel
             </Button>
             <Button variant="primary" onClick={handleUploadSignedOffer}>
@@ -784,11 +1061,39 @@ export const StudentPortalPage: React.FC = () => {
         }
       >
         <form onSubmit={handleUploadSignedOffer}>
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: 'var(--bg-subtle)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-light)',
+              marginBottom: '14px',
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            Download your official offer letter from the portal, print or sign electronically on the student declaration page, and upload the signed PDF below.
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Attach Signed PDF File</label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.png,.jpg"
+              className="form-input"
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  setSignedOfferFile(e.target.files[0]);
+                }
+              }}
+            />
+          </div>
+
           <Input
-            label="Signed Offer PDF URL"
+            label="Or Document File URL"
             value={signedOfferUrl}
             onChange={(e) => setSignedOfferUrl(e.target.value)}
-            required
+            placeholder="e.g. /uploads/signed_offer_rohan.pdf"
           />
         </form>
       </Modal>

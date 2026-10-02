@@ -6,7 +6,25 @@ import { NotFoundError, ValidationError, StageLockedError } from '../../utils/er
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
 
+const VALID_APPLICATION_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
+  [ApplicationStatus.SUBMITTED]: [ApplicationStatus.UNDER_REVIEW, ApplicationStatus.REJECTED],
+  [ApplicationStatus.UNDER_REVIEW]: [ApplicationStatus.OFFER_RECEIVED, ApplicationStatus.REJECTED],
+  [ApplicationStatus.OFFER_RECEIVED]: [],
+  [ApplicationStatus.REJECTED]: [],
+};
+
 export class ApplicationService {
+  static async getAllApplications(filter: { status?: ApplicationStatus } = {}): Promise<any[]> {
+    const query: any = {};
+    if (filter.status) {
+      query.status = filter.status;
+    }
+    return ApplicationModel.find(query)
+      .populate('leadId', 'name email phone stage targetCountry targetCourse')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
   static async getApplicationsForLead(leadId: string): Promise<any[]> {
     return ApplicationModel.find({ leadId: new Types.ObjectId(leadId) })
       .sort({ createdAt: -1 })
@@ -112,15 +130,36 @@ export class ApplicationService {
     const app = await ApplicationModel.findById(applicationId);
     if (!app) throw new NotFoundError('Application not found');
 
-    if (data.status === ApplicationStatus.REJECTED && !data.rejectionReason) {
-      throw new ValidationError('A reason is mandatory when marking an application as Rejected.');
+    // Terminal state protection: REJECTED and OFFER_RECEIVED are terminal for this application
+    if (app.status === ApplicationStatus.REJECTED || app.status === ApplicationStatus.OFFER_RECEIVED) {
+      if (data.status !== app.status) {
+        throw new ValidationError(
+          `Cannot change application status. Current status '${app.status}' is a terminal state and cannot be modified.`
+        );
+      }
+    } else if (data.status !== app.status) {
+      // Validate workflow transition: SUBMITTED -> UNDER_REVIEW -> OFFER_RECEIVED / REJECTED
+      const allowedNext = VALID_APPLICATION_TRANSITIONS[app.status] || [];
+      if (!allowedNext.includes(data.status)) {
+        throw new ValidationError(
+          `Invalid status transition from '${app.status}' to '${data.status}'. Permitted transitions: ${allowedNext.join(', ') || 'None'}.`
+        );
+      }
+    }
+
+    if (data.status === ApplicationStatus.REJECTED && (!data.rejectionReason || !data.rejectionReason.trim())) {
+      throw new ValidationError('A rejection reason is mandatory when marking an application as Rejected.');
     }
 
     const beforeState = app.toObject();
 
     app.status = data.status;
-    app.rejectionReason = data.status === ApplicationStatus.REJECTED ? data.rejectionReason : undefined;
-    app.decisionDate = data.decisionDate || new Date();
+    if (data.status === ApplicationStatus.REJECTED) {
+      app.rejectionReason = data.rejectionReason?.trim();
+      app.decisionDate = data.decisionDate || new Date();
+    } else if (data.status === ApplicationStatus.OFFER_RECEIVED) {
+      app.decisionDate = data.decisionDate || new Date();
+    }
     if (data.notes) app.notes = data.notes;
 
     await app.save();

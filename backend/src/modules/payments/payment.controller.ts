@@ -3,9 +3,19 @@ import { PaymentService } from './payment.service';
 import { ApiResponse } from '../../utils/api-response';
 
 export class PaymentController {
+  static async getAllPayments(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = req.query.status as any;
+      const payments = await PaymentService.getAllPayments(status);
+      return ApiResponse.success(res, 'All payments retrieved', payments);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getPayments(req: Request, res: Response, next: NextFunction) {
     try {
-      const payments = await PaymentService.getPaymentsForLead(req.params.leadId);
+      const payments = await PaymentService.getPaymentsForLead(req.params.leadId, req.user?.role);
       return ApiResponse.success(res, 'Payments retrieved', payments);
     } catch (error) {
       next(error);

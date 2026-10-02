@@ -10,7 +10,8 @@ import {
   ICourse,
 } from './university.model';
 import { LeadModel } from '../leads/lead.model';
-import { StudentStage, UserRole } from '../../config/constants';
+import { ApplicationModel } from '../applications/application.model';
+import { ApplicationStatus, StudentStage, UserRole } from '../../config/constants';
 import { NotFoundError, ValidationError, StageLockedError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
@@ -170,6 +171,18 @@ export class UniversityService {
     const lead = await LeadModel.findById(leadId);
     if (!lead) throw new NotFoundError('Lead not found');
 
+    // Rule: One active application rule - cannot select a new university if there is already an active (SUBMITTED/UNDER_REVIEW) application
+    const activeApp = await ApplicationModel.findOne({
+      leadId: lead._id,
+      status: { $in: [ApplicationStatus.SUBMITTED, ApplicationStatus.UNDER_REVIEW] },
+    });
+
+    if (activeApp) {
+      throw new ValidationError(
+        `There is already an active application (${activeApp.courseTitle} at ${activeApp.universityName}). Complete or resolve it before selecting another university.`
+      );
+    }
+
     const selectedItem = await ShortlistModel.findOne({
       _id: new Types.ObjectId(shortlistId),
       leadId: lead._id,
@@ -189,8 +202,51 @@ export class UniversityService {
     selectedItem.status = 'SELECTED_BY_STUDENT';
     await selectedItem.save();
 
-    // Advance stage to DOCUMENT_COLLECTION if at UNIVERSITY_SHORTLISTING
-    if (lead.stage === StudentStage.UNIVERSITY_SHORTLISTING) {
+    // Check if the student previously had applications (e.g. A previous application was REJECTED) or is already at/past APPLICATION_SUBMISSION
+    const previousApplicationsCount = await ApplicationModel.countDocuments({ leadId: lead._id });
+
+    if (previousApplicationsCount > 0 || lead.stage === StudentStage.APPLICATION_SUBMISSION) {
+      // Create a NEW application with SUBMITTED status while preserving all previous applications in MongoDB
+      const newApp = await ApplicationModel.create({
+        leadId: lead._id,
+        studentId: lead.studentUserId,
+        universityId: selectedItem.universityId,
+        universityName: selectedItem.universityName,
+        courseId: selectedItem.courseId,
+        courseTitle: selectedItem.courseTitle,
+        country: selectedItem.country,
+        intake: selectedItem.intake,
+        status: ApplicationStatus.SUBMITTED,
+        submissionDate: new Date(),
+        createdById: new Types.ObjectId(studentUserId),
+        createdByName: studentName,
+      });
+
+      lead.stage = StudentStage.APPLICATION_SUBMISSION;
+      await lead.save();
+
+      await AuditService.log({
+        userId: studentUserId,
+        userName: studentName,
+        userRole: UserRole.STUDENT,
+        action: 'REAPPLICATION_SUBMITTED',
+        entityType: 'Application',
+        entityId: newApp._id.toString(),
+        after: newApp.toObject(),
+      });
+
+      await ActivityService.log({
+        leadId: lead._id.toString(),
+        studentId: studentUserId,
+        actorId: studentUserId,
+        actorName: studentName,
+        actorRole: UserRole.STUDENT,
+        action: 'APPLICATION_SUBMITTED',
+        title: 'New Application Submitted',
+        description: `New application submitted for ${newApp.courseTitle} at ${newApp.universityName} following reapplication selection.`,
+      });
+    } else if (lead.stage === StudentStage.UNIVERSITY_SHORTLISTING) {
+      // First-time selection advances stage to DOCUMENT_COLLECTION
       lead.stage = StudentStage.DOCUMENT_COLLECTION;
       await lead.save();
     }

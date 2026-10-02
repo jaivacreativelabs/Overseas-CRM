@@ -278,7 +278,8 @@ export interface DocumentItem {
 
 export interface Application {
   _id: string;
-  leadId: string;
+  leadId: any;
+  studentId?: any;
   universityId: string;
   universityName: string;
   courseId: string;
@@ -293,14 +294,17 @@ export interface Application {
   portalUsername?: string;
   portalPassword?: string;
   notes?: string;
+  createdById?: string;
   createdByName: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Offer {
   _id: string;
-  leadId: string;
-  applicationId: string;
+  leadId: any;
+  studentId?: any;
+  applicationId: any;
   universityName: string;
   courseTitle: string;
   offerType: 'CONDITIONAL' | 'UNCONDITIONAL';
@@ -315,9 +319,15 @@ export interface Offer {
   signedOfferUrl?: string;
   signedOfferFileName?: string;
   signedUploadedAt?: string;
+  reviewedById?: string;
   reviewedByName?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
+  rejectionReason?: string;
+  uploadedById?: string;
   uploadedByName: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Payment {

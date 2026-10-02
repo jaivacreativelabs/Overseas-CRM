@@ -3,6 +3,16 @@ import { ApplicationService } from './application.service';
 import { ApiResponse } from '../../utils/api-response';
 
 export class ApplicationController {
+  static async getAllApplications(req: Request, res: Response, next: NextFunction) {
+    try {
+      const status = req.query.status as any;
+      const apps = await ApplicationService.getAllApplications({ status });
+      return ApiResponse.success(res, 'All applications retrieved', apps);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getApplications(req: Request, res: Response, next: NextFunction) {
     try {
       const apps = await ApplicationService.getApplicationsForLead(req.params.leadId);
