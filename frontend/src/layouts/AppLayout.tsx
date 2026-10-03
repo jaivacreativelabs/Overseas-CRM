@@ -250,7 +250,7 @@ export const AppLayout: React.FC = () => {
             }}
             title="Close Panel"
           >
-            <X size={20} />
+            <Menu size={20} />
           </button>
         </div>
 
@@ -404,53 +404,28 @@ export const AppLayout: React.FC = () => {
             zIndex: 90,
           }}
         >
-          {/* Left Header Actions: 3-Bars Hamburger Button & Title */}
+          {/* Left Header Actions: 3-Bars Hamburger Button */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button
-              onClick={toggleSidebar}
-              style={{
-                background: 'none',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                padding: '7px 9px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--text-primary)',
-                transition: 'background-color 0.15s ease',
-              }}
-              title={sidebarCollapsed ? 'Open Left Panel' : 'Close Left Panel'}
-            >
-              <Menu size={20} />
-            </button>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              <img
-                src="/logo.png"
-                alt="IIEC Logo"
+            {sidebarCollapsed && (
+              <button
+                onClick={toggleSidebar}
                 style={{
-                  height: '30px',
-                  maxWidth: '130px',
-                  objectFit: 'contain',
-                  display: 'block',
+                  background: 'none',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '7px 9px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--text-primary)',
+                  transition: 'background-color 0.15s ease',
                 }}
-              />
-              <span
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  color: '#D8232A',
-                  backgroundColor: '#FEF2F2',
-                  border: '1px solid #FECACA',
-                  padding: '2px 5px',
-                  borderRadius: '4px',
-                  letterSpacing: '0.04em',
-                }}
+                title={'Open Left Panel'}
               >
-                CRM
-              </span>
-            </div>
+                <Menu size={20} />
+              </button>
+            )}
           </div>
 
           {/* Right Header Actions */}

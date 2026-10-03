@@ -151,8 +151,8 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
 
   const renderSourceBadge = (l: Lead) => {
     const source = l.source;
-    const isMeta = source === LeadSource.META_ADS || source === 'Meta Ads';
-    const isLanding = source === LeadSource.LANDING_PAGE || source === 'Landing Page';
+    const isMeta = source === LeadSource.META_ADS;
+    const isLanding = source === LeadSource.LANDING_PAGE;
 
     if (isMeta) {
       return (

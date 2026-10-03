@@ -126,6 +126,31 @@ export const StudentPortalPage: React.FC = () => {
 
   useEffect(() => {
     fetchStudentData();
+
+    // Auto-refresh when tab becomes visible or gets focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchStudentData();
+      }
+    };
+    
+    const handleFocus = () => {
+      fetchStudentData();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    // Polling every 30 seconds to keep data synced
+    const interval = setInterval(() => {
+      fetchStudentData();
+    }, 30000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
   }, [fetchStudentData]);
 
   // Student selects 1 university
