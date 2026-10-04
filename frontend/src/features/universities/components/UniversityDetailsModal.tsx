@@ -320,17 +320,38 @@ export const UniversityDetailsModal: React.FC<UniversityDetailsModalProps> = ({
 
           {/* Title & Location */}
           <div style={{ marginTop: '12px' }}>
-            <h1
-              style={{
-                fontSize: '22px',
-                fontWeight: 800,
-                color: 'var(--text-primary)',
-                lineHeight: 1.25,
-                margin: 0,
-              }}
-            >
-              {university.name}
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h1
+                style={{
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  color: 'var(--text-primary)',
+                  lineHeight: 1.25,
+                  margin: 0,
+                }}
+              >
+                {university.name}
+              </h1>
+              {university.customComment && (
+                <span
+                  style={{
+                    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                    color: '#B45309',
+                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Sparkles size={11} color="#B45309" />
+                  {university.customComment}
+                </span>
+              )}
+            </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px', color: 'var(--text-secondary)', fontSize: '13.5px' }}>
               <MapPin size={15} color="var(--primary)" style={{ flexShrink: 0 }} />

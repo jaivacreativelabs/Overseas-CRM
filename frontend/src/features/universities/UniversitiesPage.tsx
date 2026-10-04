@@ -16,6 +16,9 @@ import {
   Upload,
   Image as ImageIcon,
   CheckCircle2,
+  Camera,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -80,6 +83,7 @@ export const UniversitiesPage: React.FC = () => {
     address: '',
     website: '',
     ranking: '' as number | '',
+    customComment: '',
     logoUrl: '',
     bannerUrl: '',
     description: '',
@@ -91,6 +95,14 @@ export const UniversitiesPage: React.FC = () => {
     galleryPhotos: [] as string[],
   });
   const [uniFormErrors, setUniFormErrors] = useState<Record<string, string>>({});
+
+  // Media Upload Drag & Drop and Processing States
+  const [isBannerDragging, setIsBannerDragging] = useState(false);
+  const [isLogoDragging, setIsLogoDragging] = useState(false);
+  const [isGalleryDragging, setIsGalleryDragging] = useState(false);
+  const [isProcessingBanner, setIsProcessingBanner] = useState(false);
+  const [isProcessingLogo, setIsProcessingLogo] = useState(false);
+  const [isProcessingGallery, setIsProcessingGallery] = useState(false);
 
   // Course Modal State
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
@@ -166,43 +178,84 @@ export const UniversitiesPage: React.FC = () => {
     });
   };
 
+  const validateImageFile = (file: File): boolean => {
+    if (!file.type.startsWith('image/')) {
+      error('Please select an image file (JPG, PNG, or WEBP)');
+      return false;
+    }
+    return true;
+  };
+
+  const processBannerFile = async (file: File) => {
+    if (!validateImageFile(file)) return;
+    setIsProcessingBanner(true);
+    try {
+      const compressed = await compressImage(file, 1200, 0.75);
+      setUniForm((prev) => ({ ...prev, bannerUrl: compressed }));
+      success('Campus cover banner updated.');
+    } catch (err) {
+      error('Failed to process cover banner.');
+    } finally {
+      setIsProcessingBanner(false);
+    }
+  };
+
   const handleBannerFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
+    await processBannerFile(e.target.files[0]);
+    e.target.value = '';
+  };
+
+  const processLogoFile = async (file: File) => {
+    if (!validateImageFile(file)) return;
+    setIsProcessingLogo(true);
     try {
-      const compressed = await compressImage(file, 800, 0.75);
-      setUniForm((prev) => ({ ...prev, bannerUrl: compressed }));
-      success('Campus cover photo uploaded.');
+      const compressed = await compressImage(file, 250, 0.85);
+      setUniForm((prev) => ({ ...prev, logoUrl: compressed }));
+      success('Institution logo updated.');
     } catch (err) {
-      error('Failed to process cover photo.');
+      error('Failed to process logo image.');
+    } finally {
+      setIsProcessingLogo(false);
     }
   };
 
   const handleLogoFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
+    await processLogoFile(e.target.files[0]);
+    e.target.value = '';
+  };
+
+  const processGalleryFiles = async (files: File[]) => {
+    const validFiles = files.filter((f) => {
+      if (!f.type.startsWith('image/')) {
+        error(`"${f.name}" is not an image. Please select JPG, PNG, or WEBP.`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setIsProcessingGallery(true);
     try {
-      const compressed = await compressImage(file, 200, 0.8);
-      setUniForm((prev) => ({ ...prev, logoUrl: compressed }));
-      success('University logo uploaded.');
+      const compressedList = await Promise.all(validFiles.map((f) => compressImage(f, 800, 0.7)));
+      setUniForm((prev) => ({
+        ...prev,
+        galleryPhotos: [...prev.galleryPhotos, ...compressedList],
+      }));
+      success(`Added ${compressedList.length} photo(s) to campus gallery.`);
     } catch (err) {
-      error('Failed to process logo image.');
+      error('Failed to process gallery images.');
+    } finally {
+      setIsProcessingGallery(false);
     }
   };
 
   const handleGalleryPhotosSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const files = Array.from(e.target.files);
-    try {
-      const compressedList = await Promise.all(files.map((f) => compressImage(f, 800, 0.7)));
-      setUniForm((prev) => ({
-        ...prev,
-        galleryPhotos: [...prev.galleryPhotos, ...compressedList],
-      }));
-      success(`Added ${compressedList.length} photo(s) to classroom gallery.`);
-    } catch (err) {
-      error('Failed to process image files.');
-    }
+    await processGalleryFiles(Array.from(e.target.files));
+    e.target.value = '';
   };
 
   const removeGalleryPhoto = (index: number) => {
@@ -234,6 +287,7 @@ export const UniversitiesPage: React.FC = () => {
       address: '',
       website: '',
       ranking: '',
+      customComment: '',
       logoUrl: '',
       bannerUrl: '',
       description: '',
@@ -258,6 +312,7 @@ export const UniversitiesPage: React.FC = () => {
       address: u.address || '',
       website: u.website || '',
       ranking: u.ranking !== undefined && u.ranking !== null ? u.ranking : '',
+      customComment: u.customComment || '',
       logoUrl: u.logoUrl || '',
       bannerUrl: u.bannerUrl || '',
       description: u.description || '',
@@ -302,6 +357,7 @@ export const UniversitiesPage: React.FC = () => {
             : `https://${uniForm.website.trim()}`
           : undefined,
         ranking: uniForm.ranking !== '' ? Number(uniForm.ranking) : undefined,
+        customComment: uniForm.customComment.trim(),
         logoUrl: uniForm.logoUrl.trim() || undefined,
         bannerUrl: uniForm.bannerUrl.trim() || undefined,
         description: uniForm.description.trim() || undefined,
@@ -621,30 +677,41 @@ export const UniversitiesPage: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Global Ranking Badge Chip */}
-                      {u.ranking !== undefined && u.ranking !== null && (
+                      {/* Highlight Tag / Custom Comment / Global Ranking Badge Chip */}
+                      {(u.customComment?.trim() || (u.ranking !== undefined && u.ranking !== null)) && (
                         <div
                           style={{
                             position: 'absolute',
                             top: '10px',
                             right: '10px',
-                            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                            background: 'rgba(15, 23, 42, 0.75)',
                             backdropFilter: 'blur(4px)',
-                            color: '#F59E0B',
-                            border: '1px solid rgba(245, 158, 11, 0.4)',
-                            borderRadius: '20px',
-                            padding: '3px 10px',
-                            fontSize: '11.5px',
-                            fontWeight: 700,
+                            color: '#FBBF24',
+                            padding: '4px 10px',
+                            borderRadius: '9999px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            border: '1px solid rgba(251, 191, 36, 0.3)',
+                            whiteSpace: 'nowrap',
+                            maxWidth: '180px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '4px',
+                            gap: '5px',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                            zIndex: 10,
                           }}
-                          title={`Global Rank #${u.ranking}`}
+                          title={u.customComment?.trim() || `Global Rank #${u.ranking}`}
                         >
-                          <Award size={12} color="#F59E0B" />
-                          <span>#{u.ranking} Global</span>
+                          {u.customComment?.trim() ? (
+                            <Sparkles size={12} color="#FBBF24" style={{ flexShrink: 0 }} />
+                          ) : (
+                            <Award size={12} color="#FBBF24" style={{ flexShrink: 0 }} />
+                          )}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {u.customComment?.trim() || `#${u.ranking} Global`}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -899,6 +966,7 @@ export const UniversitiesPage: React.FC = () => {
         isOpen={isUniModalOpen}
         onClose={() => setIsUniModalOpen(false)}
         title={editingUniversity ? 'Edit Partner University' : 'Add Partner University'}
+        maxWidth="620px"
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsUniModalOpen(false)} disabled={submittingUni}>
@@ -911,48 +979,109 @@ export const UniversitiesPage: React.FC = () => {
         }
       >
         <form onSubmit={handleSaveUniversity} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Section 1: Media & Branding (Banner, Logo, Gallery Uploads) */}
-          <div style={{ padding: '12px 14px', backgroundColor: 'var(--bg-subtle, #F9FAFB)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              1. Media, Banner & Multi-Photo Gallery
+          {/* Section 1: Media & Visuals */}
+          <div style={{ padding: '16px', backgroundColor: 'var(--bg-subtle, #F9FAFB)', borderRadius: 'var(--radius-lg, 12px)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
+              1. Media & Visuals
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Campus Cover Photo Upload */}
-              <div>
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
-                  Campus Cover Photo
-                </label>
-                {uniForm.bannerUrl ? (
-                  <div style={{ position: 'relative', height: '90px', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                    <img src={uniForm.bannerUrl} alt="Cover Banner Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
+            {/* Profile Staging Card: Banner + Floating Logo */}
+            <div
+              style={{
+                borderRadius: '12px',
+                border: '1px solid #E2E8F0',
+                backgroundColor: '#FFFFFF',
+                overflow: 'hidden',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                marginBottom: '16px',
+              }}
+            >
+              {/* Cover Banner Area (Height: ~140px–160px) */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsBannerDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsBannerDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsBannerDragging(false);
+                  if (e.dataTransfer.files?.[0]) {
+                    processBannerFile(e.dataTransfer.files[0]);
+                  }
+                }}
+                style={{
+                  position: 'relative',
+                  height: '150px',
+                  backgroundColor: isBannerDragging ? '#EFF6FF' : '#F8FAFC',
+                  borderBottom: '1px solid #E2E8F0',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {isProcessingBanner ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: 'var(--primary)' }}>
+                    <Loader2 size={24} className="animate-spin" />
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>Processing banner...</span>
+                  </div>
+                ) : uniForm.bannerUrl ? (
+                  <>
+                    <img
+                      src={uniForm.bannerUrl}
+                      alt="Campus Banner"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    {/* Top-Right Action Pills */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '10px',
+                        right: '10px',
+                        display: 'flex',
+                        gap: '6px',
+                        zIndex: 10,
+                      }}
+                    >
                       <label
                         style={{
-                          padding: '4px 8px',
+                          padding: '5px 10px',
                           backgroundColor: 'rgba(15, 23, 42, 0.75)',
                           color: '#FFFFFF',
-                          borderRadius: '4px',
+                          borderRadius: '6px',
                           fontSize: '11px',
                           fontWeight: 600,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
+                          backdropFilter: 'blur(4px)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                         }}
+                        title="Change campus banner"
                       >
-                        <Upload size={12} />
+                        <Edit2 size={12} />
                         <span>Change</span>
-                        <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleBannerFileSelect} style={{ display: 'none' }} />
+                        <input
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp"
+                          onChange={handleBannerFileSelect}
+                          style={{ display: 'none' }}
+                        />
                       </label>
                       <button
                         type="button"
-                        onClick={() => setUniForm({ ...uniForm, bannerUrl: '' })}
+                        onClick={() => setUniForm((prev) => ({ ...prev, bannerUrl: '' }))}
                         style={{
-                          padding: '4px 8px',
-                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                          padding: '5px 10px',
+                          backgroundColor: 'rgba(239, 68, 68, 0.85)',
                           color: '#FFFFFF',
-                          borderRadius: '4px',
+                          borderRadius: '6px',
                           border: 'none',
                           fontSize: '11px',
                           fontWeight: 600,
@@ -960,204 +1089,480 @@ export const UniversitiesPage: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
+                          backdropFilter: 'blur(4px)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                         }}
+                        title="Remove campus banner"
                       >
-                        <X size={12} />
+                        <Trash2 size={12} />
                         <span>Remove</span>
                       </button>
                     </div>
-                  </div>
+                  </>
                 ) : (
+                  /* Banner Empty State */
                   <label
                     style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                      border: isBannerDragging ? '2px dashed #0057F8' : 'none',
+                      backgroundColor: isBannerDragging ? '#EFF6FF' : 'transparent',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        backgroundColor: isBannerDragging ? '#DBEAFE' : '#EEF2F6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isBannerDragging ? '#0057F8' : '#64748B',
+                      }}
+                    >
+                      <ImageIcon size={20} />
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 500, color: '#64748B' }}>
+                      Click or drag campus banner here
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/webp"
+                      onChange={handleBannerFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Staging Footer Row: Floating Logo & Institution Crest Info */}
+              <div
+                style={{
+                  padding: '0 16px 14px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '14px',
+                }}
+              >
+                {/* Floating Logo Avatar (Bottom-Left Corner) */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsLogoDragging(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsLogoDragging(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsLogoDragging(false);
+                    if (e.dataTransfer.files?.[0]) {
+                      processLogoFile(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  style={{
+                    marginTop: '-32px',
+                    width: '68px',
+                    height: '68px',
+                    borderRadius: '12px',
+                    backgroundColor: '#FFFFFF',
+                    border: isLogoDragging ? '2.5px dashed #0057F8' : '3px solid #FFFFFF',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                    position: 'relative',
+                    zIndex: 5,
+                    flexShrink: 0,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {isProcessingLogo ? (
+                    <Loader2 size={20} className="animate-spin" color="var(--primary)" />
+                  ) : uniForm.logoUrl ? (
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <img
+                        src={uniForm.logoUrl}
+                        alt="Logo"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          padding: '4px',
+                          backgroundColor: '#FFFFFF',
+                        }}
+                      />
+                      {/* Tiny top-right remove badge */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUniForm((prev) => ({ ...prev, logoUrl: '' }));
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 10,
+                        }}
+                        title="Remove logo"
+                      >
+                        <X size={9} />
+                      </button>
+                      {/* Tiny hover edit overlay badge */}
+                      <label
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          backgroundColor: 'rgba(15, 23, 42, 0.7)',
+                          color: '#FFFFFF',
+                          fontSize: '9px',
+                          fontWeight: 600,
+                          textAlign: 'center',
+                          padding: '2px 0',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                        }}
+                        title="Change logo"
+                      >
+                        <Edit2 size={9} />
+                        <span>Edit</span>
+                        <input
+                          type="file"
+                          accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                          onChange={handleLogoFileSelect}
+                          style={{ display: 'none' }}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    /* Empty Logo State */
+                    <label
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '2px',
+                        cursor: 'pointer',
+                        backgroundColor: isLogoDragging ? '#EFF6FF' : '#F8FAFC',
+                        border: isLogoDragging ? 'none' : '1px dashed #CBD5E1',
+                        borderRadius: '9px',
+                      }}
+                      title="Upload University Crest / Logo"
+                    >
+                      <Camera size={18} color="#64748B" />
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: '#64748B' }}>
+                        Logo
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                        onChange={handleLogoFileSelect}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {/* Header Footer Info (Next to Logo) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flex: 1,
+                    paddingTop: '8px',
+                  }}
+                >
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Institution Crest / Logo
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--primary)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        backgroundColor: 'var(--primary-light, #EFF6FF)',
+                      }}
+                    >
+                      <Upload size={12} />
+                      <span>{uniForm.logoUrl ? 'Change Logo' : 'Upload Logo'}</span>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp, image/svg+xml"
+                        onChange={handleLogoFileSelect}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                    {uniForm.logoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setUniForm((prev) => ({ ...prev, logoUrl: '' }))}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--danger)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          padding: '4px',
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Campus & Classroom Photo Gallery */}
+            <div>
+              <style>{`
+                .gallery-grid-responsive {
+                  display: grid;
+                  grid-template-columns: repeat(4, 1fr);
+                  gap: 10px;
+                }
+                @media (max-width: 540px) {
+                  .gallery-grid-responsive {
+                    grid-template-columns: repeat(3, 1fr);
+                  }
+                }
+                .gallery-thumb-card {
+                  position: relative;
+                  height: 90px;
+                  border-radius: 10px;
+                  overflow: hidden;
+                  background-color: #f1f5f9;
+                  border: 1px solid #e2e8f0;
+                }
+                .gallery-thumb-card .gallery-thumb-overlay {
+                  position: absolute;
+                  inset: 0;
+                  background-color: rgba(15, 23, 42, 0);
+                  transition: background-color 0.2s ease;
+                  display: flex;
+                  justify-content: flex-end;
+                  align-items: flex-start;
+                  padding: 4px;
+                }
+                .gallery-thumb-card:hover .gallery-thumb-overlay {
+                  background-color: rgba(15, 23, 42, 0.35);
+                }
+                .gallery-thumb-card .gallery-trash-btn {
+                  opacity: 0.85;
+                  transition: all 0.15s ease;
+                }
+                .gallery-thumb-card:hover .gallery-trash-btn {
+                  opacity: 1;
+                  transform: scale(1.05);
+                }
+              `}</style>
+
+              {/* Header Row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Campus & Classroom Gallery
+                </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: '#F1F5F9',
+                    color: '#475569',
+                  }}
+                >
+                  {uniForm.galleryPhotos.length}/8 photos
+                </span>
+              </div>
+
+              {/* Interactive Thumbnail Grid */}
+              <div className="gallery-grid-responsive">
+                {/* Tile 1: "Add Photos" Action Tile */}
+                <label
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsGalleryDragging(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsGalleryDragging(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsGalleryDragging(false);
+                    if (e.dataTransfer.files) {
+                      processGalleryFiles(Array.from(e.dataTransfer.files));
+                    }
+                  }}
+                  style={{
+                    height: '90px',
+                    border: isGalleryDragging ? '2px dashed #0057F8' : '2px dashed #CBD5E1',
+                    borderRadius: '10px',
+                    backgroundColor: isGalleryDragging ? '#EFF6FF' : '#F8FAFC',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Click or drag to add photos"
+                >
+                  <Plus size={20} color="var(--primary)" />
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Add Photos
+                  </span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleGalleryPhotosSelect}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+
+                {/* Processing State Tile */}
+                {isProcessingGallery && (
+                  <div
+                    style={{
+                      height: '90px',
+                      borderRadius: '10px',
+                      border: '1px dashed var(--primary)',
+                      backgroundColor: '#EFF6FF',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '4px',
-                      padding: '16px',
-                      backgroundColor: '#FFFFFF',
-                      border: '1.5px dashed var(--border-color)',
-                      borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer',
-                      textAlign: 'center',
+                      color: 'var(--primary)',
                     }}
                   >
-                    <Upload size={20} color="var(--primary)" />
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      Upload Campus Cover Photo
-                    </span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      PNG, JPG, or WEBP (Compressed &lt; 120 KB Base64)
-                    </span>
-                    <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleBannerFileSelect} style={{ display: 'none' }} />
-                  </label>
+                    <Loader2 size={20} className="animate-spin" />
+                    <span style={{ fontSize: '10px', fontWeight: 600 }}>Processing...</span>
+                  </div>
                 )}
-              </div>
 
-              {/* University Logo Avatar Upload */}
-              <div>
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '12px', marginBottom: '4px', display: 'block' }}>
-                  University Logo Avatar
-                </label>
-                {uniForm.logoUrl ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '56px', height: '56px', borderRadius: '12px', border: '2px solid var(--border-color)', padding: '3px', backgroundColor: '#FFFFFF', overflow: 'hidden', flexShrink: 0 }}>
-                      <img src={uniForm.logoUrl} alt="Logo Preview" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px' }} />
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <label
-                        style={{
-                          padding: '6px 10px',
-                          backgroundColor: 'var(--primary-light)',
-                          color: 'var(--primary)',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <Upload size={13} />
-                        <span>Change Logo</span>
-                        <input type="file" accept="image/png, image/jpeg, image/webp, image/svg+xml" onChange={handleLogoFileSelect} style={{ display: 'none' }} />
-                      </label>
+                {/* Uploaded Photo Tiles */}
+                {uniForm.galleryPhotos.map((photo, i) => (
+                  <div key={i} className="gallery-thumb-card">
+                    <img
+                      src={photo}
+                      alt={`Campus Photo ${i + 1}`}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div className="gallery-thumb-overlay">
                       <button
                         type="button"
-                        onClick={() => setUniForm({ ...uniForm, logoUrl: '' })}
-                        style={{
-                          padding: '6px 10px',
-                          backgroundColor: '#FEF2F2',
-                          color: 'var(--danger)',
-                          border: '1px solid #FECACA',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeGalleryPhoto(i);
                         }}
+                        className="gallery-trash-btn"
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }}
+                        title="Remove photo"
                       >
-                        <X size={13} />
-                        <span>Remove</span>
+                        <Trash2 size={12} />
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <label
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      padding: '10px 14px',
-                      backgroundColor: '#FFFFFF',
-                      border: '1.5px dashed var(--border-color)',
-                      borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary)', flexShrink: 0 }}>
-                      <Upload size={18} />
+                ))}
+
+                {/* 3 Outline Placeholder Boxes when no photos are added yet */}
+                {uniForm.galleryPhotos.length === 0 && (
+                  <>
+                    <div
+                      style={{
+                        height: '90px',
+                        borderRadius: '10px',
+                        border: '1.5px dashed #CBD5E1',
+                        backgroundColor: '#FAFAFA',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <ImageIcon size={20} color="#CBD5E1" />
                     </div>
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        Upload Logo Image
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        PNG, JPG, WEBP, SVG (Compressed &lt; 30 KB Base64)
-                      </div>
+                    <div
+                      style={{
+                        height: '90px',
+                        borderRadius: '10px',
+                        border: '1.5px dashed #CBD5E1',
+                        backgroundColor: '#FAFAFA',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <ImageIcon size={20} color="#CBD5E1" />
                     </div>
-                    <input type="file" accept="image/png, image/jpeg, image/webp, image/svg+xml" onChange={handleLogoFileSelect} style={{ display: 'none' }} />
-                  </label>
-                )}
-              </div>
-
-              {/* Campus & Classroom Gallery Multi-Photo Upload */}
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '4px' }}>
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <ImageIcon size={14} color="var(--primary)" />
-                  <span>Campus & Classroom Photo Gallery</span>
-                </label>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  Select multiple photos (classrooms, auditoriums, labs). Images are client-side compressed (&lt; 100 KB base64).
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <label
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '8px 14px',
-                      backgroundColor: 'var(--primary-light)',
-                      color: 'var(--primary)',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer',
-                      border: '1px dashed var(--primary)',
-                    }}
-                  >
-                    <Upload size={14} />
-                    <span>Upload Gallery Photos</span>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleGalleryPhotosSelect}
-                      style={{ display: 'none' }}
-                    />
-                  </label>
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    {uniForm.galleryPhotos.length} photo(s) selected
-                  </span>
-                </div>
-
-                {/* Uploaded Gallery Thumbnails Strip */}
-                {uniForm.galleryPhotos.length > 0 && (
-                  <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginTop: '10px', paddingBottom: '4px' }}>
-                    {uniForm.galleryPhotos.map((photo, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          position: 'relative',
-                          width: '70px',
-                          height: '50px',
-                          borderRadius: '6px',
-                          overflow: 'hidden',
-                          flexShrink: 0,
-                          border: '1px solid var(--border-color)',
-                        }}
-                      >
-                        <img src={photo} alt={`Upload ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <button
-                          type="button"
-                          onClick={() => removeGalleryPhoto(i)}
-                          style={{
-                            position: 'absolute',
-                            top: '2px',
-                            right: '2px',
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                          title="Remove image"
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                    <div
+                      style={{
+                        height: '90px',
+                        borderRadius: '10px',
+                        border: '1.5px dashed #CBD5E1',
+                        backgroundColor: '#FAFAFA',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <ImageIcon size={20} color="#CBD5E1" />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -1181,12 +1586,12 @@ export const UniversitiesPage: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <Input
-                  label="Global Ranking"
-                  type="number"
-                  value={uniForm.ranking}
-                  onChange={(e) => setUniForm({ ...uniForm, ranking: e.target.value === '' ? '' : parseInt(e.target.value, 10) })}
-                  placeholder="e.g. 49"
-                  helperText="QS or Times Higher Education Rank"
+                  label="Card Tag / Highlight Comment (Optional)"
+                  value={uniForm.customComment}
+                  onChange={(e) => setUniForm({ ...uniForm, customComment: e.target.value.slice(0, 40) })}
+                  placeholder="e.g. Top Choice, #49 Global, 100% Scholarship, Low Tuition"
+                  maxLength={40}
+                  helperText="Short highlight badge displayed in the top-right corner of the university card."
                 />
                 <Input
                   label="Official Website URL"

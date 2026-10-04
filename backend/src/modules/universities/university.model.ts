@@ -15,6 +15,7 @@ export interface IUniversity extends Document {
   address?: string;
   website?: string;
   ranking?: number;
+  customComment?: string;
   logoUrl?: string;
   bannerUrl?: string;
   description?: string;
@@ -85,6 +86,7 @@ const universitySchema = new Schema<IUniversity>({
   address: { type: String, trim: true },
   website: { type: String, trim: true },
   ranking: { type: Number },
+  customComment: { type: String, default: '', trim: true },
   logoUrl: { type: String, trim: true },
   bannerUrl: { type: String, trim: true },
   description: { type: String, trim: true },
