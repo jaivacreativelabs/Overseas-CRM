@@ -7,6 +7,7 @@ import { Table } from '../../components/Table';
 import { StatusBadge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { VisaStatus } from '../../types';
+import { PinButton } from '../../components/PinButton';
 
 export const VisaPage: React.FC = () => {
   const [visas, setVisas] = useState<any[]>([]);
@@ -85,12 +86,25 @@ export const VisaPage: React.FC = () => {
           {
             header: 'ACTIONS',
             align: 'right',
-            render: (v) =>
-              v.status !== VisaStatus.APPROVED && (
-                <Button variant="primary" size="sm" icon={<Check size={14} />} onClick={() => handleApprove(v.leadId)}>
-                  Record Approval
-                </Button>
-              ),
+            render: (v) => (
+              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <PinButton
+                  item={{
+                    id: v._id || v.leadId,
+                    category: 'visa',
+                    title: `Visa: ${v.studentName}`,
+                    subtitle: `${v.country || 'Destination'} • ${v.visaType || 'Student Visa'}`,
+                    path: `/leads/${v.leadId}`,
+                    pinnedAt: new Date().toISOString(),
+                  }}
+                />
+                {v.status !== VisaStatus.APPROVED && (
+                  <Button variant="primary" size="sm" icon={<Check size={14} />} onClick={() => handleApprove(v.leadId)}>
+                    Record Approval
+                  </Button>
+                )}
+              </div>
+            ),
           },
         ]}
         data={visas}

@@ -10,6 +10,11 @@ import {
   CheckCircle2,
   X,
   Compass,
+  Building2,
+  FileText,
+  BarChart3,
+  Eye,
+  Pin,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NAVIGATION_SECTIONS } from '../routes/NavigationConfig';
@@ -17,6 +22,14 @@ import { apiClient } from '../services/api-client';
 import { NotificationItem, UserRole, Lead, StudentStage } from '../types';
 import { UserGuideModal } from '../components/UserGuide';
 import { VerticalStageStepper } from '../components/StageStepper';
+import { ContextMenu } from '../components/ContextMenu';
+import { getPinnedModules, togglePinModule } from '../utils/pinnedModules';
+import { REPORT_TABS } from '../features/reports/ReportsPage';
+import {
+  getCounsellorPins,
+  toggleCounsellorPin,
+  CounsellorPinnedItem,
+} from '../utils/counsellorPinManager';
 
 export const AppLayout: React.FC = () => {
   const { user, logout, isStaff, isStudent } = useAuth();
@@ -33,10 +46,34 @@ export const AppLayout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(getInitialSidebarState);
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showPinnedItems, setShowPinnedItems] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [studentStage, setStudentStage] = useState<StudentStage>(StudentStage.PROFILE_EVALUATION);
+
+  const [pinnedModules, setPinnedModules] = useState<string[]>(getPinnedModules());
+  const [counsellorPins, setCounsellorPins] = useState<CounsellorPinnedItem[]>(() =>
+    user?._id ? getCounsellorPins(user._id) : []
+  );
+  const [sidebarContextMenu, setSidebarContextMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+
+  useEffect(() => {
+    const handlePinnedChange = () => setPinnedModules(getPinnedModules());
+    window.addEventListener('pinned_modules_changed', handlePinnedChange);
+    return () => window.removeEventListener('pinned_modules_changed', handlePinnedChange);
+  }, []);
+
+  useEffect(() => {
+    const syncCounsellorPins = () => {
+      if (user?._id) {
+        setCounsellorPins(getCounsellorPins(user._id));
+      }
+    };
+    syncCounsellorPins();
+    window.addEventListener('counsellor_pins_changed', syncCounsellorPins);
+    return () => window.removeEventListener('counsellor_pins_changed', syncCounsellorPins);
+  }, [user?._id]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -265,8 +302,97 @@ export const AppLayout: React.FC = () => {
             gap: '8px',
           }}
         >
-          {isStudent ? (
-            <VerticalStageStepper currentStage={studentStage} sidebarCollapsed={false} />
+          {isStudent || location.pathname.startsWith('/portal') ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                <div
+                  style={{
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.07em',
+                    padding: '4px 10px 3px',
+                  }}
+                >
+                  STUDENT JOURNEY
+                </div>
+
+                <NavLink
+                  to="/portal?tab=universities"
+                  onClick={handleNavClick}
+                  style={() => {
+                    const active = location.pathname.startsWith('/portal') && location.search.includes('tab=universities');
+                    return {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      color: active ? 'var(--primary)' : 'var(--text-secondary)',
+                      backgroundColor: active ? 'var(--primary-light)' : 'transparent',
+                      fontWeight: active ? 600 : 500,
+                      fontSize: '13.5px',
+                      transition: 'all 0.15s ease',
+                      textDecoration: 'none',
+                    };
+                  }}
+                >
+                  <Building2 size={18} strokeWidth={2} />
+                  <span>📍 Universities</span>
+                </NavLink>
+
+                <NavLink
+                  to="/portal?tab=documents"
+                  onClick={handleNavClick}
+                  style={() => {
+                    const active = location.pathname.startsWith('/portal') && location.search.includes('tab=documents');
+                    return {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      color: active ? 'var(--primary)' : 'var(--text-secondary)',
+                      backgroundColor: active ? 'var(--primary-light)' : 'transparent',
+                      fontWeight: active ? 600 : 500,
+                      fontSize: '13.5px',
+                      transition: 'all 0.15s ease',
+                      textDecoration: 'none',
+                    };
+                  }}
+                >
+                  <FileText size={18} strokeWidth={2} />
+                  <span>📄 Documents</span>
+                </NavLink>
+
+                <NavLink
+                  to="/portal?tab=report"
+                  onClick={handleNavClick}
+                  style={() => {
+                    const active = location.pathname.startsWith('/portal') && (!location.search.includes('tab=universities') && !location.search.includes('tab=documents'));
+                    return {
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      color: active ? 'var(--primary)' : 'var(--text-secondary)',
+                      backgroundColor: active ? 'var(--primary-light)' : 'transparent',
+                      fontWeight: active ? 600 : 500,
+                      fontSize: '13.5px',
+                      transition: 'all 0.15s ease',
+                      textDecoration: 'none',
+                    };
+                  }}
+                >
+                  <BarChart3 size={18} strokeWidth={2} />
+                  <span>📊 Report</span>
+                </NavLink>
+              </div>
+
+              <VerticalStageStepper currentStage={studentStage} sidebarCollapsed={false} />
+            </div>
           ) : (
             allowedSections.map((section, sIdx) => (
               <div key={section.title} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -309,6 +435,46 @@ export const AppLayout: React.FC = () => {
                     </NavLink>
                   );
                 })}
+
+                {/* Dynamically Pinned Modules under Student Journey */}
+                {section.title === 'Student Journey' &&
+                  pinnedModules.map((modId) => {
+                    const modConfig = REPORT_TABS.find((t) => t.id === modId);
+                    if (!modConfig) return null;
+                    const ModIcon = modConfig.icon;
+                    return (
+                      <NavLink
+                        key={`pinned-${modId}`}
+                        to={`/reports?tab=${modId}`}
+                        onClick={handleNavClick}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setSidebarContextMenu({ x: e.clientX, y: e.clientY, tabId: modId });
+                        }}
+                        style={({ isActive }) => {
+                          const active = isActive || location.search.includes(`tab=${modId}`);
+                          return {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '9px 12px',
+                            justifyContent: 'flex-start',
+                            borderRadius: 'var(--radius-md)',
+                            color: active ? 'var(--primary)' : 'var(--text-secondary)',
+                            backgroundColor: active ? 'var(--primary-light)' : 'transparent',
+                            fontWeight: active ? 600 : 500,
+                            fontSize: '13.5px',
+                            transition: 'all 0.15s ease',
+                            textDecoration: 'none',
+                          };
+                        }}
+                        title={`Pinned shortcut. Right-click to unpin ${modConfig.label}`}
+                      >
+                        <ModIcon size={18} strokeWidth={2} />
+                        <span>📌 {modConfig.label}</span>
+                      </NavLink>
+                    );
+                  })}
               </div>
             ))
           )}
@@ -429,7 +595,218 @@ export const AppLayout: React.FC = () => {
           </div>
 
           {/* Right Header Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Counsellor Pinned Items */}
+            {user && (user.role === UserRole.COUNSELLOR || user.role === UserRole.ADMIN) && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowPinnedItems(!showPinnedItems)}
+                  style={{
+                    background: showPinnedItems ? 'var(--primary-light)' : 'none',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    color: showPinnedItems ? 'var(--primary)' : 'var(--text-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="View your Pinned Student Journey items"
+                >
+                  <Pin size={15} fill={counsellorPins.length > 0 ? 'var(--primary)' : 'none'} color={counsellorPins.length > 0 ? 'var(--primary)' : 'currentColor'} />
+                  <span>Pinned</span>
+                  {counsellorPins.length > 0 && (
+                    <span
+                      style={{
+                        backgroundColor: 'var(--primary)',
+                        color: '#FFFFFF',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        borderRadius: '10px',
+                        padding: '1px 6px',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {counsellorPins.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Pinned Items Popover Dropdown */}
+                {showPinnedItems && (
+                  <>
+                    <div
+                      onClick={() => setShowPinnedItems(false)}
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 1050,
+                      }}
+                    />
+                    <div
+                      className="app-notification-popover"
+                      style={{
+                        position: 'absolute',
+                        top: '44px',
+                        right: 0,
+                        width: '340px',
+                        maxWidth: 'calc(100vw - 24px)',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-lg)',
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08)',
+                        zIndex: 1100,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '12px 14px',
+                          borderBottom: '1px solid var(--border-color)',
+                          backgroundColor: 'var(--bg-subtle, #F9FAFB)',
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>📌</span> Pinned Items ({counsellorPins.length})
+                        </span>
+                        <button
+                          onClick={() => setShowPinnedItems(false)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title="Close Pinned Items"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      <div style={{ maxHeight: '340px', overflowY: 'auto' }}>
+                        {counsellorPins.length === 0 ? (
+                          <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>📌</div>
+                            <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '4px' }}>No pinned items</strong>
+                            <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                              Click the 📌 Pin icon on any student, session, application, or payment to quickly access it here.
+                            </div>
+                          </div>
+                        ) : (
+                          counsellorPins.map((item) => (
+                            <div
+                              key={item.id}
+                              style={{
+                                padding: '12px 14px',
+                                borderBottom: '1px solid var(--border-light)',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                justifyContent: 'space-between',
+                                gap: '10px',
+                                transition: 'background-color 0.15s ease',
+                              }}
+                            >
+                              <div
+                                style={{ cursor: 'pointer', flex: 1, minWidth: 0 }}
+                                onClick={() => {
+                                  navigate(item.path);
+                                  setShowPinnedItems(false);
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                  <span
+                                    style={{
+                                      fontSize: '10px',
+                                      fontWeight: 700,
+                                      color: 'var(--primary)',
+                                      backgroundColor: 'var(--primary-light)',
+                                      border: '1px solid rgba(0,87,248,0.2)',
+                                      padding: '1px 6px',
+                                      borderRadius: '4px',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.04em',
+                                    }}
+                                  >
+                                    📌 {item.category}
+                                  </span>
+                                </div>
+                                <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                                  {item.title}
+                                </div>
+                                {item.subtitle && (
+                                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: 1.3 }}>
+                                    {item.subtitle}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigate(item.path);
+                                    setShowPinnedItems(false);
+                                  }}
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    color: 'var(--primary)',
+                                    backgroundColor: 'var(--primary-light)',
+                                    border: '1px solid var(--primary)',
+                                    borderRadius: 'var(--radius-sm)',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Open
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (user?._id) {
+                                      toggleCounsellorPin(user._id, item);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: '4px 6px',
+                                    fontSize: '11px',
+                                    color: 'var(--text-muted)',
+                                    background: 'none',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: 'var(--radius-sm)',
+                                    cursor: 'pointer',
+                                  }}
+                                  title="Unpin item"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Notification Bell */}
             <div style={{ position: 'relative' }}>
               <button
@@ -603,6 +980,35 @@ export const AppLayout: React.FC = () => {
 
       {/* Interactive User Guide Modal */}
       <UserGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
+
+      {/* Sidebar Right-Click Context Menu for Pinned Modules */}
+      {sidebarContextMenu && (
+        <ContextMenu
+          x={sidebarContextMenu.x}
+          y={sidebarContextMenu.y}
+          isOpen={!!sidebarContextMenu}
+          onClose={() => setSidebarContextMenu(null)}
+          items={[
+            {
+              label: 'Open',
+              icon: Eye,
+              onClick: () => {
+                const targetPath = isStudent || location.pathname.startsWith('/portal')
+                  ? `/portal?tab=${sidebarContextMenu.tabId}`
+                  : `/reports?tab=${sidebarContextMenu.tabId}`;
+                navigate(targetPath);
+              },
+            },
+            {
+              label: 'Unpin from Sidebar',
+              icon: Pin,
+              onClick: () => {
+                togglePinModule(sidebarContextMenu.tabId);
+              },
+            },
+          ]}
+        />
+      )}
     </div>
   );
 };

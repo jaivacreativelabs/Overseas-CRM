@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
+import { PinButton } from '../../components/PinButton';
 
 export const OrientationPage: React.FC = () => {
   const [orientations, setOrientations] = useState<any[]>([]);
@@ -113,6 +114,24 @@ export const OrientationPage: React.FC = () => {
               <Badge variant="success">
                 {(o.attendedStudentIds || []).length} Attended
               </Badge>
+            ),
+          },
+          {
+            header: 'ACTIONS',
+            align: 'right',
+            render: (o) => (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <PinButton
+                  item={{
+                    id: o._id,
+                    category: 'orientation',
+                    title: `Orientation: ${o.title}`,
+                    subtitle: `${o.country} • ${o.intake || ''}`,
+                    path: `/reports?tab=orientation`,
+                    pinnedAt: new Date().toISOString(),
+                  }}
+                />
+              </div>
             ),
           },
         ]}

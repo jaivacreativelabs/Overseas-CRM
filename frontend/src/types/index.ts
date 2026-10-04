@@ -153,6 +153,7 @@ export interface Lead {
   metaLeadId?: string;
   counsellorId?: { _id: string; name: string; email: string; phone?: string; avatar?: string };
   studentUserId?: { _id: string; name: string; email: string };
+  counsellingSessions?: CounsellingSession[];
   closedLostReason?: string;
   notes?: string;
   lastContactedAt?: string;
@@ -417,6 +418,7 @@ export interface TravelSupport {
   airline?: string;
   flightNumber?: string;
   flightDate?: string;
+  departureAirport?: string;
   ticketUrl?: string;
   insuranceStatus: 'PENDING' | 'COMPLETED';
   insuranceProvider?: string;
