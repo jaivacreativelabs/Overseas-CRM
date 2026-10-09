@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { BranchModel, IBranch } from './branch.model';
 import { LeadModel } from '../leads/lead.model';
 import { UserModel } from '../users/user.model';
+import { ApplicationModel } from '../applications/application.model';
+import { IntegrationLogModel, LogStatus } from '../integrations/integration-log.model';
 import { BadRequestError, NotFoundError, ConflictError } from '../../utils/errors';
 
 // State codes lookup for Indian States & UTs
@@ -50,21 +52,42 @@ export class BranchService {
   /**
    * Creates a new branch with server-generated unique ID and backend validation
    */
-  public static async createBranch(data: {
-    name: string;
-    state: string;
-    city: string;
-    address: string;
-    capacity: number;
-    notes?: string;
-    status?: 'ACTIVE' | 'INACTIVE';
-  }): Promise<IBranch> {
+  public static async createBranch(
+    data: {
+      name: string;
+      state: string;
+      city: string;
+      address: string;
+      pinCode?: string;
+      contactNumber?: string;
+      email?: string;
+      managerName?: string;
+      managerEmail?: string;
+      capacity: number;
+      openingDate?: string;
+      notes?: string;
+      status?: 'ACTIVE' | 'INACTIVE';
+    },
+    performedByUserId?: string
+  ): Promise<IBranch> {
     if (!data.name || !data.state || !data.city || !data.address) {
       throw new BadRequestError('Branch name, state, city, and full address are mandatory');
     }
 
-    if (!data.capacity || data.capacity < 1) {
+    if (!data.capacity || Number(data.capacity) < 1) {
       throw new BadRequestError('Branch capacity must be a positive integer');
+    }
+
+    if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
+      throw new BadRequestError('Invalid branch email address format');
+    }
+
+    if (data.managerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.managerEmail.trim())) {
+      throw new BadRequestError('Invalid branch manager email address format');
+    }
+
+    if (data.pinCode && !/^\d{6}$/.test(data.pinCode.trim())) {
+      throw new BadRequestError('PIN code must be a 6-digit number');
     }
 
     // Check duplicate branch name in same state & city
@@ -102,13 +125,30 @@ export class BranchService {
       state: data.state.trim(),
       city: data.city.trim(),
       address: data.address.trim(),
+      pinCode: data.pinCode?.trim(),
+      contactNumber: data.contactNumber?.trim(),
+      email: data.email?.toLowerCase().trim(),
+      managerName: data.managerName?.trim(),
+      managerEmail: data.managerEmail?.toLowerCase().trim(),
       capacity: Number(data.capacity),
       assignedStudentsCount: 0,
+      openingDate: data.openingDate ? new Date(data.openingDate) : new Date(),
       status: data.status || 'ACTIVE',
       notes: data.notes?.trim() || '',
     });
 
     await branch.save();
+
+    // Log branch creation audit trail
+    await IntegrationLogModel.create({
+      providerId: 'branch_management',
+      eventType: 'branch.created',
+      operation: `Created Branch '${branch.name}' (${branch.branchId})`,
+      status: LogStatus.SUCCESS,
+      requestData: { branchId: branch.branchId, state: branch.state, city: branch.city, capacity: branch.capacity },
+      triggeredBy: performedByUserId,
+    });
+
     return branch;
   }
 
@@ -118,6 +158,7 @@ export class BranchService {
   public static async getBranches(query: {
     search?: string;
     state?: string;
+    city?: string;
     status?: string;
     page?: number;
     limit?: number;
@@ -138,11 +179,16 @@ export class BranchService {
         { state: searchRegex },
         { city: searchRegex },
         { address: searchRegex },
+        { managerName: searchRegex },
       ];
     }
 
     if (query.state && query.state !== 'ALL') {
       filter.state = { $regex: new RegExp(`^${query.state.trim()}$`, 'i') };
+    }
+
+    if (query.city && query.city !== 'ALL') {
+      filter.city = { $regex: new RegExp(`^${query.city.trim()}$`, 'i') };
     }
 
     if (query.status && query.status !== 'ALL') {
@@ -154,6 +200,7 @@ export class BranchService {
 
     const [branches, total] = await Promise.all([
       BranchModel.find(filter)
+        .populate('assignedStaffIds', 'name email role phone avatar')
         .sort({ [sortField]: sortDirection })
         .skip(skip)
         .limit(limit),
@@ -165,16 +212,24 @@ export class BranchService {
 
     let totalCapacity = 0;
     let totalAssignedStudents = 0;
+    let activeBranchCount = 0;
+    let inactiveBranchCount = 0;
 
-    const stateSummaryMap: Record<string, {
-      state: string;
-      branchCount: number;
-      totalCapacity: number;
-      assignedStudents: number;
-      availableSeats: number;
-    }> = {};
+    const stateSummaryMap: Record<
+      string,
+      {
+        state: string;
+        branchCount: number;
+        totalCapacity: number;
+        assignedStudents: number;
+        availableSeats: number;
+      }
+    > = {};
 
     for (const b of allBranches) {
+      if (b.status === 'ACTIVE') activeBranchCount++;
+      else inactiveBranchCount++;
+
       // Get real count from DB
       const realAssignedCount = await LeadModel.countDocuments({
         branchId: b._id,
@@ -208,9 +263,12 @@ export class BranchService {
 
     const formattedBranches = branches.map((b) => {
       const obj = b.toObject();
+      const availableSeats = Math.max(0, b.capacity - b.assignedStudentsCount);
+      const utilizationPercentage = b.capacity > 0 ? Math.min(100, Math.round((b.assignedStudentsCount / b.capacity) * 100)) : 0;
       return {
         ...obj,
-        availableSeats: Math.max(0, b.capacity - b.assignedStudentsCount),
+        availableSeats,
+        utilizationPercentage,
       };
     });
 
@@ -218,6 +276,9 @@ export class BranchService {
       branches: formattedBranches,
       summary: {
         totalBranches: allBranches.length,
+        activeBranches: activeBranchCount,
+        inactiveBranches: inactiveBranchCount,
+        statesCovered: Object.keys(stateSummaryMap).length,
         totalCapacity,
         totalAssignedStudents,
         availableSeats: Math.max(0, totalCapacity - totalAssignedStudents),
@@ -233,10 +294,13 @@ export class BranchService {
   }
 
   /**
-   * Get single branch details with assigned students list
+   * Get single branch details with assigned students list & staff list
    */
   public static async getBranchById(id: string) {
-    const branch = await BranchModel.findOne({ _id: id, isArchived: false });
+    const branch = await BranchModel.findOne({ _id: id, isArchived: false }).populate(
+      'assignedStaffIds',
+      'name email role phone avatar'
+    );
     if (!branch) {
       throw new NotFoundError('Branch not found');
     }
@@ -255,14 +319,54 @@ export class BranchService {
     }
 
     const availableSeats = Math.max(0, branch.capacity - branch.assignedStudentsCount);
+    const utilizationPercentage = branch.capacity > 0 ? Math.min(100, Math.round((branch.assignedStudentsCount / branch.capacity) * 100)) : 0;
 
     return {
       branch: {
         ...branch.toObject(),
         availableSeats,
+        utilizationPercentage,
       },
       assignedStudents,
     };
+  }
+
+  /**
+   * Fetch applications associated with students assigned to a branch
+   */
+  public static async getBranchApplications(id: string) {
+    const branch = await BranchModel.findOne({ _id: id, isArchived: false });
+    if (!branch) {
+      throw new NotFoundError('Branch not found');
+    }
+
+    const assignedLeads = await LeadModel.find({ branchId: branch._id, isArchived: false }).select('_id');
+    const leadIds = assignedLeads.map((l) => l._id);
+
+    const applications = await ApplicationModel.find({ leadId: { $in: leadIds } })
+      .populate('leadId', 'name email phone stage targetCountry')
+      .sort({ createdAt: -1 });
+
+    return applications;
+  }
+
+  /**
+   * Fetch activity logs for a specific branch
+   */
+  public static async getBranchLogs(id: string) {
+    const branch = await BranchModel.findOne({ _id: id, isArchived: false });
+    if (!branch) {
+      throw new NotFoundError('Branch not found');
+    }
+
+    const logs = await IntegrationLogModel.find({
+      $or: [{ 'requestData.branchId': branch.branchId }, { operation: new RegExp(branch.name, 'i') }],
+    })
+      .populate('triggeredBy', 'name email role')
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    return logs;
   }
 
   /**
@@ -275,10 +379,16 @@ export class BranchService {
       state?: string;
       city?: string;
       address?: string;
+      pinCode?: string;
+      contactNumber?: string;
+      email?: string;
+      managerName?: string;
+      managerEmail?: string;
       capacity?: number;
       notes?: string;
       status?: 'ACTIVE' | 'INACTIVE';
-    }
+    },
+    performedByUserId?: string
   ): Promise<IBranch> {
     const branch = await BranchModel.findOne({ _id: id, isArchived: false });
     if (!branch) {
@@ -299,7 +409,7 @@ export class BranchService {
 
       if (newCapacity < realAssigned) {
         throw new BadRequestError(
-          `Cannot set capacity to ${newCapacity}. Branch currently has ${realAssigned} students assigned.`
+          `Cannot reduce capacity to ${newCapacity}. Branch currently has ${realAssigned} students assigned.`
         );
       }
       branch.capacity = newCapacity;
@@ -309,19 +419,32 @@ export class BranchService {
     if (data.state) branch.state = data.state.trim();
     if (data.city) branch.city = data.city.trim();
     if (data.address) branch.address = data.address.trim();
+    if (data.pinCode !== undefined) branch.pinCode = data.pinCode.trim();
+    if (data.contactNumber !== undefined) branch.contactNumber = data.contactNumber.trim();
+    if (data.email !== undefined) branch.email = data.email.toLowerCase().trim();
+    if (data.managerName !== undefined) branch.managerName = data.managerName.trim();
+    if (data.managerEmail !== undefined) branch.managerEmail = data.managerEmail.toLowerCase().trim();
     if (data.notes !== undefined) branch.notes = data.notes.trim();
     if (data.status) branch.status = data.status;
 
-    // Never alter branch.branchId!
-
     await branch.save();
+
+    await IntegrationLogModel.create({
+      providerId: 'branch_management',
+      eventType: 'branch.updated',
+      operation: `Updated Branch '${branch.name}' (${branch.branchId})`,
+      status: LogStatus.SUCCESS,
+      requestData: { branchId: branch.branchId, capacity: branch.capacity, status: branch.status },
+      triggeredBy: performedByUserId,
+    });
+
     return branch;
   }
 
   /**
    * Activates or deactivates a branch
    */
-  public static async toggleStatus(id: string, status: 'ACTIVE' | 'INACTIVE'): Promise<IBranch> {
+  public static async toggleStatus(id: string, status: 'ACTIVE' | 'INACTIVE', performedByUserId?: string): Promise<IBranch> {
     const branch = await BranchModel.findOne({ _id: id, isArchived: false });
     if (!branch) {
       throw new NotFoundError('Branch not found');
@@ -329,13 +452,23 @@ export class BranchService {
 
     branch.status = status;
     await branch.save();
+
+    await IntegrationLogModel.create({
+      providerId: 'branch_management',
+      eventType: status === 'ACTIVE' ? 'branch.activated' : 'branch.deactivated',
+      operation: `Set Branch '${branch.name}' status to ${status}`,
+      status: LogStatus.SUCCESS,
+      requestData: { branchId: branch.branchId, status },
+      triggeredBy: performedByUserId,
+    });
+
     return branch;
   }
 
   /**
    * Deletes a branch safely only when no active students/leads depend on it
    */
-  public static async deleteBranch(id: string): Promise<void> {
+  public static async deleteBranch(id: string, performedByUserId?: string): Promise<void> {
     const branch = await BranchModel.findOne({ _id: id, isArchived: false });
     if (!branch) {
       throw new NotFoundError('Branch not found');
@@ -347,6 +480,15 @@ export class BranchService {
     });
 
     if (assignedStudentsCount > 0) {
+      await IntegrationLogModel.create({
+        providerId: 'branch_management',
+        eventType: 'branch.deletion_blocked',
+        operation: `Blocked deletion of Branch '${branch.name}'`,
+        status: LogStatus.FAILED,
+        errorMessage: `Deletion blocked: ${assignedStudentsCount} student(s) currently assigned`,
+        triggeredBy: performedByUserId,
+      });
+
       throw new BadRequestError(
         `Cannot delete branch '${branch.name}' (${branch.branchId}) because ${assignedStudentsCount} student(s) are currently assigned to it. Reassign or deassign students first, or deactivate the branch instead.`
       );
@@ -354,12 +496,21 @@ export class BranchService {
 
     branch.isArchived = true;
     await branch.save();
+
+    await IntegrationLogModel.create({
+      providerId: 'branch_management',
+      eventType: 'branch.deleted',
+      operation: `Deleted Branch '${branch.name}' (${branch.branchId})`,
+      status: LogStatus.SUCCESS,
+      requestData: { branchId: branch.branchId },
+      triggeredBy: performedByUserId,
+    });
   }
 
   /**
    * Assigns or reassigns a student to a branch with capacity and active status validations
    */
-  public static async assignStudentToBranch(studentLeadId: string, branchId: string | null): Promise<any> {
+  public static async assignStudentToBranch(studentLeadId: string, branchId: string | null, performedByUserId?: string): Promise<any> {
     const lead = await LeadModel.findOne({ _id: studentLeadId, isArchived: false });
     if (!lead) {
       throw new NotFoundError('Student/Lead record not found');
@@ -414,6 +565,83 @@ export class BranchService {
       await BranchModel.updateOne({ _id: oldBranchId }, { $set: { assignedStudentsCount: oldCount } });
     }
 
+    await IntegrationLogModel.create({
+      providerId: 'branch_management',
+      eventType: 'student.branch_assigned',
+      operation: `Assigned Student '${lead.name}' to Branch '${newBranch.name}'`,
+      status: LogStatus.SUCCESS,
+      requestData: { studentId: lead._id, branchId: newBranch.branchId },
+      triggeredBy: performedByUserId,
+    });
+
     return lead;
+  }
+
+  /**
+   * Assigns staff members to a branch
+   */
+  public static async assignStaffToBranch(branchId: string, staffUserIds: string[], performedByUserId?: string) {
+    const branch = await BranchModel.findOne({ _id: branchId, isArchived: false });
+    if (!branch) {
+      throw new NotFoundError('Branch not found');
+    }
+
+    branch.assignedStaffIds = staffUserIds as any;
+    await branch.save();
+
+    await IntegrationLogModel.create({
+      providerId: 'branch_management',
+      eventType: 'staff.branch_assigned',
+      operation: `Updated Staff assignments for Branch '${branch.name}'`,
+      status: LogStatus.SUCCESS,
+      requestData: { branchId: branch.branchId, staffCount: staffUserIds.length },
+      triggeredBy: performedByUserId,
+    });
+
+    return branch.populate('assignedStaffIds', 'name email role phone avatar');
+  }
+
+  /**
+   * Export all branch records to CSV string
+   */
+  public static async exportBranchesToCSV(): Promise<string> {
+    const result = await this.getBranches({ limit: 1000 });
+    const branches = result.branches;
+
+    const headers = [
+      'Branch ID',
+      'Branch Name',
+      'State',
+      'City',
+      'Address',
+      'PIN Code',
+      'Branch Manager',
+      'Manager Email',
+      'Assigned Students',
+      'Capacity',
+      'Available Seats',
+      'Utilization %',
+      'Status',
+      'Created Date',
+    ];
+
+    const rows = branches.map((b) => [
+      `"${b.branchId || ''}"`,
+      `"${b.name || ''}"`,
+      `"${b.state || ''}"`,
+      `"${b.city || ''}"`,
+      `"${b.address || ''}"`,
+      `"${b.pinCode || ''}"`,
+      `"${b.managerName || ''}"`,
+      `"${b.managerEmail || ''}"`,
+      `"${b.assignedStudentsCount || 0}"`,
+      `"${b.capacity || 0}"`,
+      `"${b.availableSeats || 0}"`,
+      `"${b.utilizationPercentage || 0}%"`,
+      `"${b.status || ''}"`,
+      `"${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}"`,
+    ]);
+
+    return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
   }
 }

@@ -19,10 +19,20 @@ import {
   MapPin,
   X,
   UserCheck,
+  Download,
+  Phone,
+  Mail,
+  User,
+  Calendar,
+  FileText,
+  Activity,
+  BarChart3,
+  UserPlus,
+  Zap,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, Branch, BranchSummary, StateBranchSummary, Lead } from '../../types';
+import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType } from '../../types';
 
 const INDIAN_STATES_AND_UTS = [
   'Andhra Pradesh',
@@ -63,18 +73,33 @@ const INDIAN_STATES_AND_UTS = [
   'Puducherry',
 ];
 
+export interface ExtendedBranchSummary {
+  totalBranches: number;
+  activeBranches: number;
+  inactiveBranches: number;
+  statesCovered: number;
+  totalCapacity: number;
+  totalAssignedStudents: number;
+  availableSeats: number;
+}
+
 export const BranchesPage: React.FC = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === UserRole.ADMIN;
+  const isOwnerAdmin =
+    user?.role === UserRole.ADMIN &&
+    (user?.adminType === AdminType.OWNER_ADMIN || !user?.adminType);
 
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [summary, setSummary] = useState<BranchSummary>({
+  const [summary, setSummary] = useState<ExtendedBranchSummary>({
     totalBranches: 0,
+    activeBranches: 0,
+    inactiveBranches: 0,
+    statesCovered: 0,
     totalCapacity: 0,
     totalAssignedStudents: 0,
     availableSeats: 0,
   });
-  const [stateSummaries, setStateSummaries] = useState<StateBranchSummary[]>([]);
+  const [stateSummaries, setStateSummaries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +108,7 @@ export const BranchesPage: React.FC = () => {
   // Filters & Controls
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
+  const [selectedCity, setSelectedCity] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -100,8 +126,14 @@ export const BranchesPage: React.FC = () => {
     branch: Branch;
     assignedStudents: Lead[];
   } | null>(null);
+  const [drawerActiveTab, setDrawerActiveTab] = useState<'overview' | 'students' | 'staff' | 'applications' | 'reports' | 'history'>('overview');
+  const [branchApplications, setBranchApplications] = useState<Application[]>([]);
+  const [branchLogs, setBranchLogs] = useState<IntegrationLog[]>([]);
+  const [isLoadingTabContent, setIsLoadingTabContent] = useState(false);
+
   const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null);
   const [assignStudentModal, setAssignStudentModal] = useState<Branch | null>(null);
+  const [assignStaffModal, setAssignStaffModal] = useState<Branch | null>(null);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -109,15 +141,23 @@ export const BranchesPage: React.FC = () => {
     state: 'Karnataka',
     city: '',
     address: '',
+    pinCode: '',
+    contactNumber: '',
+    email: '',
+    managerName: '',
+    managerEmail: '',
     capacity: 100,
+    openingDate: new Date().toISOString().split('T')[0],
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     notes: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Student assignment form state
+  // Student & Staff assignment state
   const [unassignedStudents, setUnassignedStudents] = useState<Lead[]>([]);
   const [selectedStudentToAssign, setSelectedStudentToAssign] = useState('');
+  const [allUsers, setAllUsers] = useState<UserType[]>([]);
+  const [selectedStaffUserIds, setSelectedStaffUserIds] = useState<string[]>([]);
   const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
 
   const fetchBranches = async (showRefreshSpinner = false) => {
@@ -129,6 +169,7 @@ export const BranchesPage: React.FC = () => {
       const res = await apiClient.get<any>('/branches', {
         search: searchQuery,
         state: selectedState,
+        city: selectedCity,
         status: selectedStatus,
         sortBy,
         sortOrder,
@@ -140,6 +181,9 @@ export const BranchesPage: React.FC = () => {
       setSummary(
         res.data.summary || {
           totalBranches: 0,
+          activeBranches: 0,
+          inactiveBranches: 0,
+          statesCovered: 0,
           totalCapacity: 0,
           totalAssignedStudents: 0,
           availableSeats: 0,
@@ -148,9 +192,9 @@ export const BranchesPage: React.FC = () => {
       setStateSummaries(res.data.stateSummaries || []);
       setTotalPages(res.data.pagination?.pages || 1);
 
-      // Auto expand all state accordions on initial load
+      // Auto expand state accordions
       const expMap: Record<string, boolean> = {};
-      (res.data.stateSummaries || []).forEach((st: StateBranchSummary) => {
+      (res.data.stateSummaries || []).forEach((st: any) => {
         expMap[st.state.toUpperCase()] = true;
       });
       setExpandedStates(expMap);
@@ -164,7 +208,7 @@ export const BranchesPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
-  }, [searchQuery, selectedState, selectedStatus, sortBy, sortOrder, currentPage]);
+  }, [searchQuery, selectedState, selectedCity, selectedStatus, sortBy, sortOrder, currentPage]);
 
   const handleOpenCreateModal = () => {
     setEditingBranch(null);
@@ -173,7 +217,13 @@ export const BranchesPage: React.FC = () => {
       state: 'Karnataka',
       city: '',
       address: '',
+      pinCode: '',
+      contactNumber: '',
+      email: '',
+      managerName: '',
+      managerEmail: '',
       capacity: 100,
+      openingDate: new Date().toISOString().split('T')[0],
       status: 'ACTIVE',
       notes: '',
     });
@@ -188,7 +238,13 @@ export const BranchesPage: React.FC = () => {
       state: branch.state,
       city: branch.city,
       address: branch.address,
+      pinCode: branch.pinCode || '',
+      contactNumber: branch.contactNumber || '',
+      email: branch.email || '',
+      managerName: branch.managerName || '',
+      managerEmail: branch.managerEmail || '',
       capacity: branch.capacity,
+      openingDate: branch.openingDate ? new Date(branch.openingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: branch.status,
       notes: branch.notes || '',
     });
@@ -202,7 +258,17 @@ export const BranchesPage: React.FC = () => {
     if (!formData.state.trim()) errs.state = 'State is mandatory';
     if (!formData.city.trim()) errs.city = 'City is mandatory';
     if (!formData.address.trim()) errs.address = 'Full address is mandatory';
-    if (!formData.capacity || formData.capacity < 1) errs.capacity = 'Capacity must be at least 1 student';
+    if (!formData.capacity || Number(formData.capacity) < 1) errs.capacity = 'Capacity must be at least 1 student';
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errs.email = 'Invalid email address format';
+    }
+    if (formData.managerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.managerEmail.trim())) {
+      errs.managerEmail = 'Invalid manager email address format';
+    }
+    if (formData.pinCode && !/^\d{6}$/.test(formData.pinCode.trim())) {
+      errs.pinCode = 'PIN Code must be a 6-digit number';
+    }
 
     if (editingBranch && formData.capacity < editingBranch.assignedStudentsCount) {
       errs.capacity = `Cannot reduce capacity below currently assigned students (${editingBranch.assignedStudentsCount})`;
@@ -261,8 +327,30 @@ export const BranchesPage: React.FC = () => {
     try {
       const res = await apiClient.get<any>(`/branches/${branch._id}`);
       setSelectedBranchDetails(res.data);
+      setDrawerActiveTab('overview');
     } catch (err: any) {
       setError(err.message || 'Failed to fetch branch details');
+    }
+  };
+
+  const handleTabChange = async (tab: 'overview' | 'students' | 'staff' | 'applications' | 'reports' | 'history') => {
+    setDrawerActiveTab(tab);
+    if (!selectedBranchDetails) return;
+
+    if (tab === 'applications' && branchApplications.length === 0) {
+      setIsLoadingTabContent(true);
+      try {
+        const res = await apiClient.get<any>(`/branches/${selectedBranchDetails.branch._id}/applications`);
+        setBranchApplications(res.data || []);
+      } catch (err) { }
+      setIsLoadingTabContent(false);
+    } else if (tab === 'history' && branchLogs.length === 0) {
+      setIsLoadingTabContent(true);
+      try {
+        const res = await apiClient.get<any>(`/branches/${selectedBranchDetails.branch._id}/logs`);
+        setBranchLogs(res.data || []);
+      } catch (err) { }
+      setIsLoadingTabContent(false);
     }
   };
 
@@ -294,6 +382,39 @@ export const BranchesPage: React.FC = () => {
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
       setError(err.message || 'Failed to assign student');
+    } finally {
+      setIsSubmittingAssign(false);
+    }
+  };
+
+  const handleOpenStaffModal = async (branch: Branch) => {
+    setAssignStaffModal(branch);
+    setSelectedStaffUserIds((branch as any).assignedStaffIds?.map((s: any) => s._id || s) || []);
+    try {
+      const res = await apiClient.get<UserType[]>('/users');
+      setAllUsers(res.data || []);
+    } catch (err) { }
+  };
+
+  const handleAssignStaffSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignStaffModal) return;
+
+    setIsSubmittingAssign(true);
+    try {
+      await apiClient.post('/branches/assign-staff', {
+        branchId: assignStaffModal._id,
+        staffUserIds: selectedStaffUserIds,
+      });
+      setSuccessMsg(`Staff assignments updated for ${assignStaffModal.name}.`);
+      setAssignStaffModal(null);
+      fetchBranches();
+      if (selectedBranchDetails) {
+        handleViewDetails(selectedBranchDetails.branch);
+      }
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update staff assignments');
     } finally {
       setIsSubmittingAssign(false);
     }
@@ -336,13 +457,35 @@ export const BranchesPage: React.FC = () => {
                 Branch Management
               </h1>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                Centralized state-wise branch capacity, student assignment, and location network control
+                Manage branches, state-wise operations, student capacity, staff, and performance.
               </p>
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <a
+            href="/api/v1/branches/export"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              textDecoration: 'none',
+            }}
+          >
+            <Download size={15} />
+            <span>Export CSV</span>
+          </a>
+
           <button
             onClick={() => fetchBranches(true)}
             disabled={isRefreshing}
@@ -364,7 +507,7 @@ export const BranchesPage: React.FC = () => {
             <span>Refresh</span>
           </button>
 
-          {isAdmin && (
+          {isOwnerAdmin && (
             <button
               onClick={handleOpenCreateModal}
               style={{
@@ -440,89 +583,51 @@ export const BranchesPage: React.FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '14px',
           marginBottom: '24px',
         }}
       >
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '18px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            TOTAL BRANCHES
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-            {summary.totalBranches}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Active across {stateSummaries.length} Indian state(s)
-          </div>
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL BRANCHES</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{summary.totalBranches}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>State Network</div>
         </div>
 
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '18px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            TOTAL BRANCH CAPACITY
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>
-            {summary.totalCapacity}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Maximum student intake limit
-          </div>
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ACTIVE BRANCHES</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>{summary.activeBranches}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Operational Intake</div>
         </div>
 
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '18px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            ASSIGNED STUDENTS
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: '#D97706', marginTop: '4px' }}>
-            {summary.totalAssignedStudents}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Currently enrolled across branches
-          </div>
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>INACTIVE BRANCHES</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#DC2626', marginTop: '4px' }}>{summary.inactiveBranches}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Paused Operations</div>
         </div>
 
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '18px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            AVAILABLE SEATS
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>
-            {summary.availableSeats}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Unfilled capacity available for assignment
-          </div>
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ASSIGNED STUDENTS</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#D97706', marginTop: '4px' }}>{summary.totalAssignedStudents}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Enrolled Capacity</div>
+        </div>
+
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL CAPACITY</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>{summary.totalCapacity}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Max Intake Limit</div>
+        </div>
+
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>AVAILABLE SEATS</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563EB', marginTop: '4px' }}>{summary.availableSeats}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Open Vacancies</div>
+        </div>
+
+        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>STATES COVERED</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#7C3AED', marginTop: '4px' }}>{summary.statesCovered}</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Indian Regions</div>
         </div>
       </div>
 
@@ -556,7 +661,7 @@ export const BranchesPage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search by Branch Name, ID, State, or City..."
+              placeholder="Search by Branch Name, ID, Manager, State, or City..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -608,7 +713,7 @@ export const BranchesPage: React.FC = () => {
           </select>
         </div>
 
-        {/* View Switcher & Sorting */}
+        {/* View Switcher */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
             <button
@@ -638,7 +743,7 @@ export const BranchesPage: React.FC = () => {
                 cursor: 'pointer',
               }}
             >
-              Flat Table
+              Data Table
             </button>
           </div>
         </div>
@@ -667,7 +772,7 @@ export const BranchesPage: React.FC = () => {
               ? 'No branch matching your filter criteria. Try clearing search filters.'
               : 'Start by creating your first centralized branch.'}
           </p>
-          {isAdmin && (
+          {isOwnerAdmin && (
             <button
               onClick={handleOpenCreateModal}
               style={{
@@ -759,7 +864,7 @@ export const BranchesPage: React.FC = () => {
 
                 {/* State Branches Content */}
                 {isExpanded && (
-                  <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+                  <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
                     {stateBranches.map((b) => (
                       <div
                         key={b._id}
@@ -809,19 +914,25 @@ export const BranchesPage: React.FC = () => {
                             </span>
                           </div>
 
-                          <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <MapPin size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                             <span>
-                              {b.address}, {b.city}, {b.state}
+                              {b.address}, {b.city}, {b.state} {b.pinCode ? `- ${b.pinCode}` : ''}
                             </span>
                           </div>
+
+                          {b.managerName && (
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                              Manager: <strong style={{ color: 'var(--text-primary)' }}>{b.managerName}</strong>
+                            </div>
+                          )}
 
                           {/* Capacity Progress Bar */}
                           <div style={{ marginBottom: '14px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
                               <span style={{ color: 'var(--text-secondary)' }}>Capacity Utilization:</span>
                               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                {b.assignedStudentsCount} / {b.capacity} Students ({b.availableSeats} seats available)
+                                {b.assignedStudentsCount} / {b.capacity} ({b.utilizationPercentage || 0}%)
                               </span>
                             </div>
                             <div
@@ -836,9 +947,9 @@ export const BranchesPage: React.FC = () => {
                               <div
                                 style={{
                                   height: '100%',
-                                  width: `${Math.min(100, Math.round((b.assignedStudentsCount / b.capacity) * 100))}%`,
+                                  width: `${Math.min(100, b.utilizationPercentage || 0)}%`,
                                   backgroundColor:
-                                    (b.assignedStudentsCount / b.capacity) >= 0.9 ? '#EF4444' : (b.assignedStudentsCount / b.capacity) >= 0.7 ? '#F59E0B' : '#3B82F6',
+                                    (b.utilizationPercentage || 0) >= 90 ? '#EF4444' : (b.utilizationPercentage || 0) >= 70 ? '#F59E0B' : '#3B82F6',
                                   transition: 'width 0.3s ease',
                                 }}
                               />
@@ -890,7 +1001,7 @@ export const BranchesPage: React.FC = () => {
                               <span>Assign Student</span>
                             </button>
 
-                            {isAdmin && (
+                            {isOwnerAdmin && (
                               <>
                                 <button
                                   onClick={() => handleOpenEditModal(b)}
@@ -951,17 +1062,20 @@ export const BranchesPage: React.FC = () => {
           })}
         </div>
       ) : (
-        /* Flat Table View */
+        /* Data Table View */
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--bg-subtle, #F9FAFB)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch ID</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch Name</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>State & City</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Capacity</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>State</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>City</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch Manager</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Assigned</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Capacity</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Available Seats</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Utilization %</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Status</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
               </tr>
@@ -971,12 +1085,13 @@ export const BranchesPage: React.FC = () => {
                 <tr key={b._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                   <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--primary)' }}>{b.branchId}</td>
                   <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{b.name}</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                    {b.city}, {b.state}
-                  </td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{b.capacity}</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{b.state}</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{b.city}</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{b.managerName || '-'}</td>
                   <td style={{ padding: '12px 16px', fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{b.capacity}</td>
                   <td style={{ padding: '12px 16px', fontWeight: 600, color: '#059669' }}>{b.availableSeats}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{b.utilizationPercentage || 0}%</td>
                   <td style={{ padding: '12px 16px' }}>
                     <span
                       style={{
@@ -1005,7 +1120,7 @@ export const BranchesPage: React.FC = () => {
                       >
                         Assign
                       </button>
-                      {isAdmin && (
+                      {isOwnerAdmin && (
                         <>
                           <button
                             onClick={() => handleOpenEditModal(b)}
@@ -1052,8 +1167,11 @@ export const BranchesPage: React.FC = () => {
             style={{
               backgroundColor: '#FFFFFF',
               borderRadius: 'var(--radius-lg)',
-              maxWidth: '560px',
+              maxWidth: '640px',
               width: '100%',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
               overflow: 'hidden',
             }}
@@ -1079,14 +1197,14 @@ export const BranchesPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveBranch} style={{ padding: '20px' }}>
+            <form onSubmit={handleSaveBranch} style={{ padding: '20px', overflowY: 'auto' }}>
               {formErrors.submit && (
                 <div style={{ padding: '10px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', borderRadius: '6px', fontSize: '13px', marginBottom: '16px' }}>
                   {formErrors.submit}
                 </div>
               )}
 
-              {/* Branch ID Preview */}
+              {/* Branch ID Readonly Preview */}
               <div style={{ marginBottom: '16px', backgroundColor: '#F3F4F6', padding: '10px 14px', borderRadius: '6px', border: '1px solid #E5E7EB' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                   AUTOMATIC UNIQUE BRANCH ID
@@ -1094,12 +1212,13 @@ export const BranchesPage: React.FC = () => {
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary)', marginTop: '2px' }}>
                   {editingBranch ? editingBranch.branchId : '[Server Generated e.g. KA-BLR-A81F2C]'}
                 </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Unique Branch ID is auto-generated on backend using State and City codes.
-                </div>
               </div>
 
-              {/* Branch Name */}
+              {/* Basic Information Section */}
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.04em' }}>
+                Basic Information
+              </div>
+
               <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                   Branch Name *
@@ -1120,7 +1239,6 @@ export const BranchesPage: React.FC = () => {
                 {formErrors.name && <span style={{ fontSize: '11.5px', color: '#EF4444' }}>{formErrors.name}</span>}
               </div>
 
-              {/* State & City Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
@@ -1166,31 +1284,137 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Full Address */}
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                  Full Address *
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Street address, building name, pincode..."
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: formErrors.address ? '1px solid #EF4444' : '1px solid var(--border-color)',
-                    fontSize: '13.5px',
-                  }}
-                />
-              </div>
-
-              {/* Capacity & Status */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Maximum Capacity (Students) *
+                    Full Address *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Street address, building..."
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: formErrors.address ? '1px solid #EF4444' : '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    PIN Code
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="560038"
+                    value={formData.pinCode}
+                    onChange={(e) => setFormData({ ...formData, pinCode: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: formErrors.pinCode ? '1px solid #EF4444' : '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
+                  {formErrors.pinCode && <span style={{ fontSize: '11.5px', color: '#EF4444' }}>{formErrors.pinCode}</span>}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Branch Contact Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="+91 80 1234 5678"
+                    value={formData.contactNumber}
+                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Branch Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="bangalore@ii-ec.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: formErrors.email ? '1px solid #EF4444' : '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
+                  {formErrors.email && <span style={{ fontSize: '11.5px', color: '#EF4444' }}>{formErrors.email}</span>}
+                </div>
+              </div>
+
+              {/* Management Information Section */}
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.04em' }}>
+                Management & Capacity Settings
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Branch Manager Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Rajesh Kumar"
+                    value={formData.managerName}
+                    onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Branch Manager Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="rajesh.manager@ii-ec.com"
+                    value={formData.managerEmail}
+                    onChange={(e) => setFormData({ ...formData, managerEmail: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: formErrors.managerEmail ? '1px solid #EF4444' : '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Max Student Capacity *
                   </label>
                   <input
                     type="number"
@@ -1205,7 +1429,24 @@ export const BranchesPage: React.FC = () => {
                       fontSize: '13.5px',
                     }}
                   />
-                  {formErrors.capacity && <span style={{ fontSize: '11.5px', color: '#EF4444' }}>{formErrors.capacity}</span>}
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Opening Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.openingDate}
+                    onChange={(e) => setFormData({ ...formData, openingDate: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
                 </div>
 
                 <div>
@@ -1266,7 +1507,7 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- BRANCH DETAILS & ASSIGNED STUDENTS DRAWER --- */}
+      {/* --- BRANCH DETAILS 6-TAB DRAWER --- */}
       {selectedBranchDetails && (
         <div
           style={{
@@ -1285,7 +1526,7 @@ export const BranchesPage: React.FC = () => {
           <div
             style={{
               backgroundColor: '#FFFFFF',
-              width: '560px',
+              width: '640px',
               maxWidth: '100vw',
               height: '100%',
               display: 'flex',
@@ -1293,6 +1534,7 @@ export const BranchesPage: React.FC = () => {
               boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
             }}
           >
+            {/* Drawer Header */}
             <div
               style={{
                 padding: '16px 20px',
@@ -1319,105 +1561,197 @@ export const BranchesPage: React.FC = () => {
               </button>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-              {/* Stats Bar */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', backgroundColor: '#F9FAFB', padding: '14px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Capacity</div>
-                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedBranchDetails.branch.capacity}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Assigned</div>
-                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#D97706' }}>{selectedBranchDetails.branch.assignedStudentsCount}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Available Seats</div>
-                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{selectedBranchDetails.branch.availableSeats}</div>
-                </div>
-              </div>
-
-              {/* Info Details */}
-              <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13.5px' }}>
-                <div>
-                  <strong style={{ color: 'var(--text-muted)' }}>State & City: </strong>
-                  <span>{selectedBranchDetails.branch.city}, {selectedBranchDetails.branch.state}</span>
-                </div>
-                <div>
-                  <strong style={{ color: 'var(--text-muted)' }}>Full Address: </strong>
-                  <span>{selectedBranchDetails.branch.address}</span>
-                </div>
-                <div>
-                  <strong style={{ color: 'var(--text-muted)' }}>Status: </strong>
-                  <span style={{ fontWeight: 600, color: selectedBranchDetails.branch.status === 'ACTIVE' ? '#065F46' : '#991B1B' }}>
-                    {selectedBranchDetails.branch.status}
-                  </span>
-                </div>
-                <div>
-                  <strong style={{ color: 'var(--text-muted)' }}>Created At: </strong>
-                  <span>{new Date(selectedBranchDetails.branch.createdAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-
-              {/* Assigned Students Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-                <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                  Assigned Students ({selectedBranchDetails.assignedStudents.length})
-                </h4>
+            {/* 6 Tabs Header */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', backgroundColor: '#FFFFFF', overflowX: 'auto' }}>
+              {(['overview', 'students', 'staff', 'applications', 'reports', 'history'] as const).map((tab) => (
                 <button
-                  onClick={() => handleOpenAssignModal(selectedBranchDetails.branch)}
+                  key={tab}
+                  onClick={() => handleTabChange(tab)}
                   style={{
-                    padding: '5px 10px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: '#059669',
-                    backgroundColor: '#ECFDF5',
-                    border: '1px solid #A7F3D0',
-                    borderRadius: '4px',
+                    padding: '10px 14px',
+                    fontSize: '13px',
+                    fontWeight: drawerActiveTab === tab ? 700 : 500,
+                    color: drawerActiveTab === tab ? 'var(--primary)' : 'var(--text-secondary)',
+                    borderBottom: drawerActiveTab === tab ? '2px solid var(--primary)' : '2px solid transparent',
+                    borderTop: 'none',
+                    borderLeft: 'none',
+                    borderRight: 'none',
+                    backgroundColor: 'transparent',
                     cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
+                    textTransform: 'capitalize',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <Plus size={14} />
-                  <span>Assign Student</span>
+                  {tab}
                 </button>
-              </div>
+              ))}
+            </div>
 
-              {/* Students List */}
-              {selectedBranchDetails.assignedStudents.length === 0 ? (
-                <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#F9FAFB', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px' }}>
-                  No students currently assigned to this branch. Click 'Assign Student' to assign enrolled students.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {selectedBranchDetails.assignedStudents.map((st) => (
-                    <div
-                      key={st._id}
-                      style={{
-                        padding: '12px',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)' }}>{st.name}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                          {st.email} • {st.phone}
-                        </div>
-                        <div style={{ fontSize: '11.5px', color: 'var(--primary)', marginTop: '2px' }}>
-                          Target: {st.targetCourse || 'Course'} ({st.targetCountry || 'Abroad'})
-                        </div>
-                      </div>
-
-                      <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px' }}>
-                        {st.stage}
-                      </span>
+            {/* Drawer Tab Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              {drawerActiveTab === 'overview' && (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', backgroundColor: '#F9FAFB', padding: '14px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Capacity</div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedBranchDetails.branch.capacity}</div>
                     </div>
-                  ))}
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Assigned</div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: '#D97706' }}>{selectedBranchDetails.branch.assignedStudentsCount}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Available Seats</div>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{selectedBranchDetails.branch.availableSeats}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13.5px' }}>
+                    <div><strong style={{ color: 'var(--text-muted)' }}>State & City: </strong>{selectedBranchDetails.branch.city}, {selectedBranchDetails.branch.state}</div>
+                    <div><strong style={{ color: 'var(--text-muted)' }}>Full Address: </strong>{selectedBranchDetails.branch.address} {selectedBranchDetails.branch.pinCode ? `- ${selectedBranchDetails.branch.pinCode}` : ''}</div>
+                    <div><strong style={{ color: 'var(--text-muted)' }}>Contact Number: </strong>{selectedBranchDetails.branch.contactNumber || 'N/A'}</div>
+                    <div><strong style={{ color: 'var(--text-muted)' }}>Branch Email: </strong>{selectedBranchDetails.branch.email || 'N/A'}</div>
+                    <div><strong style={{ color: 'var(--text-muted)' }}>Branch Manager: </strong>{selectedBranchDetails.branch.managerName || 'Unassigned'} {selectedBranchDetails.branch.managerEmail ? `(${selectedBranchDetails.branch.managerEmail})` : ''}</div>
+                    <div><strong style={{ color: 'var(--text-muted)' }}>Opening Date: </strong>{selectedBranchDetails.branch.openingDate ? new Date(selectedBranchDetails.branch.openingDate).toLocaleDateString() : 'N/A'}</div>
+                    <div><strong style={{ color: 'var(--text-muted)' }}>Utilization Rate: </strong>{selectedBranchDetails.branch.utilizationPercentage || 0}%</div>
+                  </div>
+                </div>
+              )}
+
+              {drawerActiveTab === 'students' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
+                      Assigned Students ({selectedBranchDetails.assignedStudents.length})
+                    </h4>
+                    <button
+                      onClick={() => handleOpenAssignModal(selectedBranchDetails.branch)}
+                      style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: '#059669', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      + Assign Student
+                    </button>
+                  </div>
+
+                  {selectedBranchDetails.assignedStudents.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#F9FAFB', borderRadius: '8px', color: 'var(--text-muted)' }}>
+                      No students currently assigned to this branch.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {selectedBranchDetails.assignedStudents.map((st) => (
+                        <div key={st._id} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{st.name}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{st.email} • {st.phone}</div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: 'var(--primary-light)', color: 'var(--primary)', padding: '2px 6px', borderRadius: '4px' }}>
+                            {st.stage}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {drawerActiveTab === 'staff' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
+                      Branch Staff & Employees ({(selectedBranchDetails.branch as any).assignedStaffIds?.length || 0})
+                    </h4>
+                    {isOwnerAdmin && (
+                      <button
+                        onClick={() => handleOpenStaffModal(selectedBranchDetails.branch)}
+                        style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: 'var(--primary)', backgroundColor: 'var(--primary-light)', border: '1px solid var(--primary)', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        + Assign Staff
+                      </button>
+                    )}
+                  </div>
+
+                  {(selectedBranchDetails.branch as any).assignedStaffIds?.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#F9FAFB', borderRadius: '8px', color: 'var(--text-muted)' }}>
+                      No staff assigned yet to this branch.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {((selectedBranchDetails.branch as any).assignedStaffIds || []).map((staff: any) => (
+                        <div key={staff._id || staff} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{staff.name || 'Staff User'}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{staff.email}</div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#F3F4F6', color: 'var(--text-primary)', padding: '2px 6px', borderRadius: '4px' }}>
+                            {staff.role}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {drawerActiveTab === 'applications' && (
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Branch Student Applications</h4>
+                  {isLoadingTabContent ? (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>Loading applications...</div>
+                  ) : branchApplications.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#F9FAFB', borderRadius: '8px', color: 'var(--text-muted)' }}>
+                      No applications recorded for students assigned to this branch.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {branchApplications.map((app) => (
+                        <div key={app._id} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{(app.leadId as any)?.name || 'Student'} - {app.universityName}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{app.courseTitle} ({app.country})</div>
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#EFF6FF', color: '#1E40AF', padding: '2px 6px', borderRadius: '4px' }}>
+                            {app.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {drawerActiveTab === 'reports' && (
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Branch Performance Summary</h4>
+                  <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '13px' }}>
+                    <div style={{ marginBottom: '8px' }}>Capacity Utilization: <strong>{selectedBranchDetails.branch.utilizationPercentage || 0}%</strong></div>
+                    <div style={{ marginBottom: '8px' }}>Assigned Students: <strong>{selectedBranchDetails.branch.assignedStudentsCount}</strong></div>
+                    <div style={{ marginBottom: '8px' }}>Available Vacancies: <strong>{selectedBranchDetails.branch.availableSeats}</strong></div>
+                    <div>Status: <strong>{selectedBranchDetails.branch.status}</strong></div>
+                  </div>
+                </div>
+              )}
+
+              {drawerActiveTab === 'history' && (
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Branch Activity Audit History</h4>
+                  {isLoadingTabContent ? (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>Loading activity logs...</div>
+                  ) : branchLogs.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#F9FAFB', borderRadius: '8px', color: 'var(--text-muted)' }}>
+                      No audit log records for this branch yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {branchLogs.map((log) => (
+                        <div key={log._id} style={{ padding: '10px 12px', border: '1px solid var(--border-light)', borderRadius: '6px', fontSize: '12.5px' }}>
+                          <div style={{ fontWeight: 600 }}>{log.operation}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {new Date(log.createdAt).toLocaleString()} by {(log.triggeredBy as any)?.name || 'Owner Admin'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1425,94 +1759,87 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
+      {/* --- ASSIGN STAFF MODAL --- */}
+      {assignStaffModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250, padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Assign Staff to Branch</h3>
+              <button onClick={() => setAssignStaffModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAssignStaffSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Select Staff Members</label>
+                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px' }}>
+                  {allUsers.filter((u) => u.role !== 'STUDENT').map((u) => (
+                    <label key={u._id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedStaffUserIds.includes(u._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedStaffUserIds([...selectedStaffUserIds, u._id]);
+                          else setSelectedStaffUserIds(selectedStaffUserIds.filter((id) => id !== u._id));
+                        }}
+                      />
+                      <span>{u.name} ({u.role}) - {u.email}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" onClick={() => setAssignStaffModal(null)} style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', background: '#FFF' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSubmittingAssign} style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
+                  Save Staff Assignments
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* --- STUDENT ASSIGNMENT MODAL --- */}
       {assignStudentModal && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1250,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 'var(--radius-lg)',
-              maxWidth: '480px',
-              width: '100%',
-              padding: '20px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
-            }}
-          >
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250, padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Assign Student to Branch
-              </h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Assign Student to Branch</h3>
               <button onClick={() => setAssignStudentModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Assigning student to <strong>{assignStudentModal.name}</strong> ({assignStudentModal.availableSeats} available seats remaining).
+              Assigning student to <strong>{assignStudentModal.name}</strong> ({assignStudentModal.availableSeats} available seats).
             </p>
 
             <form onSubmit={handleAssignStudentSubmit}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>
-                  Select Student / Lead *
-                </label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Select Student *</label>
                 <select
                   value={selectedStudentToAssign}
                   onChange={(e) => setSelectedStudentToAssign(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    fontSize: '13.5px',
-                    backgroundColor: '#FFFFFF',
-                  }}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: '#FFFFFF', fontSize: '13.5px' }}
                 >
                   <option value="">-- Choose Student --</option>
                   {unassignedStudents.map((st) => (
                     <option key={st._id} value={st._id}>
-                      {st.name} ({st.email}) - {st.targetCountry || 'Student'}
+                      {st.name} ({st.email}) - {st.targetCountry || 'Abroad'}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setAssignStudentModal(null)}
-                  style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', background: '#FFF' }}
-                >
+                <button type="button" onClick={() => setAssignStudentModal(null)} style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', background: '#FFF' }}>
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={!selectedStudentToAssign || isSubmittingAssign}
-                  style={{
-                    padding: '8px 18px',
-                    backgroundColor: 'var(--primary)',
-                    color: '#FFF',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
+                <button type="submit" disabled={!selectedStudentToAssign || isSubmittingAssign} style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
                   {isSubmittingAssign ? 'Assigning...' : 'Assign Student'}
                 </button>
               </div>
@@ -1523,64 +1850,24 @@ export const BranchesPage: React.FC = () => {
 
       {/* --- SAFE DELETION BLOCK CONFIRMATION DIALOG --- */}
       {deletingBranch && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1300,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 'var(--radius-lg)',
-              maxWidth: '460px',
-              width: '100%',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
-            }}
-          >
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '460px', width: '100%', padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px', color: '#DC2626' }}>
               <ShieldAlert size={28} />
-              <h3 style={{ fontSize: '17px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-                Delete Branch Confirmation
-              </h3>
+              <h3 style={{ fontSize: '17px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Delete Branch Confirmation</h3>
             </div>
 
             {deletingBranch.assignedStudentsCount > 0 ? (
               <div>
                 <p style={{ fontSize: '13.5px', color: 'var(--text-primary)', lineHeight: 1.5, marginBottom: '16px' }}>
-                  <strong>Cannot Delete Branch:</strong> '{deletingBranch.name}' currently has{' '}
-                  <strong style={{ color: '#DC2626' }}>{deletingBranch.assignedStudentsCount} student(s)</strong> assigned to it.
+                  <strong>Cannot Delete Branch:</strong> '{deletingBranch.name}' currently has <strong style={{ color: '#DC2626' }}>{deletingBranch.assignedStudentsCount} student(s)</strong> assigned to it.
                 </p>
                 <div style={{ padding: '12px', backgroundColor: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '6px', fontSize: '12.5px', color: '#92400E', marginBottom: '20px' }}>
-                  To maintain database integrity, you must reassign or remove all assigned students before deleting this branch. Alternatively, you can deactivate the branch to stop new assignments.
+                  To maintain database integrity, reassign all students before deleting. You can deactivate the branch instead.
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                  <button
-                    onClick={() => setDeletingBranch(null)}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: '#FFF' }}
-                  >
-                    Close
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleToggleStatus(deletingBranch);
-                      setDeletingBranch(null);
-                    }}
-                    style={{ padding: '8px 16px', borderRadius: '6px', backgroundColor: '#D97706', color: '#FFF', border: 'none', fontWeight: 600 }}
-                  >
-                    Deactivate Instead
-                  </button>
+                  <button onClick={() => setDeletingBranch(null)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: '#FFF' }}>Close</button>
+                  <button onClick={() => { handleToggleStatus(deletingBranch); setDeletingBranch(null); }} style={{ padding: '8px 16px', borderRadius: '6px', backgroundColor: '#D97706', color: '#FFF', border: 'none', fontWeight: 600 }}>Deactivate Instead</button>
                 </div>
               </div>
             ) : (
@@ -1589,18 +1876,8 @@ export const BranchesPage: React.FC = () => {
                   Are you sure you want to delete branch <strong>{deletingBranch.name}</strong> ({deletingBranch.branchId})? This action cannot be undone.
                 </p>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                  <button
-                    onClick={() => setDeletingBranch(null)}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: '#FFF' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDeleteBranch}
-                    style={{ padding: '8px 18px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#FFF', border: 'none', fontWeight: 600 }}
-                  >
-                    Delete Branch
-                  </button>
+                  <button onClick={() => setDeletingBranch(null)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: '#FFF' }}>Cancel</button>
+                  <button onClick={handleDeleteBranch} style={{ padding: '8px 18px', borderRadius: '6px', backgroundColor: '#DC2626', color: '#FFF', border: 'none', fontWeight: 600 }}>Delete Branch</button>
                 </div>
               </div>
             )}

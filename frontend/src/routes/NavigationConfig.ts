@@ -27,6 +27,7 @@ export interface NavItem {
   icon: any;
   roles: UserRole[];
   badge?: string;
+  isOwnerAdminOnly?: boolean;
 }
 
 export interface NavSection {
@@ -54,7 +55,8 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         label: 'Branches',
         path: '/branches',
         icon: GitFork,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
+        roles: [UserRole.ADMIN],
+        isOwnerAdminOnly: true,
       },
       {
         label: 'Integrations',

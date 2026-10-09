@@ -505,9 +505,18 @@ export interface Branch {
   state: string;
   city: string;
   address: string;
+  pinCode?: string;
+  contactNumber?: string;
+  email?: string;
+  managerName?: string;
+  managerEmail?: string;
+  managerUserId?: any;
+  assignedStaffIds?: any[];
   capacity: number;
   assignedStudentsCount: number;
   availableSeats: number;
+  utilizationPercentage?: number;
+  openingDate?: string;
   status: 'ACTIVE' | 'INACTIVE';
   isArchived: boolean;
   notes?: string;

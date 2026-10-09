@@ -19,7 +19,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { NAVIGATION_SECTIONS } from '../routes/NavigationConfig';
 import { apiClient } from '../services/api-client';
-import { NotificationItem, UserRole, Lead, StudentStage } from '../types';
+import { NotificationItem, UserRole, AdminType, Lead, StudentStage } from '../types';
 import { UserGuideModal } from '../components/UserGuide';
 import { VerticalStageStepper } from '../components/StageStepper';
 import { ContextMenu } from '../components/ContextMenu';
@@ -143,9 +143,19 @@ export const AppLayout: React.FC = () => {
     } catch (err) { }
   };
 
+  const isOwnerAdmin =
+    user?.role === UserRole.ADMIN &&
+    (user?.adminType === AdminType.OWNER_ADMIN || !user?.adminType);
+
   const allowedSections = NAVIGATION_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => user && item.roles.includes(user.role)),
+    items: section.items.filter((item) => {
+      if (!user) return false;
+      if (item.isOwnerAdminOnly) {
+        return isOwnerAdmin;
+      }
+      return item.roles.includes(user.role);
+    }),
   })).filter((section) => section.items.length > 0);
 
   return (

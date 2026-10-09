@@ -1,24 +1,31 @@
 import { Router } from 'express';
 import { BranchController } from './branch.controller';
 import { authenticate } from '../../middleware/auth.middleware';
-import { requireAdmin, requireStaff } from '../../middleware/rbac.middleware';
+import { requireOwnerAdmin } from '../../middleware/rbac.middleware';
 
 const router = Router();
 
-// All routes require authentication
+// EVERY endpoint in Branch Management is strictly restricted to Owner Admin only
 router.use(authenticate);
+router.use(requireOwnerAdmin);
 
-// Staff and Admin can view branches
-router.get('/', requireStaff, BranchController.getBranches);
-router.get('/:id', requireStaff, BranchController.getBranchById);
+// Export CSV for authorized Owner Admin
+router.get('/export', BranchController.exportBranchesCSV);
 
-// Staff and Admin can assign students to branches
-router.post('/assign-student', requireStaff, BranchController.assignStudent);
+// List and Detail routes
+router.get('/', BranchController.getBranches);
+router.get('/:id', BranchController.getBranchById);
+router.get('/:id/applications', BranchController.getBranchApplications);
+router.get('/:id/logs', BranchController.getBranchLogs);
 
-// Admin exclusive management routes
-router.post('/', requireAdmin, BranchController.createBranch);
-router.put('/:id', requireAdmin, BranchController.updateBranch);
-router.patch('/:id/status', requireAdmin, BranchController.toggleStatus);
-router.delete('/:id', requireAdmin, BranchController.deleteBranch);
+// Assignments
+router.post('/assign-student', BranchController.assignStudent);
+router.post('/assign-staff', BranchController.assignStaff);
+
+// Modifications
+router.post('/', BranchController.createBranch);
+router.put('/:id', BranchController.updateBranch);
+router.patch('/:id/status', BranchController.toggleStatus);
+router.delete('/:id', BranchController.deleteBranch);
 
 export default router;

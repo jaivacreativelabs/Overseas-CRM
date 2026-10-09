@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { UserRole } from '../types';
+import { AdminType, UserRole } from '../types';
 
 import { AppLayout } from '../layouts/AppLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
@@ -29,10 +29,11 @@ import { StudentPortalPage } from '../features/student-portal/StudentPortalPage'
 import { BranchesPage } from '../features/branches/BranchesPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 
-const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: UserRole[] }> = ({
-  children,
-  allowedRoles,
-}) => {
+const ProtectedRoute: React.FC<{
+  children: React.ReactElement;
+  allowedRoles?: UserRole[];
+  requireOwnerAdmin?: boolean;
+}> = ({ children, allowedRoles, requireOwnerAdmin }) => {
   const { user, token, isLoading } = useAuth();
 
   if (isLoading) {
@@ -48,6 +49,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: Us
       return <Navigate to="/portal" replace />;
     }
     return <Navigate to="/dashboard" replace />;
+  }
+
+  if (requireOwnerAdmin) {
+    const isOwnerAdmin =
+      user.role === UserRole.ADMIN &&
+      (user.adminType === AdminType.OWNER_ADMIN || !user.adminType);
+    if (!isOwnerAdmin) {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return children;
@@ -86,7 +96,14 @@ export const AppRoutes: React.FC = () => {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/leads/:id" element={<LeadDetailPage />} />
-        <Route path="/branches" element={<BranchesPage />} />
+        <Route
+          path="/branches"
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN]} requireOwnerAdmin={true}>
+              <BranchesPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/integrations" element={<IntegrationsPage />} />
         <Route path="/students" element={<LeadsPage isStudentOnly={true} />} />
         <Route path="/students/:id" element={<LeadDetailPage />} />

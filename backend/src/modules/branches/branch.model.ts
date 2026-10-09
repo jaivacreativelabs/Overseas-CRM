@@ -6,8 +6,16 @@ export interface IBranch extends Document {
   state: string;
   city: string;
   address: string;
+  pinCode?: string;
+  contactNumber?: string;
+  email?: string;
+  managerName?: string;
+  managerEmail?: string;
+  managerUserId?: Types.ObjectId;
+  assignedStaffIds?: Types.ObjectId[];
   capacity: number;
   assignedStudentsCount: number;
+  openingDate?: Date;
   status: 'ACTIVE' | 'INACTIVE';
   isArchived: boolean;
   notes?: string;
@@ -48,6 +56,39 @@ const branchSchema = new Schema<IBranch>(
       required: true,
       trim: true,
     },
+    pinCode: {
+      type: String,
+      trim: true,
+    },
+    contactNumber: {
+      type: String,
+      trim: true,
+    },
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+    managerName: {
+      type: String,
+      trim: true,
+    },
+    managerEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+    managerUserId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
+    assignedStaffIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     capacity: {
       type: Number,
       required: true,
@@ -58,6 +99,9 @@ const branchSchema = new Schema<IBranch>(
       type: Number,
       default: 0,
       min: 0,
+    },
+    openingDate: {
+      type: Date,
     },
     status: {
       type: String,
