@@ -1,6 +1,8 @@
 import {
   LayoutDashboard,
   Users,
+  GitFork,
+  Plug,
   GraduationCap,
   Calendar,
   Building2,
@@ -46,6 +48,18 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         label: 'Leads',
         path: '/leads',
         icon: Users,
+        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
+      },
+      {
+        label: 'Branches',
+        path: '/branches',
+        icon: GitFork,
+        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
+      },
+      {
+        label: 'Integrations',
+        path: '/integrations',
+        icon: Plug,
         roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
       },
       {

@@ -26,6 +26,7 @@ export interface ILead extends Document {
   metaLeadId?: string;
   counsellorId?: Types.ObjectId;
   studentUserId?: Types.ObjectId;
+  branchId?: Types.ObjectId;
   closedLostReason?: string;
   previousStatus?: LeadStatus;
   previousStage?: StudentStage;
@@ -62,6 +63,7 @@ const leadSchema = new Schema<ILead>(
     metaLeadId: { type: String, sparse: true, index: true },
     counsellorId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     studentUserId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    branchId: { type: Schema.Types.ObjectId, ref: 'Branch', index: true },
     closedLostReason: { type: String },
     previousStatus: { type: String, enum: Object.values(LeadStatus) },
     previousStage: { type: String, enum: Object.values(StudentStage) },

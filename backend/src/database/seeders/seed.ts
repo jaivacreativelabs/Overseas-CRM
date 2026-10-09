@@ -12,6 +12,9 @@ import { PaymentModel } from '../../modules/payments/payment.model';
 import { VisaRecordModel } from '../../modules/visa/visa.model';
 import { TravelSupportModel } from '../../modules/travel/travel.model';
 import { TaskModel } from '../../modules/tasks/task.model';
+import { BranchModel } from '../../modules/branches/branch.model';
+import { IntegrationService } from '../../modules/integrations/integration.service';
+import { AutomationService } from '../../modules/integrations/automation.service';
 import {
   UserRole,
   AdminType,
@@ -447,6 +450,48 @@ export const seedDatabase = async () => {
       createdBy: counsellor._id,
       createdByName: counsellor.name,
     });
+
+    // Seed Initial State-Wise Branches
+    const blrBranch = await BranchModel.create({
+      branchId: 'KA-BLR-A81F2C',
+      name: 'Bangalore Indiranagar Branch',
+      state: 'Karnataka',
+      city: 'Bangalore',
+      address: '#402 100ft Road, Indiranagar, Bangalore 560038',
+      capacity: 250,
+      assignedStudentsCount: 1,
+      status: 'ACTIVE',
+    });
+
+    const punBranch = await BranchModel.create({
+      branchId: 'MH-PUN-C62E4B',
+      name: 'Pune FC Road Branch',
+      state: 'Maharashtra',
+      city: 'Pune',
+      address: 'Suite 201, FC Road, Shivajinagar, Pune 411005',
+      capacity: 200,
+      assignedStudentsCount: 0,
+      status: 'ACTIVE',
+    });
+
+    const cheBranch = await BranchModel.create({
+      branchId: 'TN-CHE-D94F1A',
+      name: 'Chennai Nungambakkam Branch',
+      state: 'Tamil Nadu',
+      city: 'Chennai',
+      address: 'Level 4, Mahatma Gandhi Rd, Nungambakkam, Chennai 600034',
+      capacity: 150,
+      assignedStudentsCount: 0,
+      status: 'ACTIVE',
+    });
+
+    // Assign Rohan to Bangalore branch
+    leadRohan.branchId = blrBranch._id as any;
+    await leadRohan.save();
+
+    // Initialize Integration Providers & Workflows
+    await IntegrationService.initializeProviders();
+    await AutomationService.initializeDefaultWorkflows();
 
     logger.info('✅ Complete database successfully seeded with realistic enterprise CRM demo records!');
   } catch (error: any) {

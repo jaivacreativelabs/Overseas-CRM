@@ -26,6 +26,8 @@ import { UsersPage } from '../features/users/UsersPage';
 import { MastersPage } from '../features/masters/MastersPage';
 import { AuditLogsPage } from '../features/audit-logs/AuditLogsPage';
 import { StudentPortalPage } from '../features/student-portal/StudentPortalPage';
+import { BranchesPage } from '../features/branches/BranchesPage';
+import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: UserRole[] }> = ({
   children,
@@ -84,6 +86,8 @@ export const AppRoutes: React.FC = () => {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/leads/:id" element={<LeadDetailPage />} />
+        <Route path="/branches" element={<BranchesPage />} />
+        <Route path="/integrations" element={<IntegrationsPage />} />
         <Route path="/students" element={<LeadsPage isStudentOnly={true} />} />
         <Route path="/students/:id" element={<LeadDetailPage />} />
         <Route path="/counselling" element={<CounsellingPage />} />

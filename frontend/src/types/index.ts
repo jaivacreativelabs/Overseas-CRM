@@ -496,3 +496,87 @@ export interface AuditLog {
   userAgent?: string;
   createdAt: string;
 }
+
+export interface Branch {
+  _id: string;
+  branchId: string;
+  name: string;
+  state: string;
+  city: string;
+  address: string;
+  capacity: number;
+  assignedStudentsCount: number;
+  availableSeats: number;
+  status: 'ACTIVE' | 'INACTIVE';
+  isArchived: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BranchSummary {
+  totalBranches: number;
+  totalCapacity: number;
+  totalAssignedStudents: number;
+  availableSeats: number;
+}
+
+export interface StateBranchSummary {
+  state: string;
+  branchCount: number;
+  totalCapacity: number;
+  assignedStudents: number;
+  availableSeats: number;
+}
+
+export interface IntegrationConfig {
+  _id: string;
+  providerId: string;
+  category: 'COMMUNICATION' | 'STUDENT_JOURNEY' | 'PAYMENTS_DATA' | 'AUTOMATION_INTELLIGENCE';
+  name: string;
+  description: string;
+  icon: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'FAILED' | 'CONFIGURED';
+  credentials?: Record<string, string>;
+  settings?: Record<string, any>;
+  hasCredentialsSet?: boolean;
+  lastActivityAt?: string;
+  lastSuccessAt?: string;
+  lastErrorAt?: string;
+  lastErrorMessage?: string;
+  createdAt: string;
+}
+
+export interface IntegrationLog {
+  _id: string;
+  providerId: string;
+  eventType: string;
+  operation: string;
+  status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'RETRYING';
+  requestData?: any;
+  responseData?: any;
+  durationMs?: number;
+  errorMessage?: string;
+  retryCount: number;
+  maxRetries: number;
+  triggeredBy?: { name: string; email: string; role: string };
+  createdAt: string;
+}
+
+export interface AutomationWorkflow {
+  _id: string;
+  name: string;
+  description?: string;
+  trigger: string;
+  isActive: boolean;
+  actions: Array<{
+    actionType: string;
+    providerId?: string;
+    config: any;
+  }>;
+  conditions?: any[];
+  executionCount: number;
+  lastExecutedAt?: string;
+  createdAt: string;
+}
+
