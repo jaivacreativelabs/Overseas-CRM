@@ -6,6 +6,7 @@ import {
   IntegrationStatus,
 } from './integration-config.model';
 import { IntegrationLogModel, LogStatus } from './integration-log.model';
+import { AutomationWorkflowModel } from './automation-workflow.model';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 
 export const DEFAULT_PROVIDERS = [
@@ -152,6 +153,11 @@ export class IntegrationService {
       };
     });
 
+    const [activeWorkflowsCount, failedJobsCount] = await Promise.all([
+      AutomationWorkflowModel.countDocuments({ isActive: true }),
+      IntegrationLogModel.countDocuments({ status: LogStatus.FAILED }),
+    ]);
+
     return {
       providers: sanitizedConfigs,
       summary: {
@@ -159,6 +165,8 @@ export class IntegrationService {
         connectedIntegrations: connectedCount,
         disconnectedIntegrations: disconnectedCount,
         failedIntegrations: failedCount,
+        activeWorkflows: activeWorkflowsCount,
+        failedJobs: failedJobsCount,
       },
     };
   }

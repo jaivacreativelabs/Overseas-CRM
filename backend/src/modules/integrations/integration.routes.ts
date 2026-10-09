@@ -1,40 +1,41 @@
 import { Router } from 'express';
 import { IntegrationController } from './integration.controller';
 import { authenticate } from '../../middleware/auth.middleware';
-import { requireAdmin, requireStaff } from '../../middleware/rbac.middleware';
+import { requireOwnerAdmin } from '../../middleware/rbac.middleware';
 
 const router = Router();
 
 // Public incoming webhooks endpoint (bypasses auth token check for external provider callbacks)
 router.post('/webhooks/incoming/:providerId', IntegrationController.handleIncomingWebhook);
 
-// Protected routes require authentication
+// Protected routes require authentication & strict Owner Admin authorization
 router.use(authenticate);
+router.use(requireOwnerAdmin);
 
 // Catalog & Status
-router.get('/', requireStaff, IntegrationController.getCatalog);
+router.get('/', IntegrationController.getCatalog);
 
-// Provider Connections (Admin exclusive)
-router.post('/:providerId/connect', requireAdmin, IntegrationController.connectProvider);
-router.post('/:providerId/test', requireStaff, IntegrationController.testConnection);
-router.post('/:providerId/disconnect', requireAdmin, IntegrationController.disconnectProvider);
+// Provider Connections
+router.post('/:providerId/connect', IntegrationController.connectProvider);
+router.post('/:providerId/test', IntegrationController.testConnection);
+router.post('/:providerId/disconnect', IntegrationController.disconnectProvider);
 
 // Activity Logs
-router.get('/logs', requireStaff, IntegrationController.getLogs);
-router.post('/logs/:logId/retry', requireAdmin, IntegrationController.retryLog);
+router.get('/logs', IntegrationController.getLogs);
+router.post('/logs/:logId/retry', IntegrationController.retryLog);
 
 // Automation Workflows
-router.get('/workflows', requireStaff, IntegrationController.getWorkflows);
-router.post('/workflows', requireAdmin, IntegrationController.createWorkflow);
-router.patch('/workflows/:id/toggle', requireAdmin, IntegrationController.toggleWorkflow);
-router.delete('/workflows/:id', requireAdmin, IntegrationController.deleteWorkflow);
+router.get('/workflows', IntegrationController.getWorkflows);
+router.post('/workflows', IntegrationController.createWorkflow);
+router.patch('/workflows/:id/toggle', IntegrationController.toggleWorkflow);
+router.delete('/workflows/:id', IntegrationController.deleteWorkflow);
 
 // CSV Data Exchange
-router.post('/csv/import', requireStaff, IntegrationController.importCSV);
-router.get('/csv/export', requireStaff, IntegrationController.exportCSV);
+router.post('/csv/import', IntegrationController.importCSV);
+router.get('/csv/export', IntegrationController.exportCSV);
 
 // AI Tools
-router.post('/ai/generate', requireStaff, IntegrationController.generateAIDraft);
-router.get('/ai/summarize/:studentId', requireStaff, IntegrationController.summarizeStudentAI);
+router.post('/ai/generate', IntegrationController.generateAIDraft);
+router.get('/ai/summarize/:studentId', IntegrationController.summarizeStudentAI);
 
 export default router;
