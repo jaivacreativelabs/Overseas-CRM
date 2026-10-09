@@ -41,7 +41,7 @@ export const requireOwnerAdmin = (req: Request, res: Response, next: NextFunctio
 
   if (!isOwnerAdmin) {
     throw new ForbiddenError(
-      'Access Denied: Branch Management module is strictly restricted to Owner Admin users only.'
+      'Access Denied: This module is strictly restricted to Owner Admin users only.'
     );
   }
 

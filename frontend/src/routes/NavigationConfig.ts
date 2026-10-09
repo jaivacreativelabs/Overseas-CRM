@@ -62,7 +62,8 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         label: 'Integrations',
         path: '/integrations',
         icon: Plug,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
+        roles: [UserRole.ADMIN],
+        isOwnerAdminOnly: true,
       },
       {
         label: 'Students',

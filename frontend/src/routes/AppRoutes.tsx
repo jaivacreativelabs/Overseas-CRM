@@ -104,7 +104,14 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
-        <Route path="/integrations" element={<IntegrationsPage />} />
+        <Route
+          path="/integrations"
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN]} requireOwnerAdmin={true}>
+              <IntegrationsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/students" element={<LeadsPage isStudentOnly={true} />} />
         <Route path="/students/:id" element={<LeadDetailPage />} />
         <Route path="/counselling" element={<CounsellingPage />} />
