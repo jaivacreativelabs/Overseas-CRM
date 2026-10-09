@@ -73,6 +73,7 @@ export const createApp = (): Express => {
 
   // Mount API v1 Feature Routes
   app.use('/api/v1/auth', authRoutes);
+  app.use('/auth', authRoutes);
   app.use('/api/v1/users', userRoutes);
   app.use('/api/v1/leads', leadRoutes);
   app.use('/api/v1/profile-evaluations', profileRoutes);
