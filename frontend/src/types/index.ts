@@ -238,6 +238,7 @@ export interface University {
   address?: string;
   website?: string;
   ranking?: number;
+  customComment?: string;
   logoUrl?: string;
   bannerUrl?: string;
   description?: string;
