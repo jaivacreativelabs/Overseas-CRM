@@ -67,6 +67,7 @@ import { Table } from '../../components/Table';
 import { Modal, Drawer, ConfirmDialog } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
 import { CounsellingFeeModal } from '../counselling-fees';
+import { PinButton } from '../../components/PinButton';
 
 type ActiveSection =
   | 'overview'
@@ -814,6 +815,16 @@ export const LeadDetailPage: React.FC = () => {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{lead.name}</h1>
+              <PinButton
+                item={{
+                  id: lead._id,
+                  category: 'student',
+                  title: lead.name,
+                  subtitle: `${lead.email} • ${lead.phone || ''}`,
+                  path: isStudentRoute ? `/students/${lead._id}` : `/leads/${lead._id}`,
+                  pinnedAt: new Date().toISOString(),
+                }}
+              />
               <StatusBadge status={lead.status} />
               <Badge variant="primary">{lead.stage.replace(/_/g, ' ')}</Badge>
             </div>

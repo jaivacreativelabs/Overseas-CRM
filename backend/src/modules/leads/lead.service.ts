@@ -100,6 +100,7 @@ export class LeadService {
     source?: LeadSource;
     counsellorId?: string;
     targetCountry?: string;
+    branchId?: string;
     isArchived?: boolean;
     isStudent?: boolean;
   }) {
@@ -128,6 +129,7 @@ export class LeadService {
     if (query.source) filter.source = query.source;
     if (query.counsellorId) filter.counsellorId = new Types.ObjectId(query.counsellorId);
     if (query.targetCountry) filter.targetCountry = query.targetCountry;
+    if (query.branchId) filter.branchId = new Types.ObjectId(query.branchId);
 
     if (query.search) {
       filter.$or = [
@@ -143,6 +145,7 @@ export class LeadService {
       LeadModel.find(filter)
         .populate('counsellorId', 'name email phone avatar')
         .populate('studentUserId', 'name email isActive')
+        .populate('branchId', 'name city state branchId')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -650,7 +653,6 @@ export class LeadService {
 
     await ActivityService.log({
       leadId: lead._id.toString(),
-      actorId: 'system',
       actorName: 'Landing Page Webhook',
       actorRole: UserRole.ADMIN,
       action: 'LEAD_CAPTURED',
@@ -670,6 +672,9 @@ export class LeadService {
     targetCourse?: string;
     campaignName?: string;
     notes?: string;
+    branchId?: string | Types.ObjectId;
+    metaFormId?: string;
+    metaFormName?: string;
   }): Promise<{ lead: ILead; isDuplicate: boolean }> {
     const emailClean = data.email.toLowerCase().trim();
     const phoneClean = data.phone.trim();
@@ -692,6 +697,9 @@ export class LeadService {
     if (existing) {
       if (data.metaLeadId) existing.metaLeadId = data.metaLeadId;
       if (data.campaignName && !existing.campaignName) existing.campaignName = data.campaignName;
+      if (data.branchId && !existing.branchId) existing.branchId = new Types.ObjectId(data.branchId);
+      if (data.metaFormId && !existing.metaFormId) existing.metaFormId = data.metaFormId;
+      if (data.metaFormName && !existing.metaFormName) existing.metaFormName = data.metaFormName;
       await existing.save();
       return { lead: existing, isDuplicate: true };
     }
@@ -707,18 +715,20 @@ export class LeadService {
       status: LeadStatus.NEW,
       stage: StudentStage.LEAD_CAPTURED,
       metaLeadId: data.metaLeadId,
+      branchId: data.branchId ? new Types.ObjectId(data.branchId) : undefined,
+      metaFormId: data.metaFormId,
+      metaFormName: data.metaFormName,
       campaignName: data.campaignName || 'Meta Instant Form',
       notes: data.notes || 'Ingested automatically via Meta Ads Webhook',
     });
 
     await ActivityService.log({
       leadId: lead._id.toString(),
-      actorId: 'system',
       actorName: 'Meta Webhook',
       actorRole: UserRole.ADMIN,
       action: 'LEAD_CAPTURED',
       title: 'Meta Ads Lead Ingested',
-      description: `New Meta Ad Lead: ${data.name} (${data.email})`,
+      description: `New Meta Ad Lead: ${data.name} (${data.email}) [Form: ${data.metaFormName || data.metaFormId || 'Default'}]`,
     });
 
     return { lead, isDuplicate: false };

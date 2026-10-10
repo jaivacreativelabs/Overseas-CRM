@@ -13,6 +13,7 @@ export interface IUser extends Document {
   isArchived: boolean;
   leadId?: Types.ObjectId;
   assignedCounsellorId?: Types.ObjectId;
+  branchId?: Types.ObjectId;
   stage?: StudentStage;
   avatar?: string;
   lastLoginAt?: Date;
@@ -33,6 +34,7 @@ const userSchema = new Schema<IUser>(
     isArchived: { type: Boolean, default: false, index: true },
     leadId: { type: Schema.Types.ObjectId, ref: 'Lead', index: true },
     assignedCounsellorId: { type: Schema.Types.ObjectId, ref: 'User' },
+    branchId: { type: Schema.Types.ObjectId, ref: 'Branch', index: true },
     stage: { type: String, enum: Object.values(StudentStage) },
     avatar: { type: String },
     lastLoginAt: { type: Date },

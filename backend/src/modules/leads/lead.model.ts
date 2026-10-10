@@ -24,8 +24,11 @@ export interface ILead extends Document {
     utm_campaign?: string;
   };
   metaLeadId?: string;
+  metaFormId?: string;
+  metaFormName?: string;
   counsellorId?: Types.ObjectId;
   studentUserId?: Types.ObjectId;
+  branchId?: Types.ObjectId;
   closedLostReason?: string;
   previousStatus?: LeadStatus;
   previousStage?: StudentStage;
@@ -60,8 +63,11 @@ const leadSchema = new Schema<ILead>(
       utm_campaign: { type: String },
     },
     metaLeadId: { type: String, sparse: true, index: true },
+    metaFormId: { type: String, trim: true, index: true },
+    metaFormName: { type: String, trim: true },
     counsellorId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     studentUserId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    branchId: { type: Schema.Types.ObjectId, ref: 'Branch', index: true },
     closedLostReason: { type: String },
     previousStatus: { type: String, enum: Object.values(LeadStatus) },
     previousStage: { type: String, enum: Object.values(StudentStage) },

@@ -49,6 +49,7 @@ export enum StudentStage {
 
 export enum DocumentStatus {
   PENDING = 'PENDING',
+  REQUESTED = 'REQUESTED',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   SUCCESSFUL = 'SUCCESSFUL',
@@ -139,9 +140,9 @@ export interface Lead {
   targetCourse?: string;
   targetIntake?: string;
   budget?: string;
-  source: LeadSource | string;
-  status: LeadStatus | string;
-  stage: StudentStage | string;
+  source: LeadSource;
+  status: LeadStatus;
+  stage: StudentStage;
   campaignName?: string;
   preferredCountry?: string;
   utmParams?: {
@@ -150,8 +151,12 @@ export interface Lead {
     utm_campaign?: string;
   };
   metaLeadId?: string;
+  metaFormId?: string;
+  metaFormName?: string;
+  branchId?: { _id: string; name: string; city?: string; state?: string; branchId?: string } | string;
   counsellorId?: { _id: string; name: string; email: string; phone?: string; avatar?: string };
   studentUserId?: { _id: string; name: string; email: string };
+  counsellingSessions?: CounsellingSession[];
   closedLostReason?: string;
   notes?: string;
   lastContactedAt?: string;
@@ -236,6 +241,7 @@ export interface University {
   address?: string;
   website?: string;
   ranking?: number;
+  customComment?: string;
   logoUrl?: string;
   bannerUrl?: string;
   description?: string;
@@ -275,9 +281,9 @@ export interface Course {
 export interface Shortlist {
   _id: string;
   leadId: string;
-  universityId: string | University;
+  universityId: any;
   universityName: string;
-  courseId: string | Course;
+  courseId: any;
   courseTitle: string;
   country: string;
   intake: string;
@@ -460,6 +466,7 @@ export interface TravelSupport {
   airline?: string;
   flightNumber?: string;
   flightDate?: string;
+  departureAirport?: string;
   ticketUrl?: string;
   insuranceStatus: 'PENDING' | 'COMPLETED';
   insuranceProvider?: string;
@@ -537,3 +544,133 @@ export interface AuditLog {
   userAgent?: string;
   createdAt: string;
 }
+
+export interface Branch {
+  _id: string;
+  branchId: string;
+  name: string;
+  state: string;
+  city: string;
+  address: string;
+  pinCode?: string;
+  contactNumber?: string;
+  email?: string;
+  managerName?: string;
+  managerEmail?: string;
+  managerUserId?: any;
+  assignedStaffIds?: any[];
+  capacity: number;
+  assignedStudentsCount: number;
+  availableSeats: number;
+  utilizationPercentage?: number;
+  openingDate?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  isArchived: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BranchSummary {
+  totalBranches: number;
+  totalCapacity: number;
+  totalAssignedStudents: number;
+  availableSeats: number;
+}
+
+export interface StateBranchSummary {
+  state: string;
+  branchCount: number;
+  totalCapacity: number;
+  assignedStudents: number;
+  availableSeats: number;
+}
+
+export interface IntegrationConfig {
+  _id: string;
+  providerId: string;
+  category: 'COMMUNICATION' | 'STUDENT_JOURNEY' | 'PAYMENTS_DATA' | 'AUTOMATION_INTELLIGENCE';
+  name: string;
+  description: string;
+  icon: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'FAILED' | 'CONFIGURED';
+  credentials?: Record<string, string>;
+  settings?: Record<string, any>;
+  hasCredentialsSet?: boolean;
+  lastActivityAt?: string;
+  lastSuccessAt?: string;
+  lastErrorAt?: string;
+  lastErrorMessage?: string;
+  createdAt: string;
+}
+
+export interface IntegrationLog {
+  _id: string;
+  providerId: string;
+  eventType: string;
+  operation: string;
+  status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'RETRYING';
+  requestData?: any;
+  responseData?: any;
+  durationMs?: number;
+  errorMessage?: string;
+  retryCount: number;
+  maxRetries: number;
+  triggeredBy?: { name: string; email: string; role: string };
+  createdAt: string;
+}
+
+export interface AutomationWorkflow {
+  _id: string;
+  name: string;
+  description?: string;
+  trigger: string;
+  isActive: boolean;
+  actions: Array<{
+    actionType: string;
+    providerId?: string;
+    config: any;
+  }>;
+  conditions?: any[];
+  executionCount: number;
+  lastExecutedAt?: string;
+  createdAt: string;
+}
+
+export interface MetaCampaign {
+  _id: string;
+  campaignId: string;
+  name: string;
+  status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  objective: string;
+  spend: number;
+  currency: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  leadsCount: number;
+  costPerLead?: number;
+  forms: Array<{
+    formId: string;
+    formName: string;
+    branchId?: string;
+    branchName?: string;
+  }>;
+  lastSyncAt: string;
+}
+
+export interface MetaFormMapping {
+  _id: string;
+  formId: string;
+  formName: string;
+  campaignId?: string;
+  campaignName: string;
+  branchId: { _id: string; name: string; city?: string; state?: string; branchId?: string } | string;
+  branchName: string;
+  totalLeadsRouted: number;
+  lastLeadAt?: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+}
+

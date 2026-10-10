@@ -30,6 +30,8 @@ import { masterRoutes } from './modules/masters';
 import { reportRoutes } from './modules/reports';
 import { auditRoutes } from './modules/audit-logs';
 import { activityRoutes } from './modules/activities';
+import { branchRoutes } from './modules/branches';
+import { integrationRoutes } from './modules/integrations';
 
 export const createApp = (): Express => {
   const app = express();
@@ -72,6 +74,7 @@ export const createApp = (): Express => {
 
   // Mount API v1 Feature Routes
   app.use('/api/v1/auth', authRoutes);
+  app.use('/auth', authRoutes);
   app.use('/api/v1/users', userRoutes);
   app.use('/api/v1/leads', leadRoutes);
   app.use('/api/v1/profile-evaluations', profileRoutes);
@@ -91,6 +94,8 @@ export const createApp = (): Express => {
   app.use('/api/v1/reports', reportRoutes);
   app.use('/api/v1/audit-logs', auditRoutes);
   app.use('/api/v1/activities', activityRoutes);
+  app.use('/api/v1/branches', branchRoutes);
+  app.use('/api/v1/integrations', integrationRoutes);
 
   // Serve static frontend build (merged single-port application)
   const frontendDist = path.resolve(process.cwd(), '../frontend/dist');

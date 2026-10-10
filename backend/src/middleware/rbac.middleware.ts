@@ -27,6 +27,28 @@ export const authorize = (...allowedRoles: UserRole[]) => {
 export const requireAdmin = authorize(UserRole.ADMIN);
 
 /**
+ * Ensures ONLY Owner Admin can perform action.
+ * Branch Admins, Counsellors, and Students are strictly rejected with HTTP 403.
+ */
+export const requireOwnerAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    throw new UnauthorizedError('User is not authenticated');
+  }
+
+  const isOwnerAdmin =
+    req.user.role === UserRole.ADMIN &&
+    (req.user.adminType === AdminType.OWNER_ADMIN || !req.user.adminType);
+
+  if (!isOwnerAdmin) {
+    throw new ForbiddenError(
+      'Access Denied: This module is strictly restricted to Owner Admin users only.'
+    );
+  }
+
+  next();
+};
+
+/**
  * Ensures only Staff (Admin or Counsellor) can perform action
  */
 export const requireStaff = authorize(UserRole.ADMIN, UserRole.COUNSELLOR);

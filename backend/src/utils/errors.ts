@@ -38,6 +38,18 @@ export class ValidationError extends AppError {
   }
 }
 
+export class BadRequestError extends AppError {
+  constructor(message = 'Bad request', code = 'BAD_REQUEST') {
+    super(message, 400, code);
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message = 'Conflict / Duplicate record', code = 'CONFLICT') {
+    super(message, 409, code);
+  }
+}
+
 export class StageLockedError extends AppError {
   constructor(message: string, missingRequirements?: string[]) {
     super(message, 400, 'STAGE_LOCKED', missingRequirements);

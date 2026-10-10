@@ -7,6 +7,7 @@ import { Table } from '../../components/Table';
 import { StatusBadge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { PaymentStatus } from '../../types';
+import { PinButton } from '../../components/PinButton';
 
 export const PaymentsPage: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
@@ -100,12 +101,25 @@ export const PaymentsPage: React.FC = () => {
           {
             header: 'ACTIONS',
             align: 'right',
-            render: (p) =>
-              p.status === PaymentStatus.PROOF_SUBMITTED && (
-                <Button variant="primary" size="sm" icon={<Check size={14} />} onClick={() => handleVerify(p._id)}>
-                  Verify Payment
-                </Button>
-              ),
+            render: (p) => (
+              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <PinButton
+                  item={{
+                    id: p._id,
+                    category: 'payment',
+                    title: `Payment: ${p.title || 'Tuition Fee'}`,
+                    subtitle: `${p.studentName} • ${p.currency} ${p.amount}`,
+                    path: `/leads/${p.leadId}`,
+                    pinnedAt: new Date().toISOString(),
+                  }}
+                />
+                {p.status === PaymentStatus.PROOF_SUBMITTED && (
+                  <Button variant="primary" size="sm" icon={<Check size={14} />} onClick={() => handleVerify(p._id)}>
+                    Verify Payment
+                  </Button>
+                )}
+              </div>
+            ),
           },
         ]}
         data={payments}
