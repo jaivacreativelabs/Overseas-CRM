@@ -52,6 +52,9 @@ import { Table } from '../../components/Table';
 import { Modal } from '../../components/Modal';
 import { Input, Textarea } from '../../components/Form';
 
+const resolveStudentStage = (stage?: string): StudentStage =>
+  Object.values(StudentStage).find((knownStage) => knownStage === stage) ?? StudentStage.PROFILE_EVALUATION;
+
 export const StudentPortalPage: React.FC = () => {
   const { user } = useAuth();
   const { success, error } = useToast();
@@ -317,7 +320,7 @@ export const StudentPortalPage: React.FC = () => {
             {/* Collapsible Stepper Content */}
             {isJourneyExpanded && (
               <div style={{ marginTop: '10px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
-                <StageStepper currentStage={lead?.stage || StudentStage.PROFILE_EVALUATION} />
+                <StageStepper currentStage={resolveStudentStage(lead?.stage)} />
               </div>
             )}
           </div>
@@ -384,13 +387,13 @@ export const StudentPortalPage: React.FC = () => {
             <div className="card">
               <h3 className="card-title" style={{ marginBottom: '12px' }}>Pending Documents & Actions</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {documents.filter((d) => d.status === DocumentStatus.REQUESTED).length === 0 ? (
+                {documents.filter((d) => d.status === DocumentStatus.PENDING && !d.fileUrl).length === 0 ? (
                   <div style={{ color: 'var(--success)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <CheckCircle2 size={16} /> All requested documents are currently uploaded!
                   </div>
                 ) : (
                   documents
-                    .filter((d) => d.status === DocumentStatus.REQUESTED)
+                    .filter((d) => d.status === DocumentStatus.PENDING && !d.fileUrl)
                     .map((d) => (
                       <div
                         key={d._id}

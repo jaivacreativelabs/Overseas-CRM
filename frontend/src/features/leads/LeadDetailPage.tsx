@@ -106,6 +106,9 @@ const getCurrentProcessInfo = (stage?: StudentStage) => {
   }
 };
 
+const resolveStudentStage = (stage?: string): StudentStage =>
+  Object.values(StudentStage).find((knownStage) => knownStage === stage) ?? StudentStage.PROFILE_EVALUATION;
+
 export const LeadDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -429,9 +432,15 @@ export const LeadDetailPage: React.FC = () => {
     const selectedShortlist = shortlist.find((s) => s.status === 'SELECTED_BY_STUDENT') || shortlist[0];
     if (selectedShortlist) {
       setAppForm({
-        universityId: selectedShortlist.universityId,
+        universityId:
+          typeof selectedShortlist.universityId === 'string'
+            ? selectedShortlist.universityId
+            : selectedShortlist.universityId._id,
         universityName: selectedShortlist.universityName,
-        courseId: selectedShortlist.courseId,
+        courseId:
+          typeof selectedShortlist.courseId === 'string'
+            ? selectedShortlist.courseId
+            : selectedShortlist.courseId._id,
         courseTitle: selectedShortlist.courseTitle,
         country: selectedShortlist.country,
         intake: selectedShortlist.intake,
@@ -782,7 +791,7 @@ export const LeadDetailPage: React.FC = () => {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Student / Lead record not found.</div>;
   }
 
-  const currentProcessInfo = getCurrentProcessInfo(lead.stage);
+  const currentProcessInfo = getCurrentProcessInfo(resolveStudentStage(lead.stage));
   const isOverview = activeSection === 'overview';
   const isDocuments = activeSection === 'documents';
   const isCurrentProcess = activeSection === 'currentProcess' || activeSection === currentProcessInfo.key;
@@ -916,7 +925,7 @@ export const LeadDetailPage: React.FC = () => {
 
       {/* 12-Stage Student Journey Stepper */}
       <StageStepper
-        currentStage={lead.stage}
+        currentStage={resolveStudentStage(lead.stage)}
         activeStage={activeStage}
         onStageClick={handleStageClick}
       />
@@ -2435,9 +2444,9 @@ export const LeadDetailPage: React.FC = () => {
                   if (s) {
                     setAppForm((prev) => ({
                       ...prev,
-                      universityId: s.universityId,
+                      universityId: typeof s.universityId === 'string' ? s.universityId : s.universityId._id,
                       universityName: s.universityName,
-                      courseId: s.courseId,
+                      courseId: typeof s.courseId === 'string' ? s.courseId : s.courseId._id,
                       courseTitle: s.courseTitle,
                       country: s.country,
                       intake: s.intake,
