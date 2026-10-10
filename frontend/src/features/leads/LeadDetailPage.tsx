@@ -66,6 +66,7 @@ import { Badge, StatusBadge } from '../../components/Badge';
 import { Table } from '../../components/Table';
 import { Modal, Drawer, ConfirmDialog } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
+import { CounsellingFeeModal } from '../counselling-fees';
 
 type ActiveSection =
   | 'overview'
@@ -118,6 +119,7 @@ export const LeadDetailPage: React.FC = () => {
   const { user, isStaff, isAdmin } = useAuth();
 
   const [lead, setLead] = useState<Lead | null>(null);
+  const [isCounsellingFeeModalOpen, setIsCounsellingFeeModalOpen] = useState(false);
 
   const getInitialSection = (): ActiveSection => {
     const params = new URLSearchParams(window.location.search);
@@ -826,6 +828,17 @@ export const LeadDetailPage: React.FC = () => {
 
         {/* Organized Lead Actions Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {isStaff && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={() => setIsCounsellingFeeModalOpen(true)}
+            >
+              Request Fee
+            </Button>
+          )}
+
           <Button
             variant="secondary"
             size="sm"
@@ -2726,6 +2739,16 @@ export const LeadDetailPage: React.FC = () => {
           />
         </form>
       </Modal>
+
+      {isStaff && id && lead && (
+        <CounsellingFeeModal
+          isOpen={isCounsellingFeeModalOpen}
+          leadId={id}
+          leadName={lead.name}
+          onClose={() => setIsCounsellingFeeModalOpen(false)}
+          requestOnOpen
+        />
+      )}
 
       {/* --- Application Details Drawer --- */}
       <Drawer

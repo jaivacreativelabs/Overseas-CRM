@@ -19,6 +19,7 @@ import { documentRoutes } from './modules/documents';
 import { applicationRoutes } from './modules/applications';
 import { offerRoutes } from './modules/offers';
 import { paymentRoutes } from './modules/payments';
+import { counsellingFeeRoutes } from './modules/counselling-fees';
 import { visaRoutes } from './modules/visa';
 import { travelRoutes } from './modules/travel';
 import { orientationRoutes } from './modules/orientation';
@@ -79,6 +80,7 @@ export const createApp = (): Express => {
   app.use('/api/v1/applications', applicationRoutes);
   app.use('/api/v1/offers', offerRoutes);
   app.use('/api/v1/payments', paymentRoutes);
+  app.use('/api/v1/counselling-fees', counsellingFeeRoutes);
   app.use('/api/v1/visa', visaRoutes);
   app.use('/api/v1/travel', travelRoutes);
   app.use('/api/v1/orientation', orientationRoutes);

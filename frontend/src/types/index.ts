@@ -386,6 +386,50 @@ export interface Payment {
   createdAt: string;
 }
 
+export enum CounsellingFeeStatus {
+  NOT_SET = 'NOT_SET',
+  NOT_PAID = 'NOT_PAID',
+  PAID = 'PAID',
+}
+
+export enum CounsellingFeeType {
+  COUNSELLING_FEE = 'COUNSELLING_FEE',
+  PROFILE_EVALUATION_FEE = 'PROFILE_EVALUATION_FEE',
+  APPLICATION_ASSISTANCE_FEE = 'APPLICATION_ASSISTANCE_FEE',
+  OTHER = 'OTHER',
+}
+
+export interface CounsellingFeePayment {
+  amount: number;
+  paidOn?: string;
+  mode?: string;
+  reference?: string;
+  note?: string;
+  recordedByName?: string;
+  createdAt?: string;
+}
+
+export interface CounsellingFeeSummary {
+  leadId: string;
+  isSet: boolean;
+  currency: string;
+  totalFee: number;
+  amountPaid: number;
+  outstanding: number;
+  status: CounsellingFeeStatus;
+  paymentCount: number;
+}
+
+export interface CounsellingFeeDetail extends CounsellingFeeSummary {
+  feeType: CounsellingFeeType;
+  description?: string;
+  payments: CounsellingFeePayment[];
+  notes?: string;
+  setByName?: string;
+  setAt?: string;
+  updatedAt?: string;
+}
+
 export interface VisaRecord {
   _id: string;
   leadId: string;
