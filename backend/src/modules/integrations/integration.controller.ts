@@ -3,6 +3,7 @@ import { IntegrationService } from './integration.service';
 import { AutomationService } from './automation.service';
 import { CSVService } from './csv.service';
 import { AIService } from './ai.service';
+import { MetaAdsService } from './meta-ads.service';
 import { ApiResponse } from '../../utils/api-response';
 
 export class IntegrationController {
@@ -108,5 +109,47 @@ export class IntegrationController {
       signature: String(signature).slice(0, 10) + '...',
       timestamp: new Date().toISOString(),
     });
+  };
+
+  // --- Meta Ads & Form-to-Branch Routing ---
+  public static getMetaCampaigns = async (req: Request, res: Response) => {
+    const campaigns = await MetaAdsService.getCampaigns();
+    return ApiResponse.success(res, 'Meta Ads campaigns fetched successfully', campaigns);
+  };
+
+  public static syncMetaCampaigns = async (req: Request, res: Response) => {
+    const result = await MetaAdsService.syncCampaigns();
+    return ApiResponse.success(res, 'Meta Ads campaign data synced', result);
+  };
+
+  public static getMetaFormMappings = async (req: Request, res: Response) => {
+    const mappings = await MetaAdsService.getFormMappings();
+    return ApiResponse.success(res, 'Form-to-branch routing rules fetched', mappings);
+  };
+
+  public static saveMetaFormMapping = async (req: Request, res: Response) => {
+    const mapping = await MetaAdsService.createOrUpdateFormMapping(req.body);
+    return ApiResponse.success(res, 'Form-to-branch routing rule saved', mapping, 201);
+  };
+
+  public static deleteMetaFormMapping = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    await MetaAdsService.deleteFormMapping(id);
+    return ApiResponse.success(res, 'Form-to-branch routing rule deleted');
+  };
+
+  public static simulateMetaLead = async (req: Request, res: Response) => {
+    const result = await MetaAdsService.simulateLead(req.body);
+    return ApiResponse.success(
+      res,
+      result.isDuplicate ? 'Lead simulated (updated existing contact)' : 'Meta lead simulated and routed to dedicated branch successfully',
+      result,
+      201
+    );
+  };
+
+  public static getMetaAnalytics = async (req: Request, res: Response) => {
+    const summary = await MetaAdsService.getAnalyticsSummary();
+    return ApiResponse.success(res, 'Meta Ads analytics summary fetched', summary);
   };
 }

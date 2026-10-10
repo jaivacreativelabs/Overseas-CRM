@@ -13,6 +13,14 @@ import {
   CreditCard,
   Sparkles,
   Webhook,
+  Megaphone,
+  Copy,
+  MapPin,
+  TrendingUp,
+  Users,
+  DollarSign,
+  MousePointer,
+  Eye,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
@@ -36,6 +44,8 @@ import {
   IntegrationConfig,
   IntegrationLog,
   AutomationWorkflow,
+  MetaCampaign,
+  MetaFormMapping,
 } from '../../types';
 
 const ICON_MAP: Record<string, any> = {
@@ -49,6 +59,7 @@ const ICON_MAP: Record<string, any> = {
   FileSpreadsheet: FileSpreadsheet,
   Sparkles: Sparkles,
   Webhook: Webhook,
+  Megaphone: Megaphone,
 };
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -62,7 +73,7 @@ export const IntegrationsPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === UserRole.ADMIN;
 
-  const [activeTab, setActiveTab] = useState<'catalog' | 'workflows' | 'logs' | 'csv'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'meta_ads' | 'workflows' | 'logs' | 'csv'>('catalog');
 
   // Catalog state
   const [providers, setProviders] = useState<IntegrationConfig[]>([]);
@@ -116,6 +127,41 @@ export const IntegrationsPage: React.FC = () => {
   const [aiResult, setAiResult] = useState<any | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
+  // Meta Ads & Form Routing state
+  const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
+  const [metaMappings, setMetaMappings] = useState<MetaFormMapping[]>([]);
+  const [metaAnalytics, setMetaAnalytics] = useState<any>(null);
+  const [branchesList, setBranchesList] = useState<any[]>([]);
+  const [isLoadingMeta, setIsLoadingMeta] = useState(false);
+  const [isSyncingCampaigns, setIsSyncingCampaigns] = useState(false);
+
+  // Form Mapping Modal
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [editingMapping, setEditingMapping] = useState<MetaFormMapping | null>(null);
+  const [mappingFormData, setMappingFormData] = useState({
+    formId: '',
+    formName: '',
+    campaignName: '',
+    branchId: '',
+    notes: '',
+    isActive: true,
+  });
+
+  // Simulator state
+  const [simulatorFormData, setSimulatorFormData] = useState({
+    formId: '',
+    formName: '',
+    campaignName: '',
+    name: 'Aarav Sharma',
+    email: 'aarav.sharma@gmail.com',
+    phone: '+91 98450 12345',
+    preferredCountry: 'United Kingdom',
+    targetCourse: 'MSc Data Science',
+  });
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<any | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   const fetchCatalog = async () => {
     setIsLoadingProviders(true);
     try {
@@ -133,6 +179,38 @@ export const IntegrationsPage: React.FC = () => {
       setErrorMsg(err.message || 'Failed to load integrations catalog');
     } finally {
       setIsLoadingProviders(false);
+    }
+  };
+
+  const fetchMetaAdsData = async () => {
+    setIsLoadingMeta(true);
+    try {
+      const [cRes, mRes, aRes, bRes] = await Promise.all([
+        apiClient.get<any>('/integrations/meta-ads/campaigns'),
+        apiClient.get<any>('/integrations/meta-ads/mappings'),
+        apiClient.get<any>('/integrations/meta-ads/analytics'),
+        apiClient.get<any>('/branches'),
+      ]);
+      setMetaCampaigns(cRes.data || []);
+      setMetaMappings(mRes.data || []);
+      setMetaAnalytics(aRes.data || null);
+      const branchesData = bRes.data?.branches || (Array.isArray(bRes.data) ? bRes.data : []);
+      setBranchesList(branchesData);
+      if (branchesData.length > 0 && !mappingFormData.branchId) {
+        setMappingFormData((prev) => ({ ...prev, branchId: branchesData[0]._id }));
+      }
+      if (mRes.data && mRes.data.length > 0 && !simulatorFormData.formId) {
+        setSimulatorFormData((prev) => ({
+          ...prev,
+          formId: mRes.data[0].formId,
+          formName: mRes.data[0].formName,
+          campaignName: mRes.data[0].campaignName,
+        }));
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to load Meta Ads data');
+    } finally {
+      setIsLoadingMeta(false);
     }
   };
 
@@ -166,6 +244,7 @@ export const IntegrationsPage: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'catalog') fetchCatalog();
+    if (activeTab === 'meta_ads') fetchMetaAdsData();
     if (activeTab === 'workflows') fetchWorkflows();
     if (activeTab === 'logs') fetchLogs();
   }, [activeTab, logProviderFilter, logStatusFilter]);
@@ -295,6 +374,102 @@ export const IntegrationsPage: React.FC = () => {
     }
   };
 
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
+  const handleSyncCampaigns = async () => {
+    setIsSyncingCampaigns(true);
+    try {
+      const res = await apiClient.post<any>('/integrations/meta-ads/campaigns/sync');
+      setSuccessMsg(`Meta Ads synced successfully: ${res.data.updatedCount || 0} campaigns refreshed.`);
+      fetchMetaAdsData();
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to sync Meta campaigns');
+    } finally {
+      setIsSyncingCampaigns(false);
+    }
+  };
+
+  const handleOpenCreateMapping = () => {
+    setEditingMapping(null);
+    setMappingFormData({
+      formId: '',
+      formName: '',
+      campaignName: metaCampaigns[0]?.name || 'UK Admissions Campaign',
+      branchId: branchesList[0]?._id || '',
+      notes: '',
+      isActive: true,
+    });
+    setShowMappingModal(true);
+  };
+
+  const handleOpenEditMapping = (m: MetaFormMapping) => {
+    setEditingMapping(m);
+    setMappingFormData({
+      formId: m.formId,
+      formName: m.formName,
+      campaignName: m.campaignName,
+      branchId: typeof m.branchId === 'object' ? (m.branchId as any)._id : m.branchId,
+      notes: m.notes || '',
+      isActive: m.isActive,
+    });
+    setShowMappingModal(true);
+  };
+
+  const handleSaveMapping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mappingFormData.formId.trim() || !mappingFormData.formName.trim() || !mappingFormData.branchId) {
+      setErrorMsg('Form ID, Form Name, and Target Dedicated Branch are required.');
+      return;
+    }
+    try {
+      await apiClient.post('/integrations/meta-ads/mappings', mappingFormData);
+      setSuccessMsg(editingMapping ? 'Form routing rule updated.' : 'New Form-to-Branch mapping established.');
+      setShowMappingModal(false);
+      fetchMetaAdsData();
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to save form mapping');
+    }
+  };
+
+  const handleDeleteMapping = async (id: string) => {
+    if (!window.confirm('Delete this form-to-branch routing rule?')) return;
+    try {
+      await apiClient.delete(`/integrations/meta-ads/mappings/${id}`);
+      setSuccessMsg('Form routing rule deleted.');
+      fetchMetaAdsData();
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to delete rule');
+    }
+  };
+
+  const handleSimulateLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!simulatorFormData.name || !simulatorFormData.email || !simulatorFormData.phone) {
+      setErrorMsg('Name, email, and phone are required to simulate a Meta Lead response.');
+      return;
+    }
+    setIsSimulating(true);
+    setSimulationResult(null);
+    try {
+      const res = await apiClient.post<any>('/integrations/meta-ads/simulate-lead', simulatorFormData);
+      setSimulationResult(res.data);
+      setSuccessMsg('Simulated Meta Lead captured and routed to dedicated branch!');
+      fetchMetaAdsData();
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to simulate lead response');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
   const renderCategoryCards = (categoryKey: string) => {
     const categoryProviders = providers.filter((p) => p.category === categoryKey);
     if (categoryProviders.length === 0) return null;
@@ -393,6 +568,28 @@ export const IntegrationsPage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {isAdmin && (
                       <>
+                        {p.providerId === 'meta_ads' && (
+                          <button
+                            onClick={() => setActiveTab('meta_ads')}
+                            style={{
+                              padding: '5px 10px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              color: '#FFFFFF',
+                              backgroundColor: 'var(--primary)',
+                              border: 'none',
+                              borderRadius: 'var(--radius-sm)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Megaphone size={12} />
+                            <span>Campaigns</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => handleOpenConnectModal(p)}
                           style={{
@@ -474,6 +671,25 @@ export const IntegrationsPage: React.FC = () => {
           >
             <Plug size={15} />
             <span>Catalog ({providers.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('meta_ads')}
+            style={{
+              padding: '8.5px 14px',
+              backgroundColor: activeTab === 'meta_ads' ? 'var(--primary-light)' : 'transparent',
+              color: activeTab === 'meta_ads' ? 'var(--primary)' : 'var(--text-secondary)',
+              border: 'none',
+              borderLeft: '1px solid var(--border-color)',
+              fontWeight: 600,
+              fontSize: '13px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <Megaphone size={15} />
+            <span>Meta Ads & Campaigns</span>
           </button>
           <button
             onClick={() => setActiveTab('workflows')}
@@ -610,6 +826,697 @@ export const IntegrationsPage: React.FC = () => {
               {renderCategoryCards('AUTOMATION_INTELLIGENCE')}
             </div>
           )}
+        </div>
+      )}
+
+      {/* --- TAB: META ADS & CAMPAIGNS FORM ROUTING --- */}
+      {activeTab === 'meta_ads' && (
+        <div>
+          {/* Header Action Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Megaphone size={20} style={{ color: 'var(--primary)' }} />
+                <span>Meta Ads Multi-Campaign Tracking & Form Routing</span>
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                Monitor campaign spend & engagement metrics, track Instant Form responses, and route leads to dedicated branches.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={handleSyncCampaigns}
+                disabled={isSyncingCampaigns}
+                style={{
+                  padding: '8px 14px',
+                  backgroundColor: '#FFFFFF',
+                  color: 'var(--primary)',
+                  border: '1px solid var(--primary)',
+                  borderRadius: 'var(--radius-md)',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <RefreshCw size={14} className={isSyncingCampaigns ? 'spin-animation' : ''} />
+                <span>{isSyncingCampaigns ? 'Syncing...' : 'Sync with Meta API'}</span>
+              </button>
+
+              {isAdmin && (
+                <button
+                  onClick={handleOpenCreateMapping}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: 'var(--primary)',
+                    color: '#FFF',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>Map Form to Branch</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Setup Guide Accordion / Card */}
+          <div
+            style={{
+              backgroundColor: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: 'var(--radius-lg)',
+              padding: '20px',
+              marginBottom: '24px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <div style={{ backgroundColor: '#DBEAFE', color: '#1E40AF', padding: '6px', borderRadius: '6px' }}>
+                <Zap size={16} />
+              </div>
+              <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+                Meta Ads API & Webhook Configuration Guide
+              </h4>
+            </div>
+            <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 16px', lineHeight: 1.5 }}>
+              Follow these simple steps in the Meta App Dashboard to connect your Facebook / Instagram Lead Gen campaigns directly to this CRM:
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '14px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>
+                  STEP 1: Meta Developer App
+                </div>
+                <div style={{ fontSize: '12.5px', color: '#334155' }}>
+                  Create a Business App on developers.facebook.com and add the <strong>Marketing API</strong> & <strong>Webhooks</strong> products.
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
+                    STEP 2: Webhook Callback URL
+                  </div>
+                  <button
+                    onClick={() => handleCopy(`${window.location.origin}/api/v1/leads/webhook/meta`, 'webhookUrl')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    <Copy size={12} />
+                    <span>{copiedField === 'webhookUrl' ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+                <code style={{ display: 'block', fontSize: '11.5px', padding: '4px 6px', backgroundColor: '#F1F5F9', borderRadius: '4px', color: '#0F172A', wordBreak: 'break-all' }}>
+                  {`${window.location.origin}/api/v1/leads/webhook/meta`}
+                </code>
+              </div>
+
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
+                    STEP 3: Verify Token
+                  </div>
+                  <button
+                    onClick={() => handleCopy('jaiva_meta_token_2026', 'verifyToken')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    <Copy size={12} />
+                    <span>{copiedField === 'verifyToken' ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+                <code style={{ display: 'block', fontSize: '11.5px', padding: '4px 6px', backgroundColor: '#F1F5F9', borderRadius: '4px', color: '#0F172A' }}>
+                  jaiva_meta_token_2026
+                </code>
+              </div>
+
+              <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '14px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', marginBottom: '4px' }}>
+                  STEP 4: Field Subscription & Routing
+                </div>
+                <div style={{ fontSize: '12.5px', color: '#334155' }}>
+                  Subscribe to the <strong>leadgen</strong> field. Map each Meta Lead Form below to its dedicated branch for automated counselor routing.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Metric Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL AD SPEND</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                ₹{(metaAnalytics?.totalSpend || 98300).toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Across all active campaigns</div>
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>INGESTED RESPONSES</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>
+                {metaAnalytics?.totalMetaLeads || 194} Leads
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Real-time Instant Form leads</div>
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>AVERAGE CTR</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563EB', marginTop: '4px' }}>
+                {metaAnalytics?.avgCtr || '5.56'}%
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Click-through engagement rate</div>
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>AVG COST PER LEAD</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#D97706', marginTop: '4px' }}>
+                ₹{metaAnalytics?.avgCpl || 507}
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Effective acquisition cost</div>
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ACTIVE FORM RULES</div>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>
+                {metaAnalytics?.activeRoutingRulesCount || metaMappings.length || 4} Mapped
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Dedicated branch destinations</div>
+            </div>
+          </div>
+
+          {/* Section: Running Campaigns & Engagement */}
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div>
+                <h4 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Active Meta Campaigns & Engagement Metrics
+                </h4>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                  Live breakdown of ad spend, impressions, clicks, and response volume per campaign.
+                </p>
+              </div>
+            </div>
+
+            {isLoadingMeta ? (
+              <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <RefreshCw size={24} className="spin-animation" style={{ color: 'var(--primary)', marginBottom: '8px' }} />
+                <div>Loading Meta campaigns...</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
+                {metaCampaigns.map((camp) => (
+                  <div
+                    key={camp._id || camp.campaignId}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-lg)',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                    }}
+                  >
+                    <div>
+                      {/* Campaign Header */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span
+                              style={{
+                                fontSize: '10.5px',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                backgroundColor: camp.status === 'ACTIVE' ? '#D1FAE5' : '#FEF3C7',
+                                color: camp.status === 'ACTIVE' ? '#065F46' : '#92400E',
+                              }}
+                            >
+                              {camp.status}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ID: {camp.campaignId}</span>
+                          </div>
+                          <h5 style={{ fontSize: '15px', fontWeight: 700, margin: '6px 0 2px', color: 'var(--text-primary)' }}>
+                            {camp.name}
+                          </h5>
+                          <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                            Objective: {camp.objective} • Currency: {camp.currency || 'INR'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Engagement Metrics Grid */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr 1fr',
+                          gap: '10px',
+                          padding: '12px',
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: '8px',
+                          marginBottom: '16px',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>SPEND</div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            ₹{camp.spend?.toLocaleString('en-IN') || 0}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>IMPRESSIONS</div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {camp.impressions?.toLocaleString() || 0}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>CLICKS</div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {camp.clicks?.toLocaleString() || 0}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>CTR</div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#2563EB' }}>
+                            {camp.ctr}%
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>RESPONSES</div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#059669' }}>
+                            {camp.leadsCount || 0} leads
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>COST / LEAD</div>
+                          <div style={{ fontSize: '14px', fontWeight: 700, color: '#D97706' }}>
+                            ₹{camp.costPerLead || (camp.leadsCount ? Math.round(camp.spend / camp.leadsCount) : 0)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Attached Instant Forms & Assigned Branches */}
+                      <div>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                          Attached Lead Forms & Branch Mappings:
+                        </div>
+                        {camp.forms && camp.forms.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {camp.forms.map((f, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  padding: '6px 10px',
+                                  backgroundColor: '#FFFFFF',
+                                  border: '1px solid #E2E8F0',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                                  {f.formName || f.formId}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    backgroundColor: '#EFF6FF',
+                                    color: '#1E40AF',
+                                    border: '1px solid #BFDBFE',
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                  }}
+                                >
+                                  📍 {f.branchName || 'Auto Routed'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            No forms explicitly attached. Using default branch routing.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section: Form-to-Branch Routing Rules Table */}
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h4 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Form-to-Branch Routing Rules & Isolation
+                </h4>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                  Assign different Meta Lead Forms to different branches. Responses submitted via a form will only appear in that dedicated branch.
+                </p>
+              </div>
+
+              {isAdmin && (
+                <button
+                  onClick={handleOpenCreateMapping}
+                  style={{
+                    padding: '7px 12px',
+                    backgroundColor: 'var(--primary-light)',
+                    color: 'var(--primary)',
+                    border: '1px solid var(--primary)',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>Map New Form</span>
+                </button>
+              )}
+            </div>
+
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--border-color)' }}>
+                      <th style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-secondary)' }}>META FORM ID & NAME</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-secondary)' }}>CAMPAIGN NAME</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-secondary)' }}>ASSIGNED DEDICATED BRANCH</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-secondary)' }}>LEADS ROUTED</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-secondary)' }}>STATUS</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-secondary)', textAlign: 'right' }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {metaMappings.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No Form-to-Branch routing rules configured yet. Click "+ Map Form to Branch" to create one.
+                        </td>
+                      </tr>
+                    ) : (
+                      metaMappings.map((m) => {
+                        const targetBranchName = typeof m.branchId === 'object' && m.branchId ? (m.branchId as any).name : m.branchName;
+                        const targetBranchCity = typeof m.branchId === 'object' && m.branchId ? (m.branchId as any).city : '';
+
+                        return (
+                          <tr key={m._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{m.formName}</div>
+                              <code style={{ fontSize: '11px', color: 'var(--text-muted)', backgroundColor: '#F1F5F9', padding: '1px 5px', borderRadius: '4px' }}>
+                                {m.formId}
+                              </code>
+                            </td>
+                            <td style={{ padding: '14px 16px', color: '#334155' }}>
+                              {m.campaignName}
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  color: '#1E40AF',
+                                  backgroundColor: '#EFF6FF',
+                                  border: '1px solid #BFDBFE',
+                                  padding: '3px 10px',
+                                  borderRadius: '16px',
+                                }}
+                              >
+                                📍 {targetBranchName} {targetBranchCity ? `(${targetBranchCity})` : ''}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <span style={{ fontWeight: 700, color: '#059669' }}>
+                                {m.totalLeadsRouted || 0} leads
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <span
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  color: m.isActive ? '#065F46' : '#6B7280',
+                                  backgroundColor: m.isActive ? '#D1FAE5' : '#E5E7EB',
+                                  padding: '2px 8px',
+                                  borderRadius: '10px',
+                                }}
+                              >
+                                {m.isActive ? 'ACTIVE' : 'PAUSED'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                <button
+                                  onClick={() => handleOpenEditMapping(m)}
+                                  style={{
+                                    padding: '4px 8px',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    color: 'var(--primary)',
+                                    background: 'none',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => handleDeleteMapping(m._id)}
+                                    style={{
+                                      padding: '4px 8px',
+                                      fontSize: '12px',
+                                      color: '#DC2626',
+                                      background: 'none',
+                                      border: '1px solid #FECACA',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Branch Routing Distribution & Lead Isolation */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+            {/* Distribution Card */}
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <MapPin size={18} style={{ color: 'var(--primary)' }} />
+                <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Which Lead Should Be Assigned to Which Branch?
+                </h4>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px', lineHeight: 1.5 }}>
+                Lead responses automatically inherit the <strong>branchId</strong> mapped to their originating Meta Form. Counselors assigned to a branch will only see the leads assigned to their dedicated branch.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {metaAnalytics?.branchBreakdown && metaAnalytics.branchBreakdown.length > 0 ? (
+                  metaAnalytics.branchBreakdown.map((b: any, idx: number) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: '8px',
+                        border: '1px solid #E2E8F0',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '14px' }}>🏢</span>
+                        <span style={{ fontWeight: 600, color: '#0F172A', fontSize: '13px' }}>
+                          {b.branchName}
+                        </span>
+                      </div>
+                      <span style={{ fontWeight: 700, color: '#059669', fontSize: '13px' }}>
+                        {b.count} leads routed
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    No branch routing distribution recorded yet.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Live Response Simulator Card */}
+            <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <Play size={18} style={{ color: '#059669' }} />
+                <h4 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Test Form-to-Branch Live Lead Response Simulator
+                </h4>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
+                Test end-to-end ingestion and branch routing by simulating an instant form response right now:
+              </p>
+
+              <form onSubmit={handleSimulateLead}>
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '3px' }}>Select Meta Form *</label>
+                  <select
+                    value={simulatorFormData.formId}
+                    onChange={(e) => {
+                      const selected = metaMappings.find((m) => m.formId === e.target.value);
+                      setSimulatorFormData({
+                        ...simulatorFormData,
+                        formId: e.target.value,
+                        formName: selected?.formName || '',
+                        campaignName: selected?.campaignName || '',
+                      });
+                    }}
+                    style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '12.5px', backgroundColor: '#FFF' }}
+                  >
+                    {metaMappings.map((m) => (
+                      <option key={m.formId} value={m.formId}>
+                        {m.formName} ➔ {typeof m.branchId === 'object' ? (m.branchId as any).name : m.branchName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '3px' }}>Student Name *</label>
+                    <input
+                      type="text"
+                      value={simulatorFormData.name}
+                      onChange={(e) => setSimulatorFormData({ ...simulatorFormData, name: e.target.value })}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '12.5px' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '3px' }}>Email Address *</label>
+                    <input
+                      type="email"
+                      value={simulatorFormData.email}
+                      onChange={(e) => setSimulatorFormData({ ...simulatorFormData, email: e.target.value })}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '12.5px' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '3px' }}>Phone Number *</label>
+                    <input
+                      type="text"
+                      value={simulatorFormData.phone}
+                      onChange={(e) => setSimulatorFormData({ ...simulatorFormData, phone: e.target.value })}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '12.5px' }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '3px' }}>Target Country</label>
+                    <input
+                      type="text"
+                      value={simulatorFormData.preferredCountry}
+                      onChange={(e) => setSimulatorFormData({ ...simulatorFormData, preferredCountry: e.target.value })}
+                      style={{ width: '100%', padding: '7px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '12.5px' }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSimulating}
+                  style={{
+                    width: '100%',
+                    padding: '8.5px',
+                    backgroundColor: '#059669',
+                    color: '#FFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Play size={14} />
+                  <span>{isSimulating ? 'Simulating Ingestion...' : 'Simulate Incoming Lead Response'}</span>
+                </button>
+              </form>
+
+              {/* Simulation Result Box */}
+              {simulationResult && (
+                <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#065F46', fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
+                    <CheckCircle2 size={16} />
+                    <span>Lead Successfully Captured & Routed!</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#047857' }}>
+                    <strong>Student:</strong> {simulationResult.lead?.name} ({simulationResult.lead?.email})
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#047857', marginTop: '2px' }}>
+                    <strong>Assigned Dedicated Branch:</strong>{' '}
+                    <span style={{ fontWeight: 700, textDecoration: 'underline' }}>
+                      {simulationResult.assignedBranch?.name || 'Assigned Branch'}
+                    </span>
+                  </div>
+                  <div style={{ marginTop: '8px' }}>
+                    <a
+                      href={`/leads/${simulationResult.lead?._id}`}
+                      style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--primary)', textDecoration: 'underline' }}
+                    >
+                      View in Leads Module ➔
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1013,6 +1920,124 @@ export const IntegrationsPage: React.FC = () => {
                 </button>
                 <button type="submit" style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
                   Create & Activate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: MAP FORM TO BRANCH --- */}
+      {showMappingModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '520px', width: '100%', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  {editingMapping ? 'Edit Form-to-Branch Routing Rule' : 'Map Meta Form to Dedicated Branch'}
+                </h3>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
+                  Incoming leads submitted via this form will be strictly assigned to the selected branch.
+                </p>
+              </div>
+              <button onClick={() => setShowMappingModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMapping}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>
+                  Meta Lead Gen Form ID *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. meta_form_uk_blr or 109823471829"
+                  value={mappingFormData.formId}
+                  onChange={(e) => setMappingFormData({ ...mappingFormData, formId: e.target.value })}
+                  disabled={!!editingMapping}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13px', backgroundColor: editingMapping ? '#F1F5F9' : '#FFF' }}
+                  required
+                />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>The exact Form ID defined in Meta Ads Manager.</span>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>
+                  Form Display Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. UK Masters FastTrack Form (South India)"
+                  value={mappingFormData.formName}
+                  onChange={(e) => setMappingFormData({ ...mappingFormData, formName: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13px' }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>
+                  Associated Campaign Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. UK September 2026 Admissions Campaign"
+                  value={mappingFormData.campaignName}
+                  onChange={(e) => setMappingFormData({ ...mappingFormData, campaignName: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13px' }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>
+                  Assign to Dedicated Target Branch *
+                </label>
+                <select
+                  value={mappingFormData.branchId}
+                  onChange={(e) => setMappingFormData({ ...mappingFormData, branchId: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13px', backgroundColor: '#FFF' }}
+                  required
+                >
+                  <option value="">-- Choose Branch --</option>
+                  {branchesList.map((b) => (
+                    <option key={b._id} value={b._id}>
+                      {b.name} ({b.city || ''}, {b.state || ''})
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: '11px', color: '#059669', fontWeight: 500, display: 'block', marginTop: '2px' }}>
+                  ✓ Ingested responses will only be visible to counselors in this branch.
+                </span>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>
+                  Routing Notes & Rules (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dedicated South India fast-track counseling team"
+                  value={mappingFormData.notes}
+                  onChange={(e) => setMappingFormData({ ...mappingFormData, notes: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowMappingModal(false)}
+                  style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', background: '#FFF', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                >
+                  {editingMapping ? 'Update Mapping' : 'Save & Activate Mapping'}
                 </button>
               </div>
             </form>

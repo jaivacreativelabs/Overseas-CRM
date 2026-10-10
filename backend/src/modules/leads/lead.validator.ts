@@ -15,6 +15,7 @@ export const createLeadSchema = z.object({
     budget: z.string().optional(),
     source: z.nativeEnum(LeadSource).optional(),
     counsellorId: z.string().optional(),
+    branchId: z.string().optional(),
     notes: z.string().optional(),
   }),
 });
@@ -37,6 +38,7 @@ export const updateLeadSchema = z.object({
     budget: z.string().optional(),
     source: z.nativeEnum(LeadSource).optional(),
     counsellorId: z.string().optional(),
+    branchId: z.string().optional(),
     notes: z.string().optional(),
   }),
 });

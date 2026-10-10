@@ -15,6 +15,15 @@ router.use(requireOwnerAdmin);
 // Catalog & Status
 router.get('/', IntegrationController.getCatalog);
 
+// Meta Ads & Form-to-Branch Routing
+router.get('/meta-ads/campaigns', IntegrationController.getMetaCampaigns);
+router.post('/meta-ads/campaigns/sync', IntegrationController.syncMetaCampaigns);
+router.get('/meta-ads/mappings', IntegrationController.getMetaFormMappings);
+router.post('/meta-ads/mappings', IntegrationController.saveMetaFormMapping);
+router.delete('/meta-ads/mappings/:id', IntegrationController.deleteMetaFormMapping);
+router.post('/meta-ads/simulate-lead', IntegrationController.simulateMetaLead);
+router.get('/meta-ads/analytics', IntegrationController.getMetaAnalytics);
+
 // Provider Connections
 router.post('/:providerId/connect', IntegrationController.connectProvider);
 router.post('/:providerId/test', IntegrationController.testConnection);

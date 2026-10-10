@@ -97,6 +97,14 @@ export const DEFAULT_PROVIDERS = [
     icon: 'Webhook',
     status: IntegrationStatus.CONFIGURED, // Built-in active
   },
+  {
+    providerId: 'meta_ads',
+    category: IntegrationCategory.AUTOMATION_INTELLIGENCE,
+    name: 'Meta Ads & Lead Gen Hub',
+    description: 'Track multi-campaign ad spend & engagement, connect Instant Forms, and automatically route incoming leads to dedicated branch locations.',
+    icon: 'Megaphone',
+    status: IntegrationStatus.CONFIGURED, // Built-in active
+  },
 ];
 
 export class IntegrationService {

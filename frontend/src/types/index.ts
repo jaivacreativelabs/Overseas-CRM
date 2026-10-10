@@ -151,6 +151,9 @@ export interface Lead {
     utm_campaign?: string;
   };
   metaLeadId?: string;
+  metaFormId?: string;
+  metaFormName?: string;
+  branchId?: { _id: string; name: string; city?: string; state?: string; branchId?: string } | string;
   counsellorId?: { _id: string; name: string; email: string; phone?: string; avatar?: string };
   studentUserId?: { _id: string; name: string; email: string };
   counsellingSessions?: CounsellingSession[];
@@ -587,6 +590,43 @@ export interface AutomationWorkflow {
   conditions?: any[];
   executionCount: number;
   lastExecutedAt?: string;
+  createdAt: string;
+}
+
+export interface MetaCampaign {
+  _id: string;
+  campaignId: string;
+  name: string;
+  status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  objective: string;
+  spend: number;
+  currency: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  leadsCount: number;
+  costPerLead?: number;
+  forms: Array<{
+    formId: string;
+    formName: string;
+    branchId?: string;
+    branchName?: string;
+  }>;
+  lastSyncAt: string;
+}
+
+export interface MetaFormMapping {
+  _id: string;
+  formId: string;
+  formName: string;
+  campaignId?: string;
+  campaignName: string;
+  branchId: { _id: string; name: string; city?: string; state?: string; branchId?: string } | string;
+  branchName: string;
+  totalLeadsRouted: number;
+  lastLeadAt?: string;
+  isActive: boolean;
+  notes?: string;
   createdAt: string;
 }
 

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { LeadService } from './lead.service';
+import { MetaAdsService } from '../integrations/meta-ads.service';
 import { ApiResponse } from '../../utils/api-response';
 import { LeadSource, LeadStatus, StudentStage, UserRole } from '../../config/constants';
 
@@ -14,6 +15,7 @@ export class LeadController {
       const source = req.query.source as LeadSource;
       const counsellorId = req.query.counsellorId as string;
       const targetCountry = req.query.targetCountry as string;
+      const branchId = (req.query.branchId as string) || (req.user?.role === UserRole.COUNSELLOR ? (req.user as any).branchId : undefined);
       const isArchived = req.query.isArchived === 'true';
       const isStudent = req.query.isStudent !== undefined ? req.query.isStudent === 'true' : undefined;
 
@@ -26,6 +28,7 @@ export class LeadController {
         source,
         counsellorId,
         targetCountry,
+        branchId,
         isArchived,
         isStudent,
       });
@@ -450,13 +453,29 @@ export class LeadController {
       const entry = req.body.entry?.[0];
       const change = entry?.changes?.[0]?.value;
 
+      const formId = change?.form_id || req.body.formId || req.body.metaFormId;
+      const campaignName = req.body.campaignName || change?.campaign_name || req.body.campaign;
+
+      let routing: any = null;
+      try {
+        routing = await MetaAdsService.routeIncomingMetaLead(formId, campaignName);
+      } catch (err) {
+        // Fallback gracefully without breaking webhook response
+      }
+
+      const assignedBranchId = routing ? routing.branchId.toString() : (req.body.branchId || undefined);
+      const assignedFormName = routing?.formName || req.body.formName || formId;
+
       if (change && change.leadgen_id) {
         await LeadService.ingestMetaLead({
           metaLeadId: change.leadgen_id,
           name: req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
           email: req.body.email || `lead_${change.leadgen_id}@meta.com`,
           phone: req.body.phone || '0000000000',
-          campaignName: req.body.campaignName || change.form_id || 'Meta Ad Campaign',
+          campaignName: campaignName || 'Meta Ad Campaign',
+          branchId: assignedBranchId,
+          metaFormId: formId,
+          metaFormName: assignedFormName,
         });
       } else if (req.body.email || req.body.name) {
         await LeadService.ingestMetaLead({
@@ -466,8 +485,11 @@ export class LeadController {
           phone: req.body.phone || '0000000000',
           preferredCountry: req.body.preferredCountry || req.body.targetCountry,
           targetCourse: req.body.targetCourse,
-          campaignName: req.body.campaignName || 'Meta Instant Form',
+          campaignName: campaignName || 'Meta Instant Form',
           notes: req.body.notes,
+          branchId: assignedBranchId,
+          metaFormId: formId,
+          metaFormName: assignedFormName,
         });
       }
 
