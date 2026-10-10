@@ -1,13 +1,37 @@
 import { Types } from 'mongoose';
 import { PaymentModel, IPayment } from './payment.model';
 import { LeadModel } from '../leads/lead.model';
-import { PaymentStatus, StudentStage, UserRole } from '../../config/constants';
+import { OfferModel } from '../offers/offer.model';
+import { PaymentStatus, StudentStage, UserRole, OfferStatus } from '../../config/constants';
 import { NotFoundError, ValidationError, StageLockedError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
 
 export class PaymentService {
-  static async getPaymentsForLead(leadId: string): Promise<any[]> {
+  static async getAllPayments(status?: PaymentStatus): Promise<any[]> {
+    const query: any = {};
+    if (status) query.status = status;
+    return PaymentModel.find(query)
+      .populate('leadId', 'name email phone stage targetCountry targetCourse')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  static async getPaymentsForLead(leadId: string, userRole?: UserRole): Promise<any[]> {
+    // Stage Gate: Student access to fee payment is locked until the signed offer is accepted
+    if (userRole === UserRole.STUDENT) {
+      const acceptedOffer = await OfferModel.findOne({
+        leadId: new Types.ObjectId(leadId),
+        status: OfferStatus.ACCEPTED,
+      });
+
+      if (!acceptedOffer) {
+        throw new StageLockedError(
+          'Fee Payment is locked. Access to fee payment is enabled only after your signed offer letter has been approved by your counsellor.'
+        );
+      }
+    }
+
     return PaymentModel.find({ leadId: new Types.ObjectId(leadId) })
       .sort({ createdAt: -1 })
       .lean();
@@ -31,10 +55,22 @@ export class PaymentService {
     const lead = await LeadModel.findById(leadId);
     if (!lead) throw new NotFoundError('Lead not found');
 
+    // Stage Gate: Fee Payment requires an ACCEPTED signed offer letter
+    const acceptedOffer = await OfferModel.findOne({
+      leadId: lead._id,
+      status: OfferStatus.ACCEPTED,
+    });
+
+    if (!acceptedOffer) {
+      throw new StageLockedError(
+        'Fee Payment is locked. A signed offer letter must be reviewed and accepted by a counsellor before generating payment requests.'
+      );
+    }
+
     const payment = await PaymentModel.create({
       leadId: lead._id,
       studentId: lead.studentUserId,
-      offerId: data.offerId ? new Types.ObjectId(data.offerId) : undefined,
+      offerId: data.offerId ? new Types.ObjectId(data.offerId) : acceptedOffer._id,
       title: data.title,
       purpose: data.purpose || 'TUITION_DEPOSIT',
       amount: data.amount,
@@ -74,6 +110,18 @@ export class PaymentService {
   ): Promise<IPayment> {
     const payment = await PaymentModel.findById(paymentId);
     if (!payment) throw new NotFoundError('Payment request not found');
+
+    // Stage Gate: Fee Payment requires an ACCEPTED signed offer letter
+    const acceptedOffer = await OfferModel.findOne({
+      leadId: payment.leadId,
+      status: OfferStatus.ACCEPTED,
+    });
+
+    if (!acceptedOffer) {
+      throw new StageLockedError(
+        'Fee Payment is locked. Payment proof cannot be submitted until a signed offer letter is officially accepted.'
+      );
+    }
 
     payment.transactionReference = data.transactionReference;
     payment.paymentMode = data.paymentMode;

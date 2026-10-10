@@ -10,6 +10,8 @@ export enum AdminType {
 }
 
 export enum LeadSource {
+  META_ADS = 'Meta Ads',
+  LANDING_PAGE = 'Landing Page',
   WEBSITE = 'WEBSITE',
   INSTAGRAM = 'INSTAGRAM',
   FACEBOOK = 'FACEBOOK',
@@ -46,11 +48,12 @@ export enum StudentStage {
 }
 
 export enum DocumentStatus {
+  PENDING = 'PENDING',
   REQUESTED = 'REQUESTED',
-  UPLOADED = 'UPLOADED',
-  UNDER_REVIEW = 'UNDER_REVIEW',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  SUCCESSFUL = 'SUCCESSFUL',
+  FAILED = 'FAILED',
 }
 
 export enum ApplicationStatus {
@@ -140,8 +143,20 @@ export interface Lead {
   source: LeadSource;
   status: LeadStatus;
   stage: StudentStage;
+  campaignName?: string;
+  preferredCountry?: string;
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  };
+  metaLeadId?: string;
+  metaFormId?: string;
+  metaFormName?: string;
+  branchId?: { _id: string; name: string; city?: string; state?: string; branchId?: string } | string;
   counsellorId?: { _id: string; name: string; email: string; phone?: string; avatar?: string };
   studentUserId?: { _id: string; name: string; email: string };
+  counsellingSessions?: CounsellingSession[];
   closedLostReason?: string;
   notes?: string;
   lastContactedAt?: string;
@@ -221,10 +236,25 @@ export interface University {
   _id: string;
   name: string;
   country: string;
+  state?: string;
   city?: string;
+  address?: string;
   website?: string;
   ranking?: number;
+  customComment?: string;
   logoUrl?: string;
+  bannerUrl?: string;
+  description?: string;
+  galleryPhotos?: string[];
+  overview?: string;
+  campusFacilities?: string[];
+  establishedYear?: number;
+  acceptanceRate?: string;
+  averageTuitionFee?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  generalRequirements?: string;
+  isActive?: boolean;
 }
 
 export interface Course {
@@ -236,20 +266,29 @@ export interface Course {
   level: string;
   durationMonths: number;
   annualFee: number;
+  applicationFee?: number;
   currency: string;
   intakes: string[];
+  eligibilityRequirements?: string;
+  academicRequirements?: string;
+  englishRequirements?: string;
+  deadlines?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  description?: string;
 }
 
 export interface Shortlist {
   _id: string;
   leadId: string;
-  universityId: string;
+  universityId: any;
   universityName: string;
-  courseId: string;
+  courseId: any;
   courseTitle: string;
   country: string;
   intake: string;
   annualFee?: number;
+  applicationFee?: number;
   currency?: string;
   isVisibleToStudent: boolean;
   status: 'PROPOSED' | 'APPROVED_BY_COUNSELLOR' | 'SELECTED_BY_STUDENT' | 'REJECTED';
@@ -278,10 +317,11 @@ export interface DocumentItem {
 
 export interface Application {
   _id: string;
-  leadId: string;
+  leadId: any;
+  studentId?: any;
   universityId: string;
   universityName: string;
-  courseId: string;
+  courseId: string | Course;
   courseTitle: string;
   country: string;
   intake: string;
@@ -293,14 +333,17 @@ export interface Application {
   portalUsername?: string;
   portalPassword?: string;
   notes?: string;
+  createdById?: string;
   createdByName: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Offer {
   _id: string;
-  leadId: string;
-  applicationId: string;
+  leadId: any;
+  studentId?: any;
+  applicationId: any;
   universityName: string;
   courseTitle: string;
   offerType: 'CONDITIONAL' | 'UNCONDITIONAL';
@@ -315,9 +358,15 @@ export interface Offer {
   signedOfferUrl?: string;
   signedOfferFileName?: string;
   signedUploadedAt?: string;
+  reviewedById?: string;
   reviewedByName?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
+  rejectionReason?: string;
+  uploadedById?: string;
   uploadedByName: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Payment {
@@ -373,6 +422,7 @@ export interface TravelSupport {
   airline?: string;
   flightNumber?: string;
   flightDate?: string;
+  departureAirport?: string;
   ticketUrl?: string;
   insuranceStatus: 'PENDING' | 'COMPLETED';
   insuranceProvider?: string;
@@ -450,3 +500,133 @@ export interface AuditLog {
   userAgent?: string;
   createdAt: string;
 }
+
+export interface Branch {
+  _id: string;
+  branchId: string;
+  name: string;
+  state: string;
+  city: string;
+  address: string;
+  pinCode?: string;
+  contactNumber?: string;
+  email?: string;
+  managerName?: string;
+  managerEmail?: string;
+  managerUserId?: any;
+  assignedStaffIds?: any[];
+  capacity: number;
+  assignedStudentsCount: number;
+  availableSeats: number;
+  utilizationPercentage?: number;
+  openingDate?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  isArchived: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BranchSummary {
+  totalBranches: number;
+  totalCapacity: number;
+  totalAssignedStudents: number;
+  availableSeats: number;
+}
+
+export interface StateBranchSummary {
+  state: string;
+  branchCount: number;
+  totalCapacity: number;
+  assignedStudents: number;
+  availableSeats: number;
+}
+
+export interface IntegrationConfig {
+  _id: string;
+  providerId: string;
+  category: 'COMMUNICATION' | 'STUDENT_JOURNEY' | 'PAYMENTS_DATA' | 'AUTOMATION_INTELLIGENCE';
+  name: string;
+  description: string;
+  icon: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'FAILED' | 'CONFIGURED';
+  credentials?: Record<string, string>;
+  settings?: Record<string, any>;
+  hasCredentialsSet?: boolean;
+  lastActivityAt?: string;
+  lastSuccessAt?: string;
+  lastErrorAt?: string;
+  lastErrorMessage?: string;
+  createdAt: string;
+}
+
+export interface IntegrationLog {
+  _id: string;
+  providerId: string;
+  eventType: string;
+  operation: string;
+  status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'RETRYING';
+  requestData?: any;
+  responseData?: any;
+  durationMs?: number;
+  errorMessage?: string;
+  retryCount: number;
+  maxRetries: number;
+  triggeredBy?: { name: string; email: string; role: string };
+  createdAt: string;
+}
+
+export interface AutomationWorkflow {
+  _id: string;
+  name: string;
+  description?: string;
+  trigger: string;
+  isActive: boolean;
+  actions: Array<{
+    actionType: string;
+    providerId?: string;
+    config: any;
+  }>;
+  conditions?: any[];
+  executionCount: number;
+  lastExecutedAt?: string;
+  createdAt: string;
+}
+
+export interface MetaCampaign {
+  _id: string;
+  campaignId: string;
+  name: string;
+  status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  objective: string;
+  spend: number;
+  currency: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  leadsCount: number;
+  costPerLead?: number;
+  forms: Array<{
+    formId: string;
+    formName: string;
+    branchId?: string;
+    branchName?: string;
+  }>;
+  lastSyncAt: string;
+}
+
+export interface MetaFormMapping {
+  _id: string;
+  formId: string;
+  formName: string;
+  campaignId?: string;
+  campaignName: string;
+  branchId: { _id: string; name: string; city?: string; state?: string; branchId?: string } | string;
+  branchName: string;
+  totalLeadsRouted: number;
+  lastLeadAt?: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+}
+

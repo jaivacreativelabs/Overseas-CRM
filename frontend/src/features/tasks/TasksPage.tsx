@@ -9,6 +9,7 @@ import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
 import { Task, TaskPriority, TaskStatus, TaskType } from '../../types';
+import { PinButton } from '../../components/PinButton';
 
 export const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -201,14 +202,26 @@ export const TasksPage: React.FC = () => {
             header: 'ACTIONS',
             align: 'right',
             render: (t) => (
-              <Button
-                variant={t.status === TaskStatus.COMPLETED ? 'secondary' : 'primary'}
-                size="sm"
-                icon={<Check size={12} />}
-                onClick={() => handleToggleStatus(t._id, t.status)}
-              >
-                {t.status === TaskStatus.COMPLETED ? 'Reopen' : 'Complete'}
-              </Button>
+              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <PinButton
+                  item={{
+                    id: t._id,
+                    category: 'task',
+                    title: `Task: ${t.title}`,
+                    subtitle: `${t.priority} Priority • ${t.type}`,
+                    path: `/tasks`,
+                    pinnedAt: new Date().toISOString(),
+                  }}
+                />
+                <Button
+                  variant={t.status === TaskStatus.COMPLETED ? 'secondary' : 'primary'}
+                  size="sm"
+                  icon={<Check size={12} />}
+                  onClick={() => handleToggleStatus(t._id, t.status)}
+                >
+                  {t.status === TaskStatus.COMPLETED ? 'Reopen' : 'Complete'}
+                </Button>
+              </div>
             ),
           },
         ]}

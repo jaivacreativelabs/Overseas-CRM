@@ -13,6 +13,8 @@ router.post('/countries', requireStaff, UniversityController.createCountry);
 
 router.get('/list', UniversityController.getUniversities);
 router.post('/', requireStaff, UniversityController.createUniversity);
+router.put('/:id', requireStaff, UniversityController.updateUniversity);
+router.delete('/:id', requireStaff, UniversityController.deleteUniversity);
 
 router.get('/courses', UniversityController.getCourses);
 router.post('/courses', requireStaff, UniversityController.createCourse);

@@ -10,10 +10,24 @@ export interface ICountry extends Document {
 export interface IUniversity extends Document {
   name: string;
   country: string;
+  state?: string;
   city?: string;
+  address?: string;
   website?: string;
   ranking?: number;
+  customComment?: string;
   logoUrl?: string;
+  bannerUrl?: string;
+  description?: string;
+  galleryPhotos?: string[];
+  overview?: string;
+  campusFacilities?: string[];
+  establishedYear?: number;
+  acceptanceRate?: string;
+  averageTuitionFee?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  generalRequirements?: string;
   isActive: boolean;
 }
 
@@ -25,8 +39,16 @@ export interface ICourse extends Document {
   level: 'BACHELOR' | 'MASTER' | 'DOCTORATE' | 'DIPLOMA';
   durationMonths: number;
   annualFee: number;
+  applicationFee?: number;
   currency: string;
   intakes: string[]; // e.g. ["Fall 2026", "Spring 2027"]
+  eligibilityRequirements?: string;
+  academicRequirements?: string;
+  englishRequirements?: string;
+  deadlines?: string;
+  scholarshipInfo?: string;
+  accommodationInfo?: string;
+  description?: string;
   isActive: boolean;
 }
 
@@ -40,6 +62,7 @@ export interface IShortlist extends Document {
   country: string;
   intake: string;
   annualFee?: number;
+  applicationFee?: number;
   currency?: string;
   isVisibleToStudent: boolean;
   status: 'PROPOSED' | 'APPROVED_BY_COUNSELLOR' | 'SELECTED_BY_STUDENT' | 'REJECTED';
@@ -58,10 +81,24 @@ const countrySchema = new Schema<ICountry>({
 const universitySchema = new Schema<IUniversity>({
   name: { type: String, required: true, trim: true, index: true },
   country: { type: String, required: true, trim: true, index: true },
+  state: { type: String, trim: true },
   city: { type: String, trim: true },
+  address: { type: String, trim: true },
   website: { type: String, trim: true },
   ranking: { type: Number },
-  logoUrl: { type: String },
+  customComment: { type: String, default: '', trim: true },
+  logoUrl: { type: String, trim: true },
+  bannerUrl: { type: String, trim: true },
+  description: { type: String, trim: true },
+  galleryPhotos: { type: [String], default: [] },
+  overview: { type: String, default: '' },
+  campusFacilities: { type: [String], default: [] },
+  establishedYear: { type: Number },
+  acceptanceRate: { type: String, default: '' },
+  averageTuitionFee: { type: String, default: '' },
+  scholarshipInfo: { type: String },
+  accommodationInfo: { type: String },
+  generalRequirements: { type: String },
   isActive: { type: Boolean, default: true, index: true },
 });
 
@@ -73,8 +110,16 @@ const courseSchema = new Schema<ICourse>({
   level: { type: String, enum: ['BACHELOR', 'MASTER', 'DOCTORATE', 'DIPLOMA'], required: true },
   durationMonths: { type: Number, required: true },
   annualFee: { type: Number, required: true },
+  applicationFee: { type: Number, default: 0 },
   currency: { type: String, default: 'USD' },
   intakes: [{ type: String }],
+  eligibilityRequirements: { type: String },
+  academicRequirements: { type: String },
+  englishRequirements: { type: String },
+  deadlines: { type: String },
+  scholarshipInfo: { type: String },
+  accommodationInfo: { type: String },
+  description: { type: String },
   isActive: { type: Boolean, default: true, index: true },
 });
 

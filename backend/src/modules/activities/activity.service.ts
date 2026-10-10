@@ -17,9 +17,9 @@ export class ActivityService {
   static async log(params: CreateActivityParams): Promise<IActivity> {
     return ActivityModel.create({
       ...params,
-      leadId: params.leadId ? new Types.ObjectId(params.leadId.toString()) : undefined,
-      studentId: params.studentId ? new Types.ObjectId(params.studentId.toString()) : undefined,
-      actorId: params.actorId ? new Types.ObjectId(params.actorId.toString()) : undefined,
+      leadId: params.leadId && Types.ObjectId.isValid(params.leadId.toString()) ? new Types.ObjectId(params.leadId.toString()) : undefined,
+      studentId: params.studentId && Types.ObjectId.isValid(params.studentId.toString()) ? new Types.ObjectId(params.studentId.toString()) : undefined,
+      actorId: params.actorId && Types.ObjectId.isValid(params.actorId.toString()) ? new Types.ObjectId(params.actorId.toString()) : undefined,
     });
   }
 

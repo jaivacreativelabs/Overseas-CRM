@@ -55,4 +55,7 @@ const applicationSchema = new Schema<IApplication>(
   }
 );
 
+applicationSchema.index({ leadId: 1, createdAt: -1 });
+applicationSchema.index({ leadId: 1, status: 1 });
+
 export const ApplicationModel = model<IApplication>('Application', applicationSchema);

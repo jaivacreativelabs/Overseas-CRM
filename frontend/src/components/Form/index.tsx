@@ -68,11 +68,13 @@ export const Select: React.FC<SelectProps> = ({
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
+  helperText?: string;
 }
 
 export const Textarea: React.FC<TextareaProps> = ({
   label,
   error,
+  helperText,
   id,
   className = '',
   rows = 3,
@@ -85,6 +87,7 @@ export const Textarea: React.FC<TextareaProps> = ({
       {label && <label htmlFor={areaId} className="form-label">{label}</label>}
       <textarea id={areaId} rows={rows} className={`form-textarea ${className}`} {...props} />
       {error && <span className="form-error">{error}</span>}
+      {!error && helperText && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{helperText}</span>}
     </div>
   );
 };

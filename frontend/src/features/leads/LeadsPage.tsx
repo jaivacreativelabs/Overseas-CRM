@@ -13,6 +13,7 @@ import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
 import { Drawer } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
+import { PinButton } from '../../components/PinButton';
 
 export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly = false }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -27,6 +28,8 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   const [stageFilter, setStageFilter] = useState('');
   const [counsellorFilter, setCounsellorFilter] = useState('');
   const [counsellors, setCounsellors] = useState<User[]>([]);
+  const [branchFilter, setBranchFilter] = useState('');
+  const [branches, setBranches] = useState<any[]>([]);
 
   // Drawers & Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -44,6 +47,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     budget: '',
     source: LeadSource.WEBSITE,
     counsellorId: '',
+    branchId: '',
     notes: '',
   });
 
@@ -62,6 +66,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         source: sourceFilter,
         stage: stageFilter,
         counsellorId: counsellorFilter,
+        branchId: branchFilter || undefined,
         isStudent: isStudentOnly ? true : isStudentOnly === false ? false : undefined,
       });
       setLeads(res.data || []);
@@ -71,20 +76,24 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, sourceFilter, stageFilter, counsellorFilter, isStudentOnly, error]);
+  }, [page, search, statusFilter, sourceFilter, stageFilter, counsellorFilter, branchFilter, isStudentOnly, error]);
 
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
 
   useEffect(() => {
-    const fetchCounsellors = async () => {
+    const fetchCounsellorsAndBranches = async () => {
       try {
-        const res = await apiClient.get<User[]>('/users/counsellors');
-        setCounsellors(res.data || []);
+        const [cRes, bRes] = await Promise.all([
+          apiClient.get<User[]>('/users/counsellors'),
+          apiClient.get<any>('/branches'),
+        ]);
+        setCounsellors(cRes.data || []);
+        setBranches(bRes.data?.branches || (Array.isArray(bRes.data) ? bRes.data : []));
       } catch (err) {}
     };
-    fetchCounsellors();
+    fetchCounsellorsAndBranches();
   }, []);
 
   const handleCreateLead = async (e: React.FormEvent) => {
@@ -105,6 +114,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         budget: '',
         source: LeadSource.WEBSITE,
         counsellorId: '',
+        branchId: '',
         notes: '',
       });
       fetchLeads();
@@ -143,6 +153,20 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
 
           <select
             className="form-select"
+            style={{ width: '160px' }}
+            value={branchFilter}
+            onChange={(e) => setBranchFilter(e.target.value)}
+          >
+            <option value="">All Branches</option>
+            {branches.map((b) => (
+              <option key={b._id} value={b._id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="form-select"
             style={{ width: '150px' }}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -169,12 +193,13 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ))}
           </select>
 
-          {(search || statusFilter || sourceFilter || stageFilter) && (
+          {(search || branchFilter || statusFilter || sourceFilter || stageFilter) && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setSearch('');
+                setBranchFilter('');
                 setStatusFilter('');
                 setSourceFilter('');
                 setCounsellorFilter('');
@@ -215,6 +240,45 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ),
           },
           {
+            header: 'ASSIGNED BRANCH',
+            render: (l) => {
+              const b =
+                typeof l.branchId === 'object' && l.branchId
+                  ? l.branchId
+                  : branches.find((br) => br._id === l.branchId);
+
+              return (
+                <div>
+                  {b ? (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        color: '#1E40AF',
+                        backgroundColor: '#EFF6FF',
+                        border: '1px solid #BFDBFE',
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                      }}
+                    >
+                      📍 {b.name}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Unassigned</span>
+                  )}
+                  {l.source === 'Meta Ads' && (
+                    <div style={{ fontSize: '10.5px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
+                      ⚡ Meta: {l.metaFormName || 'Instant Form'}
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
             header: 'STATUS',
             render: (l) => <StatusBadge status={l.status} />,
           },
@@ -226,7 +290,17 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             header: 'ACTIONS',
             align: 'right',
             render: (l) => (
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
+                <PinButton
+                  item={{
+                    id: l._id,
+                    category: 'student',
+                    title: l.name,
+                    subtitle: `${l.email} • ${l.targetCountry || 'Student'}`,
+                    path: isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`,
+                    pinnedAt: new Date().toISOString(),
+                  }}
+                />
                 <Button
                   variant="secondary"
                   size="sm"
@@ -336,6 +410,16 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             value={createForm.budget}
             onChange={(e) => setCreateForm({ ...createForm, budget: e.target.value })}
             placeholder="e.g. £30,000 / $40,000"
+          />
+
+          <Select
+            label="Dedicated Branch"
+            value={createForm.branchId}
+            onChange={(e) => setCreateForm({ ...createForm, branchId: e.target.value })}
+            options={[
+              { value: '', label: '-- None (Assign Later) --' },
+              ...branches.map((b) => ({ value: b._id, label: `${b.name} (${b.city || ''})` })),
+            ]}
           />
 
           <Textarea

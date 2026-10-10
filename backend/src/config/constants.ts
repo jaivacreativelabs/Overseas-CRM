@@ -10,6 +10,8 @@ export enum AdminType {
 }
 
 export enum LeadSource {
+  META_ADS = 'Meta Ads',
+  LANDING_PAGE = 'Landing Page',
   WEBSITE = 'WEBSITE',
   INSTAGRAM = 'INSTAGRAM',
   FACEBOOK = 'FACEBOOK',
@@ -46,11 +48,12 @@ export enum StudentStage {
 }
 
 export enum DocumentStatus {
+  PENDING = 'PENDING',
   REQUESTED = 'REQUESTED',
-  UPLOADED = 'UPLOADED',
-  UNDER_REVIEW = 'UNDER_REVIEW',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  SUCCESSFUL = 'SUCCESSFUL',
+  FAILED = 'FAILED',
 }
 
 export enum ApplicationStatus {

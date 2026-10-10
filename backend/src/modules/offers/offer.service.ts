@@ -8,6 +8,15 @@ import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
 
 export class OfferService {
+  static async getAllOffers(status?: OfferStatus): Promise<any[]> {
+    const query: any = {};
+    if (status) query.status = status;
+    return OfferModel.find(query)
+      .populate('leadId', 'name email phone stage targetCountry targetCourse')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
   static async getOffersForLead(leadId: string): Promise<any[]> {
     return OfferModel.find({ leadId: new Types.ObjectId(leadId) })
       .sort({ createdAt: -1 })
@@ -45,8 +54,8 @@ export class OfferService {
       courseTitle: app.courseTitle,
       offerType: data.offerType,
       conditions: data.conditions,
-      tuitionFee: data.tuitionFee,
-      depositAmount: data.depositAmount,
+      tuitionFee: data.tuitionFee || 0,
+      depositAmount: data.depositAmount || 0,
       currency: data.currency || 'USD',
       deadlineDate: data.deadlineDate ? new Date(data.deadlineDate) : undefined,
       originalOfferUrl: data.originalOfferUrl,
@@ -83,10 +92,25 @@ export class OfferService {
     const offer = await OfferModel.findById(offerId);
     if (!offer) throw new NotFoundError('Offer record not found');
 
+    // Allow upload if ISSUED, SIGNED_UPLOADED, or REJECTED (re-upload after rejection)
+    if (
+      offer.status !== OfferStatus.ISSUED &&
+      offer.status !== OfferStatus.REJECTED &&
+      offer.status !== OfferStatus.SIGNED_UPLOADED
+    ) {
+      throw new ValidationError(
+        `Signed offer cannot be uploaded when offer status is '${offer.status}'.`
+      );
+    }
+
+    const wasRejected = offer.status === OfferStatus.REJECTED;
+
     offer.signedOfferUrl = signedOfferUrl;
     offer.signedOfferFileName = signedOfferFileName;
     offer.signedUploadedAt = new Date();
     offer.status = OfferStatus.SIGNED_UPLOADED;
+    offer.rejectionReason = undefined;
+    offer.reviewNotes = undefined;
 
     await offer.save();
 
@@ -97,8 +121,10 @@ export class OfferService {
       actorName: studentName,
       actorRole: UserRole.STUDENT,
       action: 'SIGNED_OFFER_UPLOADED',
-      title: 'Signed Offer Uploaded',
-      description: 'Student submitted their signed acceptance for the offer letter.',
+      title: wasRejected ? 'Signed Offer Re-uploaded' : 'Signed Offer Uploaded',
+      description: wasRejected
+        ? 'Student submitted a revised signed acceptance following previous rejection.'
+        : 'Student submitted their signed acceptance for the offer letter.',
     });
 
     return offer;
@@ -115,6 +141,14 @@ export class OfferService {
     const offer = await OfferModel.findById(offerId);
     if (!offer) throw new NotFoundError('Offer record not found');
 
+    if (offer.status !== OfferStatus.SIGNED_UPLOADED && offer.status !== OfferStatus.ACCEPTED && offer.status !== OfferStatus.REJECTED) {
+      throw new ValidationError(`Offer cannot be reviewed while status is '${offer.status}'. A signed offer must be uploaded first.`);
+    }
+
+    if (status === OfferStatus.REJECTED && (!notes || !notes.trim())) {
+      throw new ValidationError('A reason/note is mandatory when rejecting a signed offer.');
+    }
+
     const beforeState = offer.toObject();
 
     offer.status = status;
@@ -124,13 +158,26 @@ export class OfferService {
       offer.reviewedByName = actorName;
     }
 
+    if (status === OfferStatus.REJECTED) {
+      offer.rejectionReason = notes?.trim();
+      offer.reviewNotes = notes?.trim();
+    } else {
+      offer.reviewNotes = notes?.trim();
+      offer.rejectionReason = undefined;
+    }
+
     await offer.save();
 
     // Stage Gating: Accepted Signed Offer unlocks FEE_PAYMENT
     const lead = await LeadModel.findById(offer.leadId);
-    if (lead && status === OfferStatus.ACCEPTED) {
-      lead.stage = StudentStage.FEE_PAYMENT;
-      await lead.save();
+    if (lead) {
+      if (status === OfferStatus.ACCEPTED) {
+        lead.stage = StudentStage.FEE_PAYMENT;
+        await lead.save();
+      } else if (status === OfferStatus.REJECTED && lead.stage === StudentStage.FEE_PAYMENT) {
+        lead.stage = StudentStage.OFFER_MANAGEMENT;
+        await lead.save();
+      }
     }
 
     if (actorUserId) {

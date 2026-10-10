@@ -26,7 +26,13 @@ import {
   XCircle,
   RotateCcw,
   Video,
+  Eye,
+  FileCheck,
+  AlertCircle,
+  X,
 } from 'lucide-react';
+import { applicationService } from '../applications/services/applicationService';
+import { offerService } from '../offers/services/offerService';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
@@ -60,6 +66,7 @@ import { Badge, StatusBadge } from '../../components/Badge';
 import { Table } from '../../components/Table';
 import { Modal, Drawer, ConfirmDialog } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
+import { PinButton } from '../../components/PinButton';
 
 type ActiveSection =
   | 'overview'
@@ -257,17 +264,48 @@ export const LeadDetailPage: React.FC = () => {
   const [docReviewStatus, setDocReviewStatus] = useState<DocumentStatus.APPROVED | DocumentStatus.REJECTED>(DocumentStatus.APPROVED);
   const [docRejectionReason, setDocRejectionReason] = useState('');
 
+  // Application modals state
+  const [isCreateAppModalOpen, setIsCreateAppModalOpen] = useState(false);
+  const [appForm, setAppForm] = useState({
+    universityId: '',
+    universityName: '',
+    courseId: '',
+    courseTitle: '',
+    country: '',
+    intake: '',
+    applicationNumber: '',
+    portalUsername: '',
+    portalPassword: '',
+    notes: '',
+  });
+
+  const [isRejectAppModalOpen, setIsRejectAppModalOpen] = useState(false);
+  const [selectedAppForReject, setSelectedAppForReject] = useState<Application | null>(null);
+  const [appRejectionReason, setAppRejectionReason] = useState('');
+  const [appDecisionDate, setAppDecisionDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const [selectedAppForDetails, setSelectedAppForDetails] = useState<Application | null>(null);
+  const [isAppDetailsDrawerOpen, setIsAppDetailsDrawerOpen] = useState(false);
+  const [showAppPortalPassword, setShowAppPortalPassword] = useState(false);
+
+  // Offer modals state
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [offerFile, setOfferFile] = useState<File | null>(null);
   const [offerForm, setOfferForm] = useState({
     applicationId: '',
     offerType: 'CONDITIONAL' as const,
-    tuitionFee: 0,
-    depositAmount: 0,
+    tuitionFee: 15000,
+    depositAmount: 3000,
     currency: 'USD',
     conditions: '',
+    deadlineDate: '',
     originalOfferUrl: '',
     originalOfferFileName: '',
   });
+
+  const [isRejectSignedOfferModalOpen, setIsRejectSignedOfferModalOpen] = useState(false);
+  const [selectedOfferForReject, setSelectedOfferForReject] = useState<Offer | null>(null);
+  const [signedOfferRejectNotes, setSignedOfferRejectNotes] = useState('');
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
@@ -387,6 +425,114 @@ export const LeadDetailPage: React.FC = () => {
     }
   };
 
+  // Open Create Application Modal
+  const handleOpenCreateAppModal = () => {
+    const selectedShortlist = shortlist.find((s) => s.status === 'SELECTED_BY_STUDENT') || shortlist[0];
+    if (selectedShortlist) {
+      setAppForm({
+        universityId: selectedShortlist.universityId,
+        universityName: selectedShortlist.universityName,
+        courseId: selectedShortlist.courseId,
+        courseTitle: selectedShortlist.courseTitle,
+        country: selectedShortlist.country,
+        intake: selectedShortlist.intake,
+        applicationNumber: `APP-${Date.now().toString().slice(-6)}`,
+        portalUsername: '',
+        portalPassword: '',
+        notes: '',
+      });
+    } else {
+      setAppForm({
+        universityId: '',
+        universityName: lead?.targetCountry ? `University in ${lead.targetCountry}` : '',
+        courseId: '',
+        courseTitle: lead?.targetCourse || '',
+        country: lead?.targetCountry || 'International',
+        intake: lead?.targetIntake || 'Fall 2026',
+        applicationNumber: `APP-${Date.now().toString().slice(-6)}`,
+        portalUsername: '',
+        portalPassword: '',
+        notes: '',
+      });
+    }
+    setIsCreateAppModalOpen(true);
+  };
+
+  // Submit Application
+  const handleCreateApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    if (!appForm.universityName.trim() || !appForm.courseTitle.trim()) {
+      error('University name and course title are required.');
+      return;
+    }
+
+    try {
+      await applicationService.createApplication(id, {
+        universityId: appForm.universityId || '000000000000000000000000',
+        universityName: appForm.universityName.trim(),
+        courseId: appForm.courseId || '000000000000000000000000',
+        courseTitle: appForm.courseTitle.trim(),
+        country: appForm.country.trim() || lead?.targetCountry || 'International',
+        intake: appForm.intake.trim() || 'Fall 2026',
+        applicationNumber: appForm.applicationNumber.trim() || undefined,
+        portalUsername: appForm.portalUsername.trim() || undefined,
+        portalPassword: appForm.portalPassword.trim() || undefined,
+        notes: appForm.notes.trim() || undefined,
+      });
+      success('Application submitted successfully! Application stage updated.');
+      setIsCreateAppModalOpen(false);
+      fetchLeadDetails();
+    } catch (err: any) {
+      error(err.message || 'Failed to submit application');
+    }
+  };
+
+  // Application status transitions
+  const handleUpdateAppStatus = async (appId: string, status: ApplicationStatus) => {
+    try {
+      await applicationService.updateApplicationStatus(appId, {
+        status,
+        decisionDate: status === ApplicationStatus.OFFER_RECEIVED ? new Date() : undefined,
+      });
+      success(`Application marked as ${status.replace(/_/g, ' ')}.`);
+      fetchLeadDetails();
+    } catch (err: any) {
+      error(err.message || 'Failed to update application');
+    }
+  };
+
+  // Open Reject App Modal
+  const handleOpenRejectAppModal = (app: Application) => {
+    setSelectedAppForReject(app);
+    setAppRejectionReason('');
+    setAppDecisionDate(new Date().toISOString().split('T')[0]);
+    setIsRejectAppModalOpen(true);
+  };
+
+  // Confirm Reject Application
+  const handleConfirmRejectApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAppForReject) return;
+    if (!appRejectionReason.trim()) {
+      error('A rejection reason is mandatory when marking application as rejected.');
+      return;
+    }
+
+    try {
+      await applicationService.updateApplicationStatus(selectedAppForReject._id, {
+        status: ApplicationStatus.REJECTED,
+        rejectionReason: appRejectionReason.trim(),
+        decisionDate: appDecisionDate ? new Date(appDecisionDate) : new Date(),
+      });
+      success('Application marked as Rejected. Rejection reason recorded.');
+      setIsRejectAppModalOpen(false);
+      fetchLeadDetails();
+    } catch (err: any) {
+      error(err.message || 'Failed to reject application');
+    }
+  };
+
   // Create offer
   const handleCreateOffer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,9 +541,30 @@ export const LeadDetailPage: React.FC = () => {
       return;
     }
     try {
-      await apiClient.post(`/offers/lead/${id}/original`, offerForm);
-      success('Offer letter uploaded & issued to student.');
+      let payloadOrFormData: any;
+      if (offerFile) {
+        const fd = new FormData();
+        fd.append('file', offerFile);
+        fd.append('applicationId', offerForm.applicationId);
+        fd.append('offerType', offerForm.offerType);
+        fd.append('tuitionFee', String(offerForm.tuitionFee));
+        fd.append('depositAmount', String(offerForm.depositAmount));
+        fd.append('currency', offerForm.currency);
+        if (offerForm.conditions) fd.append('conditions', offerForm.conditions);
+        if (offerForm.deadlineDate) fd.append('deadlineDate', offerForm.deadlineDate);
+        payloadOrFormData = fd;
+      } else {
+        payloadOrFormData = {
+          ...offerForm,
+          originalOfferUrl: offerForm.originalOfferUrl || '/uploads/offer_letter.pdf',
+          originalOfferFileName: offerForm.originalOfferFileName || 'offer_letter.pdf',
+        };
+      }
+
+      await offerService.uploadOriginalOffer(id, payloadOrFormData);
+      success('Offer letter uploaded & issued to student. Offer Management stage unlocked.');
       setIsOfferModalOpen(false);
+      setOfferFile(null);
       fetchLeadDetails();
     } catch (err: any) {
       error(err.message || 'Failed to upload offer');
@@ -407,11 +574,43 @@ export const LeadDetailPage: React.FC = () => {
   // Accept signed offer
   const handleAcceptSignedOffer = async (offerId: string) => {
     try {
-      await apiClient.put(`/offers/${offerId}/review`, { status: OfferStatus.ACCEPTED });
+      await offerService.reviewSignedOffer(offerId, {
+        status: OfferStatus.ACCEPTED,
+        notes: 'Signed offer accepted by counsellor. Fee Payment stage unlocked.',
+      });
       success('Signed offer accepted! Fee Payment stage is now unlocked.');
       fetchLeadDetails();
     } catch (err: any) {
       error(err.message || 'Failed to review offer');
+    }
+  };
+
+  // Open Reject Signed Offer Modal
+  const handleOpenRejectSignedOfferModal = (offer: Offer) => {
+    setSelectedOfferForReject(offer);
+    setSignedOfferRejectNotes('');
+    setIsRejectSignedOfferModalOpen(true);
+  };
+
+  // Confirm Reject Signed Offer
+  const handleConfirmRejectSignedOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOfferForReject) return;
+    if (!signedOfferRejectNotes.trim()) {
+      error('A reason/note is mandatory when rejecting a signed offer.');
+      return;
+    }
+    try {
+      await offerService.reviewSignedOffer(selectedOfferForReject._id, {
+        status: OfferStatus.REJECTED,
+        notes: signedOfferRejectNotes.trim(),
+        rejectionReason: signedOfferRejectNotes.trim(),
+      });
+      success('Signed offer rejected. Feedback recorded for student to re-upload.');
+      setIsRejectSignedOfferModalOpen(false);
+      fetchLeadDetails();
+    } catch (err: any) {
+      error(err.message || 'Failed to reject signed offer');
     }
   };
 
@@ -605,6 +804,16 @@ export const LeadDetailPage: React.FC = () => {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{lead.name}</h1>
+              <PinButton
+                item={{
+                  id: lead._id,
+                  category: 'student',
+                  title: lead.name,
+                  subtitle: `${lead.email} • ${lead.phone || ''}`,
+                  path: isStudentRoute ? `/students/${lead._id}` : `/leads/${lead._id}`,
+                  pinnedAt: new Date().toISOString(),
+                }}
+              />
               <StatusBadge status={lead.status} />
               <Badge variant="primary">{lead.stage.replace(/_/g, ' ')}</Badge>
             </div>
@@ -1593,20 +1802,96 @@ export const LeadDetailPage: React.FC = () => {
           <div className="card-header">
             <div>
               <h3 className="card-title">University Applications</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Rule: Exactly 1 active application permitted at a time.
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Rule: Exactly 1 active application permitted at a time. Historic rejections remain archived.
               </p>
             </div>
+            {isStaff && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<Plus size={14} />}
+                disabled={applications.some((a) => a.status === ApplicationStatus.SUBMITTED || a.status === ApplicationStatus.UNDER_REVIEW)}
+                onClick={handleOpenCreateAppModal}
+                title={
+                  applications.some((a) => a.status === ApplicationStatus.SUBMITTED || a.status === ApplicationStatus.UNDER_REVIEW)
+                    ? 'An active application is already in progress. Complete or resolve it before submitting a new one.'
+                    : 'Submit new application'
+                }
+              >
+                + Submit Application
+              </Button>
+            )}
           </div>
 
           <Table
             columns={[
-              { header: 'UNIVERSITY', accessor: 'universityName' },
-              { header: 'COURSE', accessor: 'courseTitle' },
-              { header: 'APP NUMBER', accessor: 'applicationNumber' },
               {
-                header: 'SUBMITTED DATE',
-                render: (a) => new Date(a.submissionDate).toLocaleDateString(),
+                header: 'UNIVERSITY & COUNTRY',
+                render: (a) => (
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.universityName}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{a.country}</div>
+                  </div>
+                ),
+              },
+              {
+                header: 'COURSE & INTAKE',
+                render: (a) => (
+                  <div>
+                    <div style={{ color: 'var(--text-primary)' }}>{a.courseTitle}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{a.intake}</div>
+                  </div>
+                ),
+              },
+              {
+                header: 'APP NUMBER',
+                render: (a) =>
+                  a.applicationNumber ? (
+                    <code style={{ fontSize: '11.5px', backgroundColor: 'var(--bg-subtle)', padding: '2px 6px', borderRadius: '4px' }}>
+                      {a.applicationNumber}
+                    </code>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>—</span>
+                  ),
+              },
+              {
+                header: 'SUBMITTED',
+                render: (a) => (
+                  <span style={{ fontSize: '12px' }}>
+                    {a.submissionDate ? new Date(a.submissionDate).toLocaleDateString() : '—'}
+                  </span>
+                ),
+              },
+              {
+                header: 'DECISION / FEEDBACK',
+                render: (a) => {
+                  if (a.status === ApplicationStatus.REJECTED) {
+                    return (
+                      <div style={{ maxWidth: '240px' }}>
+                        <span style={{ color: 'var(--danger)', fontSize: '12px', fontWeight: 600, display: 'block' }}>
+                          Rejection Reason:
+                        </span>
+                        <span style={{ fontSize: '11.5px', color: 'var(--danger-text)' }}>
+                          {a.rejectionReason || 'No reason specified'}
+                        </span>
+                        {a.decisionDate && (
+                          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Decided: {new Date(a.decisionDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  if (a.decisionDate) {
+                    return (
+                      <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                        Decided: {new Date(a.decisionDate).toLocaleDateString()}
+                      </span>
+                    );
+                  }
+                  return <span style={{ color: 'var(--text-muted)' }}>In Review</span>;
+                },
               },
               {
                 header: 'STATUS',
@@ -1615,31 +1900,95 @@ export const LeadDetailPage: React.FC = () => {
               {
                 header: 'ACTIONS',
                 align: 'right',
-                render: (a) =>
-                  isStaff &&
-                  a.status !== ApplicationStatus.OFFER_RECEIVED && (
+                render: (a) => (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
-                      onClick={async () => {
-                        try {
-                          await apiClient.put(`/applications/${a._id}/status`, {
-                            status: ApplicationStatus.OFFER_RECEIVED,
-                          });
-                          success('Application marked as Offer Received!');
-                          fetchLeadDetails();
-                        } catch (err: any) {
-                          error(err.message);
-                        }
+                      icon={<Eye size={13} />}
+                      onClick={() => {
+                        setSelectedAppForDetails(a);
+                        setIsAppDetailsDrawerOpen(true);
                       }}
+                      title="View Details"
                     >
-                      Mark Offer Received
+                      Details
                     </Button>
-                  ),
+
+                    {isStaff && a.status === ApplicationStatus.SUBMITTED && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Clock size={13} />}
+                          onClick={() => handleUpdateAppStatus(a._id, ApplicationStatus.UNDER_REVIEW)}
+                          title="Move to Under Review"
+                        >
+                          Under Review
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<CheckCircle2 size={13} />}
+                          onClick={() => handleUpdateAppStatus(a._id, ApplicationStatus.OFFER_RECEIVED)}
+                          title="Mark Offer Received"
+                        >
+                          Offer Received
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          icon={<XCircle size={13} />}
+                          onClick={() => handleOpenRejectAppModal(a)}
+                          title="Reject Application"
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+
+                    {isStaff && a.status === ApplicationStatus.UNDER_REVIEW && (
+                      <>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<CheckCircle2 size={13} />}
+                          onClick={() => handleUpdateAppStatus(a._id, ApplicationStatus.OFFER_RECEIVED)}
+                          title="Mark Offer Received"
+                        >
+                          Offer Received
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          icon={<XCircle size={13} />}
+                          onClick={() => handleOpenRejectAppModal(a)}
+                          title="Reject Application"
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+
+                    {isStaff && a.status === ApplicationStatus.OFFER_RECEIVED && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<Upload size={13} />}
+                        onClick={() => {
+                          setOfferForm((prev) => ({ ...prev, applicationId: a._id }));
+                          setIsOfferModalOpen(true);
+                        }}
+                      >
+                        Upload Offer
+                      </Button>
+                    )}
+                  </div>
+                ),
               },
             ]}
             data={applications}
-            emptyMessage="No applications submitted yet."
+            emptyMessage="No applications submitted yet. Click '+ Submit Application' to begin."
           />
         </div>
       )}
@@ -1648,14 +1997,22 @@ export const LeadDetailPage: React.FC = () => {
       {((isCurrentProcess && currentProcessInfo.key === 'offers') || activeSection === 'offers') && (
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">Official Offer Letters & Acceptance</h3>
+            <div>
+              <h3 className="card-title">Official Offer Letters & Acceptance</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Upload official letters, monitor student signed declarations, and approve offers to unlock fee payments.
+              </p>
+            </div>
             {isStaff && applications.length > 0 && (
               <Button
                 variant="primary"
                 size="sm"
                 icon={<Upload size={14} />}
                 onClick={() => {
-                  setOfferForm((prev) => ({ ...prev, applicationId: applications[0]._id }));
+                  setOfferForm((prev) => ({
+                    ...prev,
+                    applicationId: applications.find((a) => a.status === ApplicationStatus.OFFER_RECEIVED)?._id || applications[0]._id,
+                  }));
                   setIsOfferModalOpen(true);
                 }}
               >
@@ -1666,31 +2023,108 @@ export const LeadDetailPage: React.FC = () => {
 
           <Table
             columns={[
-              { header: 'UNIVERSITY', accessor: 'universityName' },
-              { header: 'COURSE', accessor: 'courseTitle' },
-              { header: 'TYPE', accessor: 'offerType' },
               {
-                header: 'TUITION / DEPOSIT',
-                render: (o) => `${o.currency} ${o.tuitionFee} (Deposit: ${o.depositAmount})`,
+                header: 'UNIVERSITY & COURSE',
+                render: (o) => (
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{o.universityName}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{o.courseTitle}</div>
+                  </div>
+                ),
               },
               {
-                header: 'ORIGINAL OFFER',
+                header: 'TYPE',
                 render: (o) => (
-                  <a href={o.originalOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
-                    {o.originalOfferFileName}
+                  <Badge variant={o.offerType === 'UNCONDITIONAL' ? 'success' : 'neutral'}>
+                    {o.offerType}
+                  </Badge>
+                ),
+              },
+              {
+                header: 'TUITION / DEPOSIT',
+                render: (o) => (
+                  <div>
+                    <strong>
+                      {o.currency} {o.depositAmount.toLocaleString()}
+                    </strong>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
+                      Tuition: {o.currency} {o.tuitionFee.toLocaleString()}
+                    </span>
+                    {o.deadlineDate && (
+                      <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', display: 'block' }}>
+                        Due: {new Date(o.deadlineDate).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                header: 'ORIGINAL LETTER',
+                render: (o) => (
+                  <a
+                    href={o.originalOfferUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      color: 'var(--primary)',
+                      fontSize: '12px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <ExternalLink size={12} /> {o.originalOfferFileName || 'View Letter'}
                   </a>
                 ),
               },
               {
-                header: 'SIGNED OFFER',
+                header: 'SIGNED ACCEPTANCE',
                 render: (o) =>
                   o.signedOfferUrl ? (
-                    <a href={o.signedOfferUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--success)' }}>
-                      {o.signedOfferFileName || 'Signed Offer'}
+                    <a
+                      href={o.signedOfferUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        color: 'var(--success)',
+                        fontSize: '12px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <FileCheck size={12} /> {o.signedOfferFileName || 'Signed Copy'}
                     </a>
                   ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Pending Signature</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Pending Upload</span>
                   ),
+              },
+              {
+                header: 'REVIEW / FEEDBACK',
+                render: (o) => {
+                  if (o.status === OfferStatus.REJECTED) {
+                    return (
+                      <div style={{ maxWidth: '200px' }}>
+                        <span style={{ color: 'var(--danger)', fontSize: '11px', fontWeight: 600, display: 'block' }}>
+                          Signed Copy Rejected:
+                        </span>
+                        <span style={{ fontSize: '11.5px', color: 'var(--danger-text)' }}>
+                          {o.rejectionReason || o.reviewNotes || 'Resubmission requested'}
+                        </span>
+                      </div>
+                    );
+                  }
+                  if (o.reviewedByName) {
+                    return (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        Reviewed by {o.reviewedByName}
+                      </span>
+                    );
+                  }
+                  return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+                },
               },
               {
                 header: 'STATUS',
@@ -1699,17 +2133,41 @@ export const LeadDetailPage: React.FC = () => {
               {
                 header: 'ACTIONS',
                 align: 'right',
-                render: (o) =>
-                  isStaff &&
-                  o.status === OfferStatus.SIGNED_UPLOADED && (
-                    <Button variant="primary" size="sm" onClick={() => handleAcceptSignedOffer(o._id)}>
-                      Accept Signed Offer
-                    </Button>
-                  ),
+                render: (o) => (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    {isStaff && o.status === OfferStatus.SIGNED_UPLOADED && (
+                      <>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<CheckCircle2 size={13} />}
+                          onClick={() => handleAcceptSignedOffer(o._id)}
+                          title="Accept Signed Offer"
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          icon={<XCircle size={13} />}
+                          onClick={() => handleOpenRejectSignedOfferModal(o)}
+                          title="Reject Signed Offer"
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    {o.status === OfferStatus.ACCEPTED && (
+                      <span style={{ color: 'var(--success)', fontSize: '12px', fontWeight: 600 }}>
+                        ✓ Fee Payment Unlocked
+                      </span>
+                    )}
+                  </div>
+                ),
               },
             ]}
             data={offers}
-            emptyMessage="No offer letters issued yet."
+            emptyMessage="No offer letters issued yet. Issue an offer once admission is confirmed."
           />
         </div>
       )}
@@ -1961,6 +2419,166 @@ export const LeadDetailPage: React.FC = () => {
         </form>
       </Modal>
 
+      {/* --- Submit / Create Application Modal --- */}
+      <Modal
+        isOpen={isCreateAppModalOpen}
+        onClose={() => setIsCreateAppModalOpen(false)}
+        title="Submit University Application"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsCreateAppModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleCreateApplication}>
+              Submit Application
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateApplication}>
+          {shortlist.length > 0 && (
+            <div style={{ marginBottom: '14px' }}>
+              <label className="form-label">Prefill from Shortlist Option</label>
+              <select
+                className="form-select"
+                onChange={(e) => {
+                  const s = shortlist.find((item) => item._id === e.target.value);
+                  if (s) {
+                    setAppForm((prev) => ({
+                      ...prev,
+                      universityId: s.universityId,
+                      universityName: s.universityName,
+                      courseId: s.courseId,
+                      courseTitle: s.courseTitle,
+                      country: s.country,
+                      intake: s.intake,
+                    }));
+                  }
+                }}
+              >
+                <option value="">-- Choose from student's shortlist --</option>
+                {shortlist.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.universityName} — {s.courseTitle} ({s.intake}) {s.status === 'SELECTED_BY_STUDENT' ? '✓ Selected' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Input
+              label="University Name *"
+              value={appForm.universityName}
+              onChange={(e) => setAppForm({ ...appForm, universityName: e.target.value })}
+              required
+            />
+            <Input
+              label="Country *"
+              value={appForm.country}
+              onChange={(e) => setAppForm({ ...appForm, country: e.target.value })}
+              required
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '12px' }}>
+            <Input
+              label="Course Title *"
+              value={appForm.courseTitle}
+              onChange={(e) => setAppForm({ ...appForm, courseTitle: e.target.value })}
+              required
+            />
+            <Input
+              label="Intake *"
+              value={appForm.intake}
+              onChange={(e) => setAppForm({ ...appForm, intake: e.target.value })}
+              placeholder="e.g. Fall 2026"
+              required
+            />
+          </div>
+
+          <Input
+            label="Application Reference Number"
+            value={appForm.applicationNumber}
+            onChange={(e) => setAppForm({ ...appForm, applicationNumber: e.target.value })}
+            placeholder="e.g. OXF-2026-99214"
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Input
+              label="Portal Username"
+              value={appForm.portalUsername}
+              onChange={(e) => setAppForm({ ...appForm, portalUsername: e.target.value })}
+              placeholder="Admissions portal username"
+            />
+            <Input
+              label="Portal Password"
+              value={appForm.portalPassword}
+              onChange={(e) => setAppForm({ ...appForm, portalPassword: e.target.value })}
+              placeholder="Admissions portal password"
+            />
+          </div>
+
+          <Textarea
+            label="Internal Notes"
+            value={appForm.notes}
+            onChange={(e) => setAppForm({ ...appForm, notes: e.target.value })}
+            placeholder="e.g. Application lodged via agent portal, conditional on final transcript..."
+            rows={2}
+          />
+        </form>
+      </Modal>
+
+      {/* --- Reject Application Modal --- */}
+      <Modal
+        isOpen={isRejectAppModalOpen}
+        onClose={() => setIsRejectAppModalOpen(false)}
+        title="Record University Rejection"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsRejectAppModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={<XCircle size={14} />} onClick={handleConfirmRejectApp}>
+              Confirm Rejection
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleConfirmRejectApp}>
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '16px',
+              fontSize: '12.5px',
+              color: 'var(--danger-text)',
+            }}
+          >
+            <strong>University Rejection:</strong> Recording this rejection marks this application as permanently resolved and archived. The student will be permitted to reapply to another institution from their shortlist.
+          </div>
+
+          <Input
+            label="Decision Date *"
+            type="date"
+            value={appDecisionDate}
+            onChange={(e) => setAppDecisionDate(e.target.value)}
+            required
+          />
+
+          <Textarea
+            label="Mandatory Rejection Reason *"
+            value={appRejectionReason}
+            onChange={(e) => setAppRejectionReason(e.target.value)}
+            placeholder="e.g. Minimum GPA prerequisite not met, program cohort filled, missing language test score..."
+            rows={4}
+            required
+          />
+        </form>
+      </Modal>
+
       {/* --- Upload Offer Modal --- */}
       <Modal
         isOpen={isOfferModalOpen}
@@ -1985,6 +2603,7 @@ export const LeadDetailPage: React.FC = () => {
             options={applications.map((a) => ({ value: a._id, label: `${a.courseTitle} — ${a.universityName}` }))}
             placeholder="Select application..."
           />
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Select
               label="Offer Type"
@@ -1995,27 +2614,260 @@ export const LeadDetailPage: React.FC = () => {
                 { value: 'UNCONDITIONAL', label: 'Unconditional Offer' },
               ]}
             />
-            <Input
-              label="Tuition Fee"
-              type="number"
-              value={offerForm.tuitionFee}
-              onChange={(e) => setOfferForm({ ...offerForm, tuitionFee: parseFloat(e.target.value) })}
+            <Select
+              label="Currency"
+              value={offerForm.currency}
+              onChange={(e) => setOfferForm({ ...offerForm, currency: e.target.value })}
+              options={[
+                { value: 'USD', label: 'USD ($)' },
+                { value: 'GBP', label: 'GBP (£)' },
+                { value: 'CAD', label: 'CAD ($)' },
+                { value: 'AUD', label: 'AUD ($)' },
+                { value: 'EUR', label: 'EUR (€)' },
+                { value: 'INR', label: 'INR (₹)' },
+              ]}
             />
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Input
+              label="Tuition Fee (Annual)"
+              type="number"
+              value={offerForm.tuitionFee}
+              onChange={(e) => setOfferForm({ ...offerForm, tuitionFee: parseFloat(e.target.value) || 0 })}
+            />
+            <Input
+              label="Required Deposit Amount *"
+              type="number"
+              value={offerForm.depositAmount}
+              onChange={(e) => setOfferForm({ ...offerForm, depositAmount: parseFloat(e.target.value) || 0 })}
+              required
+            />
+          </div>
+
           <Input
-            label="Required Deposit Amount"
-            type="number"
-            value={offerForm.depositAmount}
-            onChange={(e) => setOfferForm({ ...offerForm, depositAmount: parseFloat(e.target.value) })}
+            label="Acceptance / Deposit Deadline"
+            type="date"
+            value={offerForm.deadlineDate}
+            onChange={(e) => setOfferForm({ ...offerForm, deadlineDate: e.target.value })}
           />
+
+          <div className="form-group">
+            <label className="form-label">Attach Offer Letter PDF *</label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.png,.jpg"
+              className="form-input"
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  setOfferFile(e.target.files[0]);
+                  setOfferForm((prev) => ({
+                    ...prev,
+                    originalOfferFileName: e.target.files![0].name,
+                  }));
+                }
+              }}
+            />
+            {!offerFile && (
+              <Input
+                label="Or File URL / Path"
+                value={offerForm.originalOfferUrl}
+                onChange={(e) => setOfferForm({ ...offerForm, originalOfferUrl: e.target.value })}
+                placeholder="e.g. /uploads/offer_letter.pdf"
+              />
+            )}
+          </div>
+
           <Textarea
             label="Conditions / Notes"
             value={offerForm.conditions}
             onChange={(e) => setOfferForm({ ...offerForm, conditions: e.target.value })}
-            placeholder="e.g. Submit final degree certificate and passport scan..."
+            placeholder="e.g. Submit official graduation marksheet and 6.5+ IELTS score by July 15..."
           />
         </form>
       </Modal>
+
+      {/* --- Reject Signed Offer Modal --- */}
+      <Modal
+        isOpen={isRejectSignedOfferModalOpen}
+        onClose={() => setIsRejectSignedOfferModalOpen(false)}
+        title="Reject Signed Offer Acceptance"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsRejectSignedOfferModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" icon={<XCircle size={14} />} onClick={handleConfirmRejectSignedOffer}>
+              Confirm Rejection
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleConfirmRejectSignedOffer}>
+          <div
+            style={{
+              padding: '12px',
+              backgroundColor: 'var(--danger-bg)',
+              border: '1px solid var(--danger-border)',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '16px',
+              fontSize: '12.5px',
+              color: 'var(--danger-text)',
+            }}
+          >
+            <strong>Signed Offer Rejection:</strong> The student will be prompted to review your feedback notes and re-upload an amended signed copy.
+          </div>
+
+          <Textarea
+            label="Mandatory Rejection Feedback / Reason *"
+            value={signedOfferRejectNotes}
+            onChange={(e) => setSignedOfferRejectNotes(e.target.value)}
+            placeholder="e.g. Signature missing on page 2, incorrect acceptance date, scanned copy cut off..."
+            rows={4}
+            required
+          />
+        </form>
+      </Modal>
+
+      {/* --- Application Details Drawer --- */}
+      <Drawer
+        isOpen={isAppDetailsDrawerOpen}
+        onClose={() => setIsAppDetailsDrawerOpen(false)}
+        title="University Application Details"
+      >
+        {selectedAppForDetails && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div
+              style={{
+                padding: '16px',
+                backgroundColor: 'var(--bg-subtle)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Current Status
+                </span>
+                <div style={{ marginTop: '4px' }}>
+                  <StatusBadge status={selectedAppForDetails.status} />
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Submitted On
+                </span>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
+                  {new Date(selectedAppForDetails.submissionDate).toLocaleDateString()}
+                </div>
+              </div>
+            </div>
+
+            {selectedAppForDetails.status === ApplicationStatus.REJECTED && (
+              <div
+                style={{
+                  padding: '14px',
+                  backgroundColor: 'var(--danger-bg)',
+                  border: '1px solid var(--danger-border)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--danger)', fontWeight: 600, fontSize: '13px' }}>
+                  <AlertCircle size={16} /> Rejection Reason
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--danger-text)', lineHeight: 1.4 }}>
+                  {selectedAppForDetails.rejectionReason || 'No reason specified'}
+                </div>
+                {selectedAppForDetails.decisionDate && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Decision Date: {new Date(selectedAppForDetails.decisionDate).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="card" style={{ padding: '16px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                Program & Institution
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12.5px' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>University</span>
+                  <strong>{selectedAppForDetails.universityName}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Country</span>
+                  <span>{selectedAppForDetails.country}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Course Title</span>
+                  <strong>{selectedAppForDetails.courseTitle}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Intake</span>
+                  <span>{selectedAppForDetails.intake}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>App Number</span>
+                  <strong>{selectedAppForDetails.applicationNumber || 'None'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Lodged By</span>
+                  <span>{selectedAppForDetails.createdByName}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="card" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                  University Portal Credentials
+                </h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAppPortalPassword(!showAppPortalPassword)}
+                >
+                  {showAppPortalPassword ? 'Hide' : 'Reveal'}
+                </Button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '12.5px' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Portal Username</span>
+                  <code>{selectedAppForDetails.portalUsername || 'Not provided'}</code>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px' }}>Portal Password</span>
+                  <code>
+                    {selectedAppForDetails.portalPassword
+                      ? showAppPortalPassword
+                        ? selectedAppForDetails.portalPassword
+                        : '••••••••••••'
+                      : 'Not provided'}
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            {selectedAppForDetails.notes && (
+              <div className="card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                  Submission Notes
+                </h4>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                  {selectedAppForDetails.notes}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
 
       {/* --- Generate Payment Request Modal --- */}
       <Modal

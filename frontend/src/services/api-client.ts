@@ -1,4 +1,9 @@
-const API_BASE_URL = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
+const rawApi = (import.meta.env.VITE_API_URL || '/api/v1').trim().replace(/\/+$/, '');
+const API_BASE_URL = rawApi.endsWith('/api/v1')
+  ? rawApi
+  : rawApi.endsWith('/api')
+  ? `${rawApi}/v1`
+  : `${rawApi}/api/v1`;
 
 export class ApiError extends Error {
   public statusCode: number;
@@ -33,7 +38,10 @@ export const apiClient = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const rawEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const normalizedEndpoint = rawEndpoint.startsWith('/api/v1')
+      ? rawEndpoint.replace(/^\/api\/v1/, '')
+      : rawEndpoint;
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${normalizedEndpoint}`;
 
     try {
@@ -101,6 +109,13 @@ export const apiClient = {
   put<T = any>(endpoint: string, body?: any) {
     return this.request<T>(endpoint, {
       method: 'PUT',
+      body: body instanceof FormData ? body : JSON.stringify(body),
+    });
+  },
+
+  patch<T = any>(endpoint: string, body?: any) {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
       body: body instanceof FormData ? body : JSON.stringify(body),
     });
   },

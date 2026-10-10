@@ -3,20 +3,10 @@ import path from 'path';
 import fs from 'fs';
 import { AppError } from '../utils/errors';
 
-import os from 'os';
-
-// Ensure uploads directory exists (use /tmp in serverless environments like Vercel)
-export const uploadDir =
-  process.env.VERCEL || process.env.NODE_ENV === 'production'
-    ? path.join(os.tmpdir(), 'uploads')
-    : path.resolve(process.cwd(), 'uploads');
-
-try {
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
-} catch {
-  // Ignore filesystem errors in read-only serverless environments
+// Ensure uploads directory exists
+const uploadDir = path.resolve(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({

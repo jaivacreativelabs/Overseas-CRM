@@ -1,0 +1,22 @@
+warning: in the working copy of 'frontend/src/features/applications/ApplicationsPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/features/leads/LeadDetailPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/features/offers/OffersPage.tsx', LF will be replaced by CRLF the next time Git touches it
+ .../modules/applications/application.controller.ts |  10 [32m+[m
+ .../src/modules/applications/application.model.ts  |   3 [32m+[m
+ .../src/modules/applications/application.routes.ts |   1 [32m+[m
+ .../modules/applications/application.service.ts    |  47 [32m+[m[31m-[m
+ backend/src/modules/offers/offer.controller.ts     |  23 [32m+[m[31m-[m
+ backend/src/modules/offers/offer.model.ts          |  11 [32m+[m[31m-[m
+ backend/src/modules/offers/offer.routes.ts         |   7 [32m+[m[31m-[m
+ backend/src/modules/offers/offer.service.ts        |  61 [32m+[m[31m-[m
+ backend/src/modules/payments/payment.controller.ts |  12 [32m+[m[31m-[m
+ backend/src/modules/payments/payment.routes.ts     |   1 [32m+[m
+ backend/src/modules/payments/payment.service.ts    |  54 [32m+[m[31m-[m
+ .../src/modules/universities/university.service.ts |  62 [32m+[m[31m-[m
+ frontend/src/components/Form/index.tsx             |   3 [32m+[m
+ .../src/features/applications/ApplicationsPage.tsx | 623 [32m+++++++++++++[m[31m-[m
+ frontend/src/features/leads/LeadDetailPage.tsx     | 955 [32m+++++++++++++++++++[m[31m--[m
+ frontend/src/features/offers/OffersPage.tsx        | 615 [32m++++++++++++[m[31m-[m
+ .../features/student-portal/StudentPortalPage.tsx  | 435 [32m++++++++[m[31m--[m
+ frontend/src/types/index.ts                        |  16 [32m+[m[31m-[m
+ 18 files changed, 2707 insertions(+), 232 deletions(-)

@@ -12,6 +12,9 @@ import { PaymentModel } from '../../modules/payments/payment.model';
 import { VisaRecordModel } from '../../modules/visa/visa.model';
 import { TravelSupportModel } from '../../modules/travel/travel.model';
 import { TaskModel } from '../../modules/tasks/task.model';
+import { BranchModel } from '../../modules/branches/branch.model';
+import { IntegrationService } from '../../modules/integrations/integration.service';
+import { AutomationService } from '../../modules/integrations/automation.service';
 import {
   UserRole,
   AdminType,
@@ -281,7 +284,7 @@ export const seedDatabase = async () => {
         title: 'Passport Copy (Front & Back)',
         category: 'IDENTITY',
         isMandatory: true,
-        status: DocumentStatus.APPROVED,
+        status: DocumentStatus.SUCCESSFUL,
         fileUrl: '/uploads/sample-passport.pdf',
         originalFileName: 'rohan_passport.pdf',
         reviewedById: counsellor._id,
@@ -295,7 +298,7 @@ export const seedDatabase = async () => {
         title: 'B.Tech Degree Transcripts',
         category: 'ACADEMIC',
         isMandatory: true,
-        status: DocumentStatus.APPROVED,
+        status: DocumentStatus.SUCCESSFUL,
         fileUrl: '/uploads/sample-transcripts.pdf',
         originalFileName: 'dtu_transcripts.pdf',
         reviewedById: counsellor._id,
@@ -309,7 +312,7 @@ export const seedDatabase = async () => {
         title: 'IELTS Official Test Report',
         category: 'LANGUAGE_TEST',
         isMandatory: true,
-        status: DocumentStatus.APPROVED,
+        status: DocumentStatus.SUCCESSFUL,
         fileUrl: '/uploads/sample-ielts.pdf',
         originalFileName: 'ielts_scorecard.pdf',
         reviewedById: counsellor._id,
@@ -323,7 +326,7 @@ export const seedDatabase = async () => {
         title: 'Statement of Purpose (SOP)',
         category: 'ACADEMIC',
         isMandatory: true,
-        status: DocumentStatus.APPROVED,
+        status: DocumentStatus.SUCCESSFUL,
         fileUrl: '/uploads/sample-sop.pdf',
         originalFileName: 'rohan_sop_oxford.pdf',
         reviewedById: counsellor._id,
@@ -447,6 +450,48 @@ export const seedDatabase = async () => {
       createdBy: counsellor._id,
       createdByName: counsellor.name,
     });
+
+    // Seed Initial State-Wise Branches
+    const blrBranch = await BranchModel.create({
+      branchId: 'KA-BLR-A81F2C',
+      name: 'Bangalore Indiranagar Branch',
+      state: 'Karnataka',
+      city: 'Bangalore',
+      address: '#402 100ft Road, Indiranagar, Bangalore 560038',
+      capacity: 250,
+      assignedStudentsCount: 1,
+      status: 'ACTIVE',
+    });
+
+    const punBranch = await BranchModel.create({
+      branchId: 'MH-PUN-C62E4B',
+      name: 'Pune FC Road Branch',
+      state: 'Maharashtra',
+      city: 'Pune',
+      address: 'Suite 201, FC Road, Shivajinagar, Pune 411005',
+      capacity: 200,
+      assignedStudentsCount: 0,
+      status: 'ACTIVE',
+    });
+
+    const cheBranch = await BranchModel.create({
+      branchId: 'TN-CHE-D94F1A',
+      name: 'Chennai Nungambakkam Branch',
+      state: 'Tamil Nadu',
+      city: 'Chennai',
+      address: 'Level 4, Mahatma Gandhi Rd, Nungambakkam, Chennai 600034',
+      capacity: 150,
+      assignedStudentsCount: 0,
+      status: 'ACTIVE',
+    });
+
+    // Assign Rohan to Bangalore branch
+    leadRohan.branchId = blrBranch._id as any;
+    await leadRohan.save();
+
+    // Initialize Integration Providers & Workflows
+    await IntegrationService.initializeProviders();
+    await AutomationService.initializeDefaultWorkflows();
 
     logger.info('✅ Complete database successfully seeded with realistic enterprise CRM demo records!');
   } catch (error: any) {

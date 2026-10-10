@@ -8,6 +8,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/', requireStaff, PaymentController.getAllPayments);
 router.get('/lead/:leadId', PaymentController.getPayments);
 router.post('/lead/:leadId/request', requireStaff, PaymentController.createRequest);
 router.post('/:id/submit-proof', upload.single('file'), PaymentController.submitProof);

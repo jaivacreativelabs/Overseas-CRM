@@ -7,6 +7,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/', requireStaff, ApplicationController.getAllApplications);
 router.get('/lead/:leadId', ApplicationController.getApplications);
 router.get('/:id', ApplicationController.getApplicationById);
 router.post('/lead/:leadId', requireStaff, ApplicationController.createApplication);

@@ -1,6 +1,8 @@
 import {
   LayoutDashboard,
   Users,
+  GitFork,
+  Plug,
   GraduationCap,
   Calendar,
   Building2,
@@ -25,6 +27,7 @@ export interface NavItem {
   icon: any;
   roles: UserRole[];
   badge?: string;
+  isOwnerAdminOnly?: boolean;
 }
 
 export interface NavSection {
@@ -49,6 +52,20 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
       },
       {
+        label: 'Branches',
+        path: '/branches',
+        icon: GitFork,
+        roles: [UserRole.ADMIN],
+        isOwnerAdminOnly: true,
+      },
+      {
+        label: 'Integrations',
+        path: '/integrations',
+        icon: Plug,
+        roles: [UserRole.ADMIN],
+        isOwnerAdminOnly: true,
+      },
+      {
         label: 'Students',
         path: '/students',
         icon: GraduationCap,
@@ -59,12 +76,6 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
   {
     title: 'Student Journey',
     items: [
-      {
-        label: 'Counselling',
-        path: '/counselling',
-        icon: Calendar,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
-      },
       {
         label: 'Universities',
         path: '/universities',
@@ -78,39 +89,9 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
       },
       {
-        label: 'Applications',
-        path: '/applications',
-        icon: FileCheck,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
-      },
-      {
-        label: 'Offers',
-        path: '/offers',
-        icon: Award,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
-      },
-      {
-        label: 'Payments',
-        path: '/payments',
-        icon: CreditCard,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
-      },
-      {
-        label: 'Visa Tracking',
-        path: '/visa',
-        icon: Stamp,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
-      },
-      {
-        label: 'Travel & Departure',
-        path: '/travel',
-        icon: Plane,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
-      },
-      {
-        label: 'Orientation',
-        path: '/orientation',
-        icon: Compass,
+        label: 'Reports',
+        path: '/reports',
+        icon: BarChart3,
         roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
       },
     ],
@@ -135,12 +116,6 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
   {
     title: 'Administration',
     items: [
-      {
-        label: 'Reports',
-        path: '/reports',
-        icon: BarChart3,
-        roles: [UserRole.ADMIN],
-      },
       {
         label: 'User Management',
         path: '/users',

@@ -22,6 +22,8 @@ export interface IOffer extends Document {
   reviewedById?: Types.ObjectId;
   reviewedByName?: string;
   reviewedAt?: Date;
+  reviewNotes?: string;
+  rejectionReason?: string;
   uploadedById: Types.ObjectId;
   uploadedByName: string;
   createdAt: Date;
@@ -37,8 +39,8 @@ const offerSchema = new Schema<IOffer>(
     courseTitle: { type: String, required: true },
     offerType: { type: String, enum: ['CONDITIONAL', 'UNCONDITIONAL'], default: 'CONDITIONAL' },
     conditions: { type: String },
-    tuitionFee: { type: Number, required: true },
-    depositAmount: { type: Number, required: true },
+    tuitionFee: { type: Number, default: 0 },
+    depositAmount: { type: Number, default: 0 },
     currency: { type: String, default: 'USD' },
     deadlineDate: { type: Date },
     status: {
@@ -55,6 +57,8 @@ const offerSchema = new Schema<IOffer>(
     reviewedById: { type: Schema.Types.ObjectId, ref: 'User' },
     reviewedByName: { type: String },
     reviewedAt: { type: Date },
+    reviewNotes: { type: String, trim: true },
+    rejectionReason: { type: String, trim: true },
     uploadedById: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     uploadedByName: { type: String, required: true },
   },
@@ -62,5 +66,8 @@ const offerSchema = new Schema<IOffer>(
     timestamps: true,
   }
 );
+
+offerSchema.index({ leadId: 1, createdAt: -1 });
+offerSchema.index({ leadId: 1, status: 1 });
 
 export const OfferModel = model<IOffer>('Offer', offerSchema);

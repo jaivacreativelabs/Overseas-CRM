@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { Table } from '../../components/Table';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
+import { PinButton } from '../../components/PinButton';
 
 export const TravelPage: React.FC = () => {
   const [travelRecords, setTravelRecords] = useState<any[]>([]);
@@ -116,7 +117,17 @@ export const TravelPage: React.FC = () => {
             header: 'ACTIONS',
             align: 'right',
             render: (t) => (
-              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <PinButton
+                  item={{
+                    id: t._id || t.leadId,
+                    category: 'travel',
+                    title: `Travel: ${t.studentName}`,
+                    subtitle: `Pre-Departure & Flight Tracking`,
+                    path: `/leads/${t.leadId}`,
+                    pinnedAt: new Date().toISOString(),
+                  }}
+                />
                 {!t.studentDeparted ? (
                   <Button variant="secondary" size="sm" onClick={() => handleRecordDeparture(t.leadId)}>
                     Departed

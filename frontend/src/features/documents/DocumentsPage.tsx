@@ -9,6 +9,7 @@ import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { Select, Textarea } from '../../components/Form';
 import { DocumentStatus } from '../../types';
+import { PinButton } from '../../components/PinButton';
 
 export const DocumentsPage: React.FC = () => {
   const [docs, setDocs] = useState<any[]>([]);
@@ -117,17 +118,29 @@ export const DocumentsPage: React.FC = () => {
             header: 'ACTIONS',
             align: 'right',
             render: (d) => (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setSelectedDoc(d);
-                  setDecision(DocumentStatus.APPROVED);
-                  setIsReviewOpen(true);
-                }}
-              >
-                Review
-              </Button>
+              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <PinButton
+                  item={{
+                    id: d._id,
+                    category: 'document',
+                    title: `Document: ${d.title}`,
+                    subtitle: `${d.studentName} • ${d.category}`,
+                    path: `/leads/${d.leadId}`,
+                    pinnedAt: new Date().toISOString(),
+                  }}
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedDoc(d);
+                    setDecision(DocumentStatus.APPROVED);
+                    setIsReviewOpen(true);
+                  }}
+                >
+                  Review
+                </Button>
+              </div>
             ),
           },
         ]}
