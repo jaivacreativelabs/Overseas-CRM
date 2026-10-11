@@ -5,100 +5,25 @@ import { LeadModel } from '../leads/lead.model';
 import { LeadService } from '../leads/lead.service';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { IntegrationLogModel, LogStatus } from './integration-log.model';
+import { IntegrationConfigModel } from './integration-config.model';
+import { MetaGraphApiService } from './meta-graph-api.service';
+import { logger } from '../../utils/logger';
 
 export class MetaAdsService {
   /**
-   * Automatically initializes default active Meta campaigns and form-to-branch mappings
-   * if the database doesn't have them yet.
+   * Automatically initializes default form-to-branch mappings if needed
    */
   static async ensureInitialData(): Promise<void> {
-    const campaignCount = await MetaCampaignModel.countDocuments();
     const mappingCount = await MetaFormMappingModel.countDocuments();
-
-    if (campaignCount > 0 && mappingCount > 0) return;
+    if (mappingCount > 0) return;
 
     // Fetch available branches to map to
     const branches = await BranchModel.find({ isActive: { $ne: false }, isArchived: { $ne: true } }).limit(5);
-
     const blrBranch = branches.find((b) => b.city?.toLowerCase().includes('bangalore') || b.state?.toLowerCase().includes('karnataka')) || branches[0];
     const punBranch = branches.find((b) => b.city?.toLowerCase().includes('pune') || b.state?.toLowerCase().includes('maharashtra')) || branches[1] || branches[0];
     const cheBranch = branches.find((b) => b.city?.toLowerCase().includes('chennai') || b.state?.toLowerCase().includes('tamil')) || branches[2] || branches[0];
 
-    if (!blrBranch) return; // If no branches exist at all, will be configured manually
-
-    if (campaignCount === 0) {
-      await MetaCampaignModel.create([
-        {
-          campaignId: 'cmp_meta_uk_2026',
-          name: 'UK September 2026 Admissions Campaign',
-          status: 'ACTIVE',
-          objective: 'LEAD_GENERATION',
-          spend: 34500,
-          currency: 'INR',
-          impressions: 48200,
-          clicks: 2540,
-          ctr: 5.27,
-          leadsCount: 64,
-          forms: [
-            {
-              formId: 'meta_form_uk_blr',
-              formName: 'UK Masters FastTrack Form (South India)',
-              branchId: blrBranch._id,
-              branchName: blrBranch.name,
-            },
-            {
-              formId: 'meta_form_uk_pune',
-              formName: 'UK STEM & Business Admissions Form (West India)',
-              branchId: punBranch ? punBranch._id : blrBranch._id,
-              branchName: punBranch ? punBranch.name : blrBranch.name,
-            },
-          ],
-          lastSyncAt: new Date(),
-        },
-        {
-          campaignId: 'cmp_meta_can_visa',
-          name: 'Canada Student Visa Express 2026',
-          status: 'ACTIVE',
-          objective: 'LEAD_GENERATION',
-          spend: 42000,
-          currency: 'INR',
-          impressions: 62000,
-          clicks: 3720,
-          ctr: 6.0,
-          leadsCount: 88,
-          forms: [
-            {
-              formId: 'meta_form_can_pune',
-              formName: 'Canada SDS & Express Visa Form (Western Region)',
-              branchId: punBranch ? punBranch._id : blrBranch._id,
-              branchName: punBranch ? punBranch.name : blrBranch.name,
-            },
-          ],
-          lastSyncAt: new Date(),
-        },
-        {
-          campaignId: 'cmp_meta_aus_gte',
-          name: 'Australia Direct Admissions 2027',
-          status: 'ACTIVE',
-          objective: 'LEAD_GENERATION',
-          spend: 21800,
-          currency: 'INR',
-          impressions: 31000,
-          clicks: 1680,
-          ctr: 5.42,
-          leadsCount: 42,
-          forms: [
-            {
-              formId: 'meta_form_aus_che',
-              formName: 'Australia GTE & Scholarship Form (Chennai Hub)',
-              branchId: cheBranch ? cheBranch._id : blrBranch._id,
-              branchName: cheBranch ? cheBranch.name : blrBranch.name,
-            },
-          ],
-          lastSyncAt: new Date(),
-        },
-      ]);
-    }
+    if (!blrBranch) return;
 
     if (mappingCount === 0) {
       await MetaFormMappingModel.create([
@@ -156,9 +81,46 @@ export class MetaAdsService {
 
   /**
    * Fetches all active Meta Ads campaigns, reconciling live response counts from the CRM database.
+   * If real Meta Graph API credentials exist, queries live campaigns directly from Meta.
    */
   static async getCampaigns(): Promise<any[]> {
     await this.ensureInitialData();
+
+    const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+    const accessToken = metaConfig?.credentials?.accessToken || process.env.META_ACCESS_TOKEN;
+    const adAccountId = metaConfig?.credentials?.adAccountId || process.env.META_AD_ACCOUNT_ID;
+
+    if (!accessToken || !adAccountId) {
+      return [];
+    }
+
+    // Query live campaigns from Meta Graph API
+    try {
+      const liveCampaigns = await MetaGraphApiService.getCampaigns(adAccountId, accessToken);
+      if (liveCampaigns && liveCampaigns.length > 0) {
+        for (const lc of liveCampaigns) {
+          await MetaCampaignModel.findOneAndUpdate(
+            { campaignId: lc.campaignId },
+            {
+              $set: {
+                name: lc.name,
+                status: lc.status,
+                objective: lc.objective,
+                spend: lc.spend,
+                impressions: lc.impressions,
+                clicks: lc.clicks,
+                ctr: lc.ctr,
+                leadsCount: lc.leadsCount,
+                lastSyncAt: new Date(),
+              },
+            },
+            { upsert: true }
+          );
+        }
+      }
+    } catch (err: any) {
+      logger.warn('Meta Graph API live query notice:', err.message);
+    }
 
     const campaigns = await MetaCampaignModel.find().sort({ createdAt: -1 }).lean();
 
@@ -197,6 +159,41 @@ export class MetaAdsService {
   static async syncCampaigns(): Promise<{ updatedCount: number; syncedAt: Date }> {
     await this.ensureInitialData();
 
+    let updatedCount = 0;
+    try {
+      const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+      const accessToken = metaConfig?.credentials?.accessToken || process.env.META_ACCESS_TOKEN;
+      const adAccountId = metaConfig?.credentials?.adAccountId || process.env.META_AD_ACCOUNT_ID;
+
+      if (accessToken && adAccountId) {
+        const liveCampaigns = await MetaGraphApiService.getCampaigns(adAccountId, accessToken);
+        if (liveCampaigns && liveCampaigns.length > 0) {
+          for (const lc of liveCampaigns) {
+            await MetaCampaignModel.findOneAndUpdate(
+              { campaignId: lc.campaignId },
+              {
+                $set: {
+                  name: lc.name,
+                  status: lc.status,
+                  objective: lc.objective,
+                  spend: lc.spend,
+                  impressions: lc.impressions,
+                  clicks: lc.clicks,
+                  ctr: lc.ctr,
+                  leadsCount: lc.leadsCount,
+                  lastSyncAt: new Date(),
+                },
+              },
+              { upsert: true }
+            );
+            updatedCount++;
+          }
+        }
+      }
+    } catch (err: any) {
+      logger.warn('Live sync with Meta Graph API encountered notice:', err.message);
+    }
+
     const campaigns = await MetaCampaignModel.find();
     for (const c of campaigns) {
       const dbLeadCount = await LeadModel.countDocuments({
@@ -221,7 +218,7 @@ export class MetaAdsService {
       operation: 'Synced Meta Ads Campaign Metrics',
       status: LogStatus.SUCCESS,
       requestData: { timestamp: new Date() },
-      responseData: { campaignsCount: campaigns.length },
+      responseData: { campaignsCount: campaigns.length, liveUpdated: updatedCount },
       durationMs: 145,
     });
 
@@ -247,7 +244,7 @@ export class MetaAdsService {
     formId: string;
     formName: string;
     campaignId?: string;
-    campaignName: string;
+    campaignName?: string;
     branchId: string;
     notes?: string;
     isActive?: boolean;
@@ -257,12 +254,13 @@ export class MetaAdsService {
       throw new NotFoundError('Target branch not found');
     }
 
+    const effectiveCampaignName = data.campaignName?.trim() || 'General Meta Ad';
     let mapping = await MetaFormMappingModel.findOne({ formId: data.formId });
 
     if (mapping) {
       mapping.formName = data.formName || mapping.formName;
       mapping.campaignId = data.campaignId || mapping.campaignId;
-      mapping.campaignName = data.campaignName || mapping.campaignName;
+      mapping.campaignName = data.campaignName || mapping.campaignName || effectiveCampaignName;
       mapping.branchId = new Types.ObjectId(data.branchId);
       mapping.branchName = branch.name;
       if (data.notes !== undefined) mapping.notes = data.notes;
@@ -273,7 +271,7 @@ export class MetaAdsService {
         formId: data.formId.trim(),
         formName: data.formName.trim(),
         campaignId: data.campaignId?.trim() || '',
-        campaignName: data.campaignName.trim(),
+        campaignName: effectiveCampaignName,
         branchId: branch._id,
         branchName: branch.name,
         notes: data.notes || '',
@@ -283,7 +281,7 @@ export class MetaAdsService {
 
     // Also update/add this form in MetaCampaignModel
     const campaign = await MetaCampaignModel.findOne({
-      $or: [{ campaignId: data.campaignId }, { name: { $regex: new RegExp(data.campaignName, 'i') } }],
+      $or: [{ campaignId: data.campaignId }, { name: { $regex: new RegExp(effectiveCampaignName, 'i') } }],
     });
 
     if (campaign) {
@@ -523,6 +521,239 @@ export class MetaAdsService {
       activeRoutingRulesCount: mappings.filter((m) => m.isActive).length,
       branchBreakdown: Object.values(branchBreakdown),
     };
+  }
+
+  /**
+   * Toggles campaign status between ACTIVE and PAUSED
+   * Calls live Meta Graph API if active credentials exist.
+   */
+  static async toggleCampaign(campaignId: string): Promise<any> {
+    const campaign = await MetaCampaignModel.findOne({
+      $or: [
+        { campaignId },
+        { _id: Types.ObjectId.isValid(campaignId) ? campaignId : null },
+      ],
+    });
+    if (!campaign) {
+      throw new NotFoundError('Campaign not found');
+    }
+    const newStatus = campaign.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+    campaign.status = newStatus;
+    campaign.lastSyncAt = new Date();
+    await campaign.save();
+
+    // Call live Meta Graph API if real credentials exist
+    try {
+      const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+      const accessToken = metaConfig?.credentials?.accessToken || process.env.META_ACCESS_TOKEN;
+      if (accessToken && campaign.campaignId && !campaign.campaignId.startsWith('cmp_meta_')) {
+        await MetaGraphApiService.toggleCampaignStatus(campaign.campaignId, newStatus, accessToken);
+      }
+    } catch (err: any) {
+      logger.warn('Could not toggle campaign on Meta live server:', err.message);
+    }
+
+    return campaign;
+  }
+
+  /**
+   * Returns current live status of Meta Ads integration
+   */
+  static async getMetaStatus(): Promise<{
+    isConnected: boolean;
+    isDirectEnvConfig: boolean;
+    configuredAccountNo: string | null;
+    configuredAppId: string | null;
+    configuredPageId: string | null;
+    account: {
+      id: string;
+      name: string;
+      currency: string;
+      balance: number;
+      amountSpent: number;
+    } | null;
+    user: {
+      id: string;
+      name: string;
+      email?: string;
+    } | null;
+    appId: string | null;
+    adAccounts: Array<{ id: string; name: string; currency: string; balance?: number }>;
+    webhook: {
+      callbackUrl: string;
+      verifyToken: string;
+    };
+  }> {
+    const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+    const accessToken = process.env.META_ACCESS_TOKEN || metaConfig?.credentials?.accessToken;
+    const adAccountId = process.env.META_AD_ACCOUNT_ID || metaConfig?.credentials?.adAccountId;
+    const appId = process.env.META_APP_ID || metaConfig?.credentials?.appId || null;
+    const pageId = process.env.META_PAGE_ID || metaConfig?.credentials?.pageId || null;
+    const isDirectEnvConfig = Boolean(process.env.META_ACCESS_TOKEN || process.env.META_AD_ACCOUNT_ID);
+
+    const webhook = {
+      callbackUrl: `${process.env.FRONTEND_URL?.replace(':5173', ':5000') || 'http://localhost:5000'}/api/v1/leads/webhook/meta`,
+      verifyToken: process.env.META_VERIFY_TOKEN || 'jaiva_meta_token_2026',
+    };
+
+    if (!accessToken) {
+      return {
+        isConnected: false,
+        isDirectEnvConfig,
+        configuredAccountNo: adAccountId || null,
+        configuredAppId: appId,
+        configuredPageId: pageId,
+        account: null,
+        user: null,
+        appId,
+        adAccounts: [],
+        webhook,
+      };
+    }
+
+    try {
+      const user = await MetaGraphApiService.getMe(accessToken);
+      const adAccounts = await MetaGraphApiService.getAdAccounts(accessToken);
+
+      let selectedAccount: any = null;
+      if (adAccountId) {
+        selectedAccount = adAccounts.find(
+          (a) => a.id === adAccountId || a.account_id === adAccountId || a.id === `act_${adAccountId}`
+        );
+      }
+      if (!selectedAccount && adAccounts.length > 0) {
+        selectedAccount = adAccounts[0];
+      }
+
+      return {
+        isConnected: true,
+        isDirectEnvConfig,
+        configuredAccountNo: adAccountId || null,
+        configuredAppId: appId,
+        configuredPageId: pageId,
+        account: selectedAccount
+          ? {
+              id: selectedAccount.id,
+              name: selectedAccount.name,
+              currency: selectedAccount.currency || 'INR',
+              balance: selectedAccount.balance ? Math.round(selectedAccount.balance / 100) : 0,
+              amountSpent: selectedAccount.amount_spent ? Math.round(Number(selectedAccount.amount_spent) / 100) : 0,
+            }
+          : null,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        appId,
+        adAccounts: adAccounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          currency: a.currency,
+          balance: a.balance ? Math.round(a.balance / 100) : 0,
+        })),
+        webhook,
+      };
+    } catch (err: any) {
+      logger.warn('Meta credentials verification notice:', err.message);
+      return {
+        isConnected: false,
+        isDirectEnvConfig,
+        configuredAccountNo: adAccountId || null,
+        configuredAppId: appId,
+        configuredPageId: pageId,
+        account: null,
+        user: null,
+        appId,
+        adAccounts: [],
+        webhook,
+      };
+    }
+  }
+
+  /**
+   * Disconnect Meta Ads integration and clear credentials
+   */
+  static async disconnectMeta(): Promise<void> {
+    const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+    if (metaConfig) {
+      metaConfig.status = 'DISCONNECTED' as any;
+      metaConfig.credentials = {};
+      metaConfig.lastActivityAt = new Date();
+      await metaConfig.save();
+    }
+    // Remove cached campaigns
+    await MetaCampaignModel.deleteMany({});
+  }
+
+  /**
+   * Real Meta connection verification via Graph API
+   */
+  static async verifyAndConnectMeta(credentials: {
+    appId?: string;
+    accessToken: string;
+    adAccountId?: string;
+  }): Promise<{ user: any; adAccounts: any[]; primaryAccount: any }> {
+    if (!credentials.accessToken) {
+      throw new BadRequestError('Meta Access Token is required');
+    }
+
+    // Call Real Meta Graph API
+    const user = await MetaGraphApiService.getMe(credentials.accessToken);
+    const adAccounts = await MetaGraphApiService.getAdAccounts(credentials.accessToken);
+
+    const cleanAccountId = credentials.adAccountId
+      ? (credentials.adAccountId.startsWith('act_') ? credentials.adAccountId : `act_${credentials.adAccountId}`)
+      : (adAccounts[0] ? adAccounts[0].id : '');
+
+    const primaryAccount = adAccounts.find((a) => a.id === cleanAccountId) || adAccounts[0] || null;
+
+    // Save to IntegrationConfigModel
+    let metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+    if (!metaConfig) {
+      metaConfig = new IntegrationConfigModel({
+        providerId: 'meta_ads',
+        name: 'Meta Ads & Lead Gen Hub',
+        category: 'AUTOMATION_INTELLIGENCE' as any,
+        description: 'Meta Ads Manager live synchronization and Lead Gen webhooks',
+        icon: 'Megaphone',
+      });
+    }
+
+    metaConfig.status = 'CONNECTED' as any;
+    metaConfig.credentials = {
+      appId: credentials.appId,
+      accessToken: credentials.accessToken,
+      adAccountId: cleanAccountId,
+      userName: user.name,
+      userId: user.id,
+      userEmail: user.email,
+      accountName: primaryAccount?.name,
+      currency: primaryAccount?.currency || 'INR',
+    };
+    metaConfig.lastActivityAt = new Date();
+    metaConfig.lastSuccessAt = new Date();
+    await metaConfig.save();
+
+    // Clear old campaigns and fetch live campaigns
+    await MetaCampaignModel.deleteMany({});
+
+    if (cleanAccountId) {
+      try {
+        const liveCampaigns = await MetaGraphApiService.getCampaigns(cleanAccountId, credentials.accessToken);
+        for (const lc of liveCampaigns) {
+          await MetaCampaignModel.findOneAndUpdate(
+            { campaignId: lc.campaignId },
+            { $set: lc },
+            { upsert: true }
+          );
+        }
+      } catch (err: any) {
+        logger.warn('Failed initial campaign fetch:', err.message);
+      }
+    }
+
+    return { user, adAccounts, primaryAccount };
   }
 }
 

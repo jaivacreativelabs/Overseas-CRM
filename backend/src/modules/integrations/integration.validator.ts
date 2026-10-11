@@ -23,7 +23,7 @@ export const saveMetaFormMappingSchema = z.object({
     formId: z.string().trim().min(1, 'Form ID is required'),
     formName: z.string().trim().min(1, 'Form name is required'),
     campaignId: z.string().optional(),
-    campaignName: z.string().trim().min(1, 'Campaign name is required'),
+    campaignName: z.string().trim().optional(),
     branchId: objectId,
     notes: z.string().optional(),
     isActive: z.boolean().optional(),

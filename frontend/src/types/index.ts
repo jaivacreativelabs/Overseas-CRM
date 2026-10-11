@@ -601,7 +601,9 @@ export interface MetaCampaign {
   ctr: number;
   leadsCount: number;
   costPerLead?: number;
-  forms: Array<{
+  dailyBudget?: number;
+  lifetimeBudget?: number;
+  forms?: Array<{
     formId: string;
     formName: string;
     branchId?: string;

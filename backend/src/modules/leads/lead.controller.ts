@@ -482,14 +482,29 @@ export class LeadController {
       const assignedFormName = routing?.formName || req.body.formName || formId;
 
       if (change && change.leadgen_id) {
+        // Fetch real lead data from Meta Graph API if access token is available
+        let leadData: any = null;
+        try {
+          const { IntegrationConfigModel } = require('../integrations/integration-config.model');
+          const { MetaGraphApiService } = require('../integrations/meta-graph-api.service');
+          const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+          const token = metaConfig?.credentials?.pageAccessToken || metaConfig?.credentials?.accessToken || process.env.META_ACCESS_TOKEN;
+          if (token) {
+            leadData = await MetaGraphApiService.getLeadData(change.leadgen_id, token);
+          }
+        } catch (err: any) {
+          // Graceful fallback if token is invalid or permissions pending
+        }
+
         const result = await LeadService.ingestMetaLead({
           metaLeadId: change.leadgen_id,
-          name: req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
-          email: req.body.email || `lead_${change.leadgen_id}@meta.com`,
-          phone: req.body.phone || '0000000000',
-          campaignName: campaignName || 'Meta Ad Campaign',
+          name: leadData?.name || req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
+          email: leadData?.email || req.body.email || `lead_${change.leadgen_id}@meta.com`,
+          phone: leadData?.phone || req.body.phone || '0000000000',
+          preferredCountry: leadData?.country || req.body.preferredCountry,
+          campaignName: leadData?.campaignName || campaignName || 'Meta Ad Campaign',
           branchId: assignedBranchId,
-          metaFormId: formId,
+          metaFormId: leadData?.formId || formId,
           metaFormName: assignedFormName,
         });
         if (!result.isDuplicate) {

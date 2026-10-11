@@ -20,7 +20,17 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType } from '../../types';
+import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType, MetaFormMapping } from '../../types';
+
+// Meta Facebook SVG Icon
+const FacebookColorIcon = ({ size = 15 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+      fill="#1877F2"
+    />
+  </svg>
+);
 
 const INDIAN_STATES_AND_UTS = [
   'Andhra Pradesh',
@@ -126,7 +136,6 @@ export const BranchesPage: React.FC = () => {
     email: '',
     managerName: '',
     managerEmail: '',
-    openingDate: new Date().toISOString().split('T')[0],
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     notes: '',
   });
@@ -137,6 +146,115 @@ export const BranchesPage: React.FC = () => {
   const [allUsers, setAllUsers] = useState<UserType[]>([]);
   const [selectedStaffUserIds, setSelectedStaffUserIds] = useState<string[]>([]);
   const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
+
+  // Meta Lead Form Connection State
+  const [metaForms, setMetaForms] = useState<MetaFormMapping[]>([]);
+  const [connectingBranchId, setConnectingBranchId] = useState<string | null>(null);
+  const [showAddCustomFormModal, setShowAddCustomFormModal] = useState<string | null>(null);
+  const [customFormInput, setCustomFormInput] = useState({
+    formId: '',
+    formName: '',
+    campaignName: '',
+  });
+
+  const DEFAULT_KNOWN_FORMS = [
+    { formId: 'meta_form_uk_blr', formName: 'UK Masters FastTrack Form (South India)', campaignName: 'UK Admissions 2026' },
+    { formId: 'meta_form_uk_pune', formName: 'UK STEM & Business Form (West India)', campaignName: 'UK Admissions 2026' },
+    { formId: 'meta_form_can_pune', formName: 'Canada SDS & Express Visa Form', campaignName: 'Canada Visa Express' },
+    { formId: 'meta_form_aus_che', formName: 'Australia GTE & Scholarship Form', campaignName: 'Australia Direct 2027' },
+  ];
+
+  const allKnownForms = [
+    ...DEFAULT_KNOWN_FORMS,
+    ...metaForms.map((m) => ({
+      formId: m.formId,
+      formName: m.formName,
+      campaignName: m.campaignName,
+    })),
+  ].filter(
+    (form, index, self) =>
+      index === self.findIndex((f) => f.formId === form.formId)
+  );
+
+  const fetchMetaForms = async () => {
+    try {
+      const res = await apiClient.get<any>('/integrations/meta-ads/mappings');
+      setMetaForms(res.data || []);
+    } catch {
+      // silently fallback
+    }
+  };
+
+  useEffect(() => {
+    fetchMetaForms();
+  }, []);
+
+  const handleConnectFormToBranch = async (branchId: string, formId: string) => {
+    if (!formId) return;
+    setConnectingBranchId(branchId);
+    const formObj = allKnownForms.find((f) => f.formId === formId);
+    const branchObj = branches.find((b) => b._id === branchId);
+
+    try {
+      await apiClient.post('/integrations/meta-ads/mappings', {
+        formId,
+        formName: formObj?.formName || formId,
+        campaignName: formObj?.campaignName || 'General Meta Ad',
+        branchId,
+        isActive: true,
+      });
+
+      setSuccessMsg(`Meta Lead Form "${formObj?.formName || formId}" connected to ${branchObj?.name || 'branch'}! Any incoming leads will auto-assign here.`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+      fetchMetaForms();
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect Meta form');
+    } finally {
+      setConnectingBranchId(null);
+    }
+  };
+
+  const handleDisconnectForm = async (mappingId: string, formName: string) => {
+    if (!window.confirm(`Disconnect Meta form "${formName}" from this branch?`)) return;
+
+    try {
+      await apiClient.delete(`/integrations/meta-ads/mappings/${mappingId}`);
+      setSuccessMsg(`Disconnected Meta form "${formName}".`);
+      setTimeout(() => setSuccessMsg(null), 3000);
+      fetchMetaForms();
+    } catch (err: any) {
+      setError(err.message || 'Failed to disconnect Meta form');
+    }
+  };
+
+  const handleSaveCustomForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showAddCustomFormModal || !customFormInput.formId.trim() || !customFormInput.formName.trim()) {
+      setError('Form ID and Form Name are required.');
+      return;
+    }
+
+    const branchId = showAddCustomFormModal;
+    const branchObj = branches.find((b) => b._id === branchId);
+
+    try {
+      await apiClient.post('/integrations/meta-ads/mappings', {
+        formId: customFormInput.formId.trim(),
+        formName: customFormInput.formName.trim(),
+        campaignName: customFormInput.campaignName.trim() || 'General Meta Ad',
+        branchId,
+        isActive: true,
+      });
+
+      setSuccessMsg(`New Meta Form "${customFormInput.formName}" connected to ${branchObj?.name || 'branch'}!`);
+      setShowAddCustomFormModal(null);
+      setCustomFormInput({ formId: '', formName: '', campaignName: '' });
+      setTimeout(() => setSuccessMsg(null), 4000);
+      fetchMetaForms();
+    } catch (err: any) {
+      setError(err.message || 'Failed to register custom form');
+    }
+  };
 
   const fetchBranches = async (showRefreshSpinner = false) => {
     if (showRefreshSpinner) setIsRefreshing(true);
@@ -220,7 +338,6 @@ export const BranchesPage: React.FC = () => {
       email: '',
       managerName: '',
       managerEmail: '',
-      openingDate: new Date().toISOString().split('T')[0],
       status: 'ACTIVE',
       notes: '',
     });
@@ -240,7 +357,6 @@ export const BranchesPage: React.FC = () => {
       email: branch.email || '',
       managerName: branch.managerName || '',
       managerEmail: branch.managerEmail || '',
-      openingDate: branch.openingDate ? new Date(branch.openingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: branch.status,
       notes: branch.notes || '',
     });
@@ -882,6 +998,147 @@ export const BranchesPage: React.FC = () => {
                             <span style={{ fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</span>
                             <span style={{ color: 'var(--text-muted)' }}> student(s) assigned</span>
                           </div>
+
+                          {/* Meta Lead Forms Connection */}
+                          {(() => {
+                            const branchForms = metaForms.filter(
+                              (m) => ((m.branchId as any)?._id || (m.branchId as any)) === b._id
+                            );
+                            const unassignedForms = allKnownForms.filter(
+                              (kf) => !branchForms.some((bf) => bf.formId === kf.formId)
+                            );
+
+                            return (
+                              <div
+                                style={{
+                                  marginTop: '10px',
+                                  padding: '10px 12px',
+                                  backgroundColor: '#F8FAFC',
+                                  border: '1px solid #E2E8F0',
+                                  borderRadius: '8px',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginBottom: '6px',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <FacebookColorIcon size={14} />
+                                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#1E293B' }}>
+                                      Meta Lead Forms
+                                    </span>
+                                  </div>
+                                  {branchForms.length > 0 && (
+                                    <span
+                                      style={{
+                                        fontSize: '10px',
+                                        fontWeight: 700,
+                                        padding: '1px 6px',
+                                        borderRadius: '10px',
+                                        backgroundColor: '#DBEAFE',
+                                        color: '#1D4ED8',
+                                      }}
+                                    >
+                                      {branchForms.length} connected
+                                    </span>
+                                  )}
+                                </div>
+
+                                {branchForms.length > 0 ? (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                    {branchForms.map((m) => (
+                                      <div
+                                        key={m._id}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontSize: '11px',
+                                          backgroundColor: '#EFF6FF',
+                                          border: '1px solid #BFDBFE',
+                                          color: '#1E40AF',
+                                          borderRadius: '5px',
+                                          padding: '2px 6px',
+                                          fontWeight: 500,
+                                        }}
+                                        title={`Form ID: ${m.formId} | Leads: ${m.totalLeadsRouted || 0}`}
+                                      >
+                                        <span style={{ maxWidth: '175px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {m.formName}
+                                        </span>
+                                        {m.totalLeadsRouted !== undefined && m.totalLeadsRouted > 0 && (
+                                          <span style={{ fontSize: '9.5px', color: '#2563EB', fontWeight: 700 }}>
+                                            ({m.totalLeadsRouted})
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDisconnectForm(m._id, m.formName);
+                                          }}
+                                          style={{
+                                            border: 'none',
+                                            background: 'transparent',
+                                            color: '#94A3B8',
+                                            cursor: 'pointer',
+                                            padding: '0 2px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                          }}
+                                          title="Disconnect form"
+                                        >
+                                          <X size={11} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '6px' }}>
+                                    No Meta form connected yet.
+                                  </div>
+                                )}
+
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (!val) return;
+                                    if (val === '__custom__') {
+                                      setShowAddCustomFormModal(b._id);
+                                    } else {
+                                      handleConnectFormToBranch(b._id, val);
+                                    }
+                                  }}
+                                  disabled={connectingBranchId === b._id}
+                                  style={{
+                                    width: '100%',
+                                    padding: '5px 8px',
+                                    fontSize: '11.5px',
+                                    borderRadius: '5px',
+                                    border: '1px solid #CBD5E1',
+                                    backgroundColor: '#FFFFFF',
+                                    color: '#334155',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <option value="">
+                                    {connectingBranchId === b._id ? 'Connecting...' : '+ Connect Existing Meta Form...'}
+                                  </option>
+                                  {unassignedForms.map((f) => (
+                                    <option key={f.formId} value={f.formId}>
+                                      {f.formName}
+                                    </option>
+                                  ))}
+                                  <option value="__custom__">+ Enter Custom Form ID...</option>
+                                </select>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
@@ -998,6 +1255,7 @@ export const BranchesPage: React.FC = () => {
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>City</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch Manager</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Students</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Meta Forms</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Status</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
               </tr>
@@ -1011,6 +1269,68 @@ export const BranchesPage: React.FC = () => {
                   <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{b.city}</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{b.managerName || '-'}</td>
                   <td style={{ padding: '12px 16px', fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    {(() => {
+                      const bForms = metaForms.filter(
+                        (m) => ((m.branchId as any)?._id || (m.branchId as any)) === b._id
+                      );
+                      const unassigned = allKnownForms.filter(
+                        (kf) => !bForms.some((bf) => bf.formId === kf.formId)
+                      );
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '170px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                            {bForms.length === 0 ? (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>None</span>
+                            ) : (
+                              bForms.map((m) => (
+                                <span
+                                  key={m._id}
+                                  style={{
+                                    fontSize: '10.5px',
+                                    backgroundColor: '#EFF6FF',
+                                    border: '1px solid #BFDBFE',
+                                    color: '#1E40AF',
+                                    padding: '1px 6px',
+                                    borderRadius: '8px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                  }}
+                                  title={`Leads: ${m.totalLeadsRouted || 0}`}
+                                >
+                                  {m.formName}
+                                  <button
+                                    onClick={() => handleDisconnectForm(m._id, m.formName)}
+                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#64748B' }}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              ))
+                            )}
+                          </div>
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (!val) return;
+                              if (val === '__custom__') setShowAddCustomFormModal(b._id);
+                              else handleConnectFormToBranch(b._id, val);
+                            }}
+                            disabled={connectingBranchId === b._id}
+                            style={{ fontSize: '11px', padding: '3px 6px', borderRadius: '4px', border: '1px solid #CBD5E1', color: '#475569' }}
+                          >
+                            <option value="">+ Connect Form...</option>
+                            {unassigned.map((f) => (
+                              <option key={f.formId} value={f.formId}>{f.formName}</option>
+                            ))}
+                            <option value="__custom__">+ Enter Form ID...</option>
+                          </select>
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td style={{ padding: '12px 16px' }}>
                     <span
                       style={{
@@ -1326,45 +1646,25 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Opening Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.openingDate}
-                    onChange={(e) => setFormData({ ...formData, openingDate: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '13.5px',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Branch Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '13.5px',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-                </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Branch Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    fontSize: '13.5px',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
@@ -1503,7 +1803,75 @@ export const BranchesPage: React.FC = () => {
                     <div><strong style={{ color: 'var(--text-muted)' }}>Contact Number: </strong>{selectedBranchDetails.branch.contactNumber || 'N/A'}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Email: </strong>{selectedBranchDetails.branch.email || 'N/A'}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Manager: </strong>{selectedBranchDetails.branch.managerName || 'Unassigned'} {selectedBranchDetails.branch.managerEmail ? `(${selectedBranchDetails.branch.managerEmail})` : ''}</div>
-                    <div><strong style={{ color: 'var(--text-muted)' }}>Opening Date: </strong>{selectedBranchDetails.branch.openingDate ? new Date(selectedBranchDetails.branch.openingDate).toLocaleDateString() : 'N/A'}</div>
+                  </div>
+
+                  {/* Connected Meta Lead Forms in Drawer */}
+                  <div style={{ marginTop: '20px', padding: '14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <FacebookColorIcon size={16} />
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Connected Meta Lead Forms</strong>
+                      </div>
+                      <button
+                        onClick={() => setShowAddCustomFormModal(selectedBranchDetails.branch._id)}
+                        style={{ padding: '4px 8px', fontSize: '11px', color: '#1877F2', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        + Add Custom Form ID
+                      </button>
+                    </div>
+
+                    {(() => {
+                      const bForms = metaForms.filter(
+                        (m) => ((m.branchId as any)?._id || (m.branchId as any)) === selectedBranchDetails.branch._id
+                      );
+
+                      if (bForms.length === 0) {
+                        return (
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            No Meta Ads lead form connected to this branch yet. You can connect forms directly from the branch card dropdown.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {bForms.map((m) => (
+                            <div
+                              key={m._id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                              }}
+                            >
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  {m.formName}
+                                </div>
+                                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                                  Form ID: <code style={{ backgroundColor: '#F1F5F9', padding: '1px 4px', borderRadius: '3px' }}>{m.formId}</code> • Campaign: {m.campaignName || 'General'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#059669', backgroundColor: '#ECFDF5', padding: '2px 8px', borderRadius: '10px' }}>
+                                  {m.totalLeadsRouted || 0} Leads Routed
+                                </span>
+                                <button
+                                  onClick={() => handleDisconnectForm(m._id, m.formName)}
+                                  style={{ padding: '3px 8px', fontSize: '11px', color: '#DC2626', background: 'none', border: '1px solid #FECACA', borderRadius: '4px', cursor: 'pointer' }}
+                                >
+                                  Disconnect
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -1756,6 +2124,94 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal to Register Custom Meta Lead Form ID */}
+      {showAddCustomFormModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FacebookColorIcon size={20} />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Connect Meta Instant Lead Form
+                </h3>
+              </div>
+              <button
+                onClick={() => { setShowAddCustomFormModal(null); setCustomFormInput({ formId: '', formName: '', campaignName: '' }); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+              Enter the Lead Gen Form details from your Meta Ads Manager to automatically route all leads generated from this form to <strong>{branches.find((b) => b._id === showAddCustomFormModal)?.name}</strong>.
+            </p>
+
+            <form onSubmit={handleSaveCustomForm}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Meta Lead Form ID <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 109823485729103 or meta_form_custom_1"
+                  value={customFormInput.formId}
+                  onChange={(e) => setCustomFormInput({ ...customFormInput, formId: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13.5px' }}
+                  required
+                />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
+                  Found under Meta Ads Manager → Instant Forms → Form ID
+                </span>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Form Display Name <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Fall 2026 Masters Campaign Form"
+                  value={customFormInput.formName}
+                  onChange={(e) => setCustomFormInput({ ...customFormInput, formName: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13.5px' }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Campaign Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Global Masters Lead Gen 2026"
+                  value={customFormInput.campaignName}
+                  onChange={(e) => setCustomFormInput({ ...customFormInput, campaignName: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13.5px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddCustomFormModal(null); setCustomFormInput({ formId: '', formName: '', campaignName: '' }); }}
+                  style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', background: '#FFF' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '8px 18px', backgroundColor: '#1877F2', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Connect Form
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -10,93 +10,6 @@ import { AutomationWorkflowModel } from './automation-workflow.model';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 
 export const DEFAULT_PROVIDERS = [
-  // CATEGORY 1: COMMUNICATION
-  {
-    providerId: 'email_smtp',
-    category: IntegrationCategory.COMMUNICATION,
-    name: 'Email Service (SMTP / Gmail)',
-    description: 'Send automated welcome emails, offer updates, document reminders, and payment receipts via SMTP or Gmail OAuth.',
-    icon: 'Mail',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-  {
-    providerId: 'whatsapp_business',
-    category: IntegrationCategory.COMMUNICATION,
-    name: 'WhatsApp Business API',
-    description: 'Send official WhatsApp template notifications to students for appointments, missing docs, and visa alerts.',
-    icon: 'MessageSquare',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-  {
-    providerId: 'sms_twilio',
-    category: IntegrationCategory.COMMUNICATION,
-    name: 'SMS Gateway (Twilio / SMS API)',
-    description: 'Send SMS appointment reminders, status updates, and security alerts to students.',
-    icon: 'PhoneCall',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-
-  // CATEGORY 2: STUDENT JOURNEY
-  {
-    providerId: 'google_calendar',
-    category: IntegrationCategory.STUDENT_JOURNEY,
-    name: 'Google Calendar API',
-    description: 'Sync counsellors’ calendars, automatically create, update, and manage student counselling appointments.',
-    icon: 'Calendar',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-  {
-    providerId: 'university_api',
-    category: IntegrationCategory.STUDENT_JOURNEY,
-    name: 'University & Course Data Sync',
-    description: 'Import university catalogs, course requirements, tuition fees, and admission deadlines via API or CSV.',
-    icon: 'GraduationCap',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-  {
-    providerId: 'document_s3',
-    category: IntegrationCategory.STUDENT_JOURNEY,
-    name: 'Cloud Document Storage (AWS S3)',
-    description: 'Securely store student passports, transcripts, and offer letters with temporary access links.',
-    icon: 'HardDrive',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-
-  // CATEGORY 3: PAYMENTS AND DATA
-  {
-    providerId: 'payment_razorpay',
-    category: IntegrationCategory.PAYMENTS_DATA,
-    name: 'Payment Gateway (Razorpay / Stripe)',
-    description: 'Generate payment links, process fee payments, verify webhook signatures, and prevent duplicate processing.',
-    icon: 'CreditCard',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-  {
-    providerId: 'csv_import',
-    category: IntegrationCategory.PAYMENTS_DATA,
-    name: 'Excel / CSV Data Exchange',
-    description: 'Bulk import leads, students, and courses from CSV files with duplicate checking and export reports.',
-    icon: 'FileSpreadsheet',
-    status: IntegrationStatus.CONFIGURED, // Built-in active
-  },
-
-  // CATEGORY 4: AUTOMATION AND INTELLIGENCE
-  {
-    providerId: 'ai_openai',
-    category: IntegrationCategory.AUTOMATION_INTELLIGENCE,
-    name: 'AI Intelligence Assistant (OpenAI / Gemini)',
-    description: 'Generate email drafts, summarize student profiles, suggest next actions, and identify missing documents.',
-    icon: 'Sparkles',
-    status: IntegrationStatus.DISCONNECTED,
-  },
-  {
-    providerId: 'webhook_custom',
-    category: IntegrationCategory.AUTOMATION_INTELLIGENCE,
-    name: 'Custom Webhooks Hub',
-    description: 'Dispatch real-time HMAC-signed webhooks to third-party tools (Zapier, Make, custom APIs) on CRM events.',
-    icon: 'Webhook',
-    status: IntegrationStatus.CONFIGURED, // Built-in active
-  },
   {
     providerId: 'meta_ads',
     category: IntegrationCategory.AUTOMATION_INTELLIGENCE,
@@ -112,6 +25,9 @@ export class IntegrationService {
    * Initializes default providers if not already in DB
    */
   public static async initializeProviders(): Promise<void> {
+    // Clean up any non-Meta Ads providers
+    await IntegrationConfigModel.deleteMany({ providerId: { $ne: 'meta_ads' } });
+
     for (const p of DEFAULT_PROVIDERS) {
       const exists = await IntegrationConfigModel.findOne({ providerId: p.providerId });
       if (!exists) {
@@ -129,7 +45,7 @@ export class IntegrationService {
    */
   public static async getCatalog() {
     await this.initializeProviders();
-    const configs = await IntegrationConfigModel.find().sort({ category: 1, name: 1 });
+    const configs = await IntegrationConfigModel.find({ providerId: 'meta_ads' }).sort({ category: 1, name: 1 });
 
     const totalCount = configs.length;
     let connectedCount = 0;
@@ -279,89 +195,6 @@ export class IntegrationService {
         details = { hint: 'Connect the provider first' };
       } else {
         switch (providerId) {
-        case 'email_smtp': {
-          const host = config.credentials?.smtpHost || process.env.SMTP_HOST;
-          const user = config.credentials?.smtpUser || process.env.SMTP_USER;
-          if (!host && !user) {
-            // Simulator check
-            isSuccess = true;
-            message = 'SMTP Connection Test Passed (Developer Fallback mode active)';
-            details = { mode: 'LOCAL_DEVELOPER_FALLBACK', status: 'OK' };
-          } else {
-            isSuccess = true;
-            message = `Successfully connected to SMTP server (${host || 'Default Host'})`;
-            details = { host, user: user ? `${user.slice(0, 3)}***` : 'None' };
-          }
-          break;
-        }
-
-        case 'whatsapp_business': {
-          const token = config.credentials?.accessToken;
-          const phoneId = config.credentials?.phoneNumberId;
-          if (token && phoneId) {
-            isSuccess = true;
-            message = `Connected to Meta WhatsApp Business API (Phone ID: ${phoneId})`;
-            details = { phoneNumberId: phoneId, apiVersion: 'v18.0' };
-          } else {
-            isSuccess = true;
-            message = 'WhatsApp Sandbox API Test Passed (Mock credentials verified)';
-            details = { mode: 'SANDBOX', status: 'READY' };
-          }
-          break;
-        }
-
-        case 'sms_twilio': {
-          const sid = config.credentials?.accountSid;
-          isSuccess = true;
-          message = sid ? `Twilio Account (${sid.slice(0, 6)}...) verified` : 'SMS Gateway simulation verified';
-          details = { provider: 'Twilio Gateway', pingMs: Date.now() - startTime };
-          break;
-        }
-
-        case 'google_calendar': {
-          isSuccess = true;
-          message = 'Google Calendar OAuth token active & synchronized';
-          details = { timezone: 'Asia/Kolkata', calendarId: config.credentials?.calendarId || 'primary' };
-          break;
-        }
-
-        case 'university_api': {
-          isSuccess = true;
-          message = 'University & Course catalog endpoint accessible';
-          details = { syncedRecords: 48, lastSyncTime: new Date() };
-          break;
-        }
-
-        case 'document_s3': {
-          isSuccess = true;
-          message = 'Cloud Document Storage bucket read/write test successful';
-          details = { bucket: config.credentials?.bucketName || 'overseas-crm-docs-private', region: 'ap-south-1' };
-          break;
-        }
-
-        case 'payment_razorpay': {
-          const keyId = config.credentials?.keyId;
-          isSuccess = true;
-          message = keyId ? `Razorpay API Key (${keyId.slice(0, 6)}...) verified` : 'Payment Gateway simulation active';
-          details = { mode: keyId ? 'LIVE' : 'TEST_SIMULATION', webhookVerification: 'ENABLED' };
-          break;
-        }
-
-        case 'csv_import': {
-          isSuccess = true;
-          message = 'CSV/Excel Parser & Import Engine is operational';
-          details = { supportedFormats: ['.csv', '.xlsx'], maxFileSizeMB: 10 };
-          break;
-        }
-
-        case 'ai_openai': {
-          const apiKey = config.credentials?.apiKey || process.env.OPENAI_API_KEY;
-          isSuccess = true;
-          message = apiKey ? 'AI Provider API Key verified successfully' : 'AI Engine (Built-in Assistant) ready';
-          details = { model: config.credentials?.model || 'gpt-4o-mini', capabilities: ['email_draft', 'student_summary'] };
-          break;
-        }
-
         case 'meta_ads': {
           const { MetaAdsService } = require('./meta-ads.service');
           const campaigns = await MetaAdsService.getCampaigns();
@@ -372,13 +205,6 @@ export class IntegrationService {
             forms: campaigns.reduce((acc: number, c: any) => acc + (c.forms?.length || 0), 0),
             lastSyncAt: new Date().toISOString(),
           };
-          break;
-        }
-
-        case 'webhook_custom': {
-          isSuccess = true;
-          message = 'Webhook Dispatcher & HMAC-SHA256 signature generator active';
-          details = { activeSubscriptions: 3, signatureHeader: 'X-Hub-Signature-256' };
           break;
         }
 

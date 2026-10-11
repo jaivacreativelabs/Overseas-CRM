@@ -27,8 +27,12 @@ router.use(requireOwnerAdmin);
 router.get('/', IntegrationController.getCatalog);
 
 // Meta Ads & Form-to-Branch Routing
+router.get('/meta-ads/status', IntegrationController.getMetaStatus);
+router.post('/meta-ads/disconnect', IntegrationController.disconnectMeta);
 router.get('/meta-ads/campaigns', IntegrationController.getMetaCampaigns);
 router.post('/meta-ads/campaigns/sync', IntegrationController.syncMetaCampaigns);
+router.patch('/meta-ads/campaigns/:campaignId/toggle', IntegrationController.toggleMetaCampaign);
+router.post('/meta-ads/connect-real', IntegrationController.connectRealMeta);
 router.get('/meta-ads/mappings', IntegrationController.getMetaFormMappings);
 router.post('/meta-ads/mappings', validate(saveMetaFormMappingSchema), IntegrationController.saveMetaFormMapping);
 router.delete('/meta-ads/mappings/:id', validate(objectIdParamsSchema), IntegrationController.deleteMetaFormMapping);
