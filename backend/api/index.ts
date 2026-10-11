@@ -8,8 +8,8 @@ let isInitialized = false;
 const ensureConnected = async () => {
   if (!isInitialized) {
     await connectDatabase();
-    await seedDatabase();
     isInitialized = true;
+    seedDatabase().catch((err: any) => console.warn('Background seed warning:', err?.message));
   }
 };
 
