@@ -13,7 +13,6 @@ export interface IBranch extends Document {
   managerEmail?: string;
   managerUserId?: Types.ObjectId;
   assignedStaffIds?: Types.ObjectId[];
-  capacity: number;
   assignedStudentsCount: number;
   openingDate?: Date;
   status: 'ACTIVE' | 'INACTIVE';
@@ -89,12 +88,6 @@ const branchSchema = new Schema<IBranch>(
         ref: 'User',
       },
     ],
-    capacity: {
-      type: Number,
-      required: true,
-      min: [1, 'Capacity must be at least 1'],
-      default: 100,
-    },
     assignedStudentsCount: {
       type: Number,
       default: 0,

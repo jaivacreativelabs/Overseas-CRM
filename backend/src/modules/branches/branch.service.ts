@@ -64,7 +64,6 @@ export class BranchService {
       email?: string;
       managerName?: string;
       managerEmail?: string;
-      capacity: number;
       openingDate?: string;
       notes?: string;
       status?: 'ACTIVE' | 'INACTIVE';
@@ -73,10 +72,6 @@ export class BranchService {
   ): Promise<IBranch> {
     if (!data.name || !data.state || !data.city || !data.address) {
       throw new BadRequestError('Branch name, state, city, and full address are mandatory');
-    }
-
-    if (!data.capacity || Number(data.capacity) < 1) {
-      throw new BadRequestError('Branch capacity must be a positive integer');
     }
 
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
@@ -131,7 +126,6 @@ export class BranchService {
       email: data.email?.toLowerCase().trim(),
       managerName: data.managerName?.trim(),
       managerEmail: data.managerEmail?.toLowerCase().trim(),
-      capacity: Number(data.capacity),
       assignedStudentsCount: 0,
       openingDate: data.openingDate ? new Date(data.openingDate) : new Date(),
       status: data.status || 'ACTIVE',
@@ -146,7 +140,7 @@ export class BranchService {
       eventType: 'branch.created',
       operation: `Created Branch '${branch.name}' (${branch.branchId})`,
       status: LogStatus.SUCCESS,
-      requestData: { branchId: branch.branchId, state: branch.state, city: branch.city, capacity: branch.capacity },
+      requestData: { branchId: branch.branchId, state: branch.state, city: branch.city },
       triggeredBy: performedByUserId,
     });
 
@@ -220,7 +214,6 @@ export class BranchService {
     // Recalculate actual assigned student counts from Lead model for guaranteed data consistency
     const allBranches = await BranchModel.find({ isArchived: false });
 
-    let totalCapacity = 0;
     let totalAssignedStudents = 0;
     let activeBranchCount = 0;
     let inactiveBranchCount = 0;
@@ -230,9 +223,7 @@ export class BranchService {
       {
         state: string;
         branchCount: number;
-        totalCapacity: number;
         assignedStudents: number;
-        availableSeats: number;
       }
     > = {};
 
@@ -251,8 +242,6 @@ export class BranchService {
         await b.save();
       }
 
-      const availableSeats = Math.max(0, b.capacity - b.assignedStudentsCount);
-      totalCapacity += b.capacity;
       totalAssignedStudents += b.assignedStudentsCount;
 
       const stKey = b.state.toUpperCase();
@@ -260,27 +249,14 @@ export class BranchService {
         stateSummaryMap[stKey] = {
           state: b.state,
           branchCount: 0,
-          totalCapacity: 0,
           assignedStudents: 0,
-          availableSeats: 0,
         };
       }
       stateSummaryMap[stKey].branchCount += 1;
-      stateSummaryMap[stKey].totalCapacity += b.capacity;
       stateSummaryMap[stKey].assignedStudents += b.assignedStudentsCount;
-      stateSummaryMap[stKey].availableSeats += availableSeats;
     }
 
-    const formattedBranches = branches.map((b) => {
-      const obj = b.toObject();
-      const availableSeats = Math.max(0, b.capacity - b.assignedStudentsCount);
-      const utilizationPercentage = b.capacity > 0 ? Math.min(100, Math.round((b.assignedStudentsCount / b.capacity) * 100)) : 0;
-      return {
-        ...obj,
-        availableSeats,
-        utilizationPercentage,
-      };
-    });
+    const formattedBranches = branches.map((b) => b.toObject());
 
     return {
       branches: formattedBranches,
@@ -289,9 +265,7 @@ export class BranchService {
         activeBranches: activeBranchCount,
         inactiveBranches: inactiveBranchCount,
         statesCovered: Object.keys(stateSummaryMap).length,
-        totalCapacity,
         totalAssignedStudents,
-        availableSeats: Math.max(0, totalCapacity - totalAssignedStudents),
       },
       stateSummaries: Object.values(stateSummaryMap),
       pagination: {
@@ -328,15 +302,8 @@ export class BranchService {
       await branch.save();
     }
 
-    const availableSeats = Math.max(0, branch.capacity - branch.assignedStudentsCount);
-    const utilizationPercentage = branch.capacity > 0 ? Math.min(100, Math.round((branch.assignedStudentsCount / branch.capacity) * 100)) : 0;
-
     return {
-      branch: {
-        ...branch.toObject(),
-        availableSeats,
-        utilizationPercentage,
-      },
+      branch: branch.toObject(),
       assignedStudents,
     };
   }
@@ -380,7 +347,7 @@ export class BranchService {
   }
 
   /**
-   * Updates branch details while leaving branchId intact and validating capacity bounds
+   * Updates branch details while leaving branchId intact
    */
   public static async updateBranch(
     id: string,
@@ -394,7 +361,6 @@ export class BranchService {
       email?: string;
       managerName?: string;
       managerEmail?: string;
-      capacity?: number;
       notes?: string;
       status?: 'ACTIVE' | 'INACTIVE';
     },
@@ -403,26 +369,6 @@ export class BranchService {
     const branch = await BranchModel.findOne({ _id: id, isArchived: false });
     if (!branch) {
       throw new NotFoundError('Branch not found');
-    }
-
-    if (data.capacity !== undefined) {
-      const newCapacity = Number(data.capacity);
-      if (isNaN(newCapacity) || newCapacity < 1) {
-        throw new BadRequestError('Branch capacity must be a positive integer');
-      }
-
-      // Check real assigned count
-      const realAssigned = await LeadModel.countDocuments({
-        branchId: branch._id,
-        isArchived: false,
-      });
-
-      if (newCapacity < realAssigned) {
-        throw new BadRequestError(
-          `Cannot reduce capacity to ${newCapacity}. Branch currently has ${realAssigned} students assigned.`
-        );
-      }
-      branch.capacity = newCapacity;
     }
 
     if (data.name) branch.name = data.name.trim();
@@ -444,7 +390,7 @@ export class BranchService {
       eventType: 'branch.updated',
       operation: `Updated Branch '${branch.name}' (${branch.branchId})`,
       status: LogStatus.SUCCESS,
-      requestData: { branchId: branch.branchId, capacity: branch.capacity, status: branch.status },
+      requestData: { branchId: branch.branchId, status: branch.status },
       triggeredBy: performedByUserId,
     });
 
@@ -518,7 +464,7 @@ export class BranchService {
   }
 
   /**
-   * Assigns or reassigns a student to a branch with capacity and active status validations
+   * Assigns or reassigns a student to a branch with active status validation
    */
   public static async assignStudentToBranch(studentLeadId: string, branchId: string | null, performedByUserId?: string): Promise<any> {
     const lead = await LeadModel.findOne({ _id: studentLeadId, isArchived: false });
@@ -546,14 +492,6 @@ export class BranchService {
 
     if (newBranch.status !== 'ACTIVE') {
       throw new BadRequestError(`Cannot assign student to inactive branch '${newBranch.name}'`);
-    }
-
-    // Check real current student count
-    const currentCount = await LeadModel.countDocuments({ branchId: newBranch._id, isArchived: false });
-    if (lead.branchId?.toString() !== newBranch._id.toString() && currentCount >= newBranch.capacity) {
-      throw new BadRequestError(
-        `Branch '${newBranch.name}' has reached its maximum capacity of ${newBranch.capacity} students.`
-      );
     }
 
     const oldBranchId = lead.branchId;
@@ -615,8 +553,7 @@ export class BranchService {
    * Export all branch records to CSV string
    */
   public static async exportBranchesToCSV(): Promise<string> {
-    const result = await this.getBranches({ limit: 1000 });
-    const branches = result.branches;
+    const branches = await BranchModel.find({ isArchived: false }).sort({ createdAt: -1 });
 
     const headers = [
       'Branch ID',
@@ -625,12 +562,10 @@ export class BranchService {
       'City',
       'Address',
       'PIN Code',
+      'Contact Number',
       'Branch Manager',
       'Manager Email',
       'Assigned Students',
-      'Capacity',
-      'Available Seats',
-      'Utilization %',
       'Status',
       'Created Date',
     ];
@@ -642,12 +577,10 @@ export class BranchService {
       `"${b.city || ''}"`,
       `"${b.address || ''}"`,
       `"${b.pinCode || ''}"`,
+      `"${b.contactNumber || ''}"`,
       `"${b.managerName || ''}"`,
       `"${b.managerEmail || ''}"`,
       `"${b.assignedStudentsCount || 0}"`,
-      `"${b.capacity || 0}"`,
-      `"${b.availableSeats || 0}"`,
-      `"${b.utilizationPercentage || 0}%"`,
       `"${b.status || ''}"`,
       `"${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}"`,
     ]);

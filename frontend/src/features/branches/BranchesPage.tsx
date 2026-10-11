@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   GitFork,
-  Building2,
   Users,
   CheckCircle2,
   AlertTriangle,
   Search,
-  Filter,
   Plus,
   RefreshCw,
   Edit,
@@ -15,20 +13,10 @@ import {
   ChevronDown,
   ChevronRight,
   ShieldAlert,
-  ArrowUpDown,
   MapPin,
   X,
   UserCheck,
   Download,
-  Phone,
-  Mail,
-  User,
-  Calendar,
-  FileText,
-  Activity,
-  BarChart3,
-  UserPlus,
-  Zap,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useAuth } from '../../context/AuthContext';
@@ -78,9 +66,7 @@ export interface ExtendedBranchSummary {
   activeBranches: number;
   inactiveBranches: number;
   statesCovered: number;
-  totalCapacity: number;
   totalAssignedStudents: number;
-  availableSeats: number;
 }
 
 export const BranchesPage: React.FC = () => {
@@ -95,38 +81,33 @@ export const BranchesPage: React.FC = () => {
     activeBranches: 0,
     inactiveBranches: 0,
     statesCovered: 0,
-    totalCapacity: 0,
     totalAssignedStudents: 0,
-    availableSeats: 0,
   });
   const [stateSummaries, setStateSummaries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Filters & Controls
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
-  const [selectedCity, setSelectedCity] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
   const [expandedStates, setExpandedStates] = useState<Record<string, boolean>>({});
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [selectedBranchDetails, setSelectedBranchDetails] = useState<{
     branch: Branch;
     assignedStudents: Lead[];
   } | null>(null);
-  const [drawerActiveTab, setDrawerActiveTab] = useState<'overview' | 'students' | 'staff' | 'applications' | 'reports' | 'history'>('overview');
+  const [drawerActiveTab, setDrawerActiveTab] = useState<'overview' | 'students' | 'staff' | 'applications' | 'history'>('overview');
   const [branchApplications, setBranchApplications] = useState<Application[]>([]);
   const [branchLogs, setBranchLogs] = useState<IntegrationLog[]>([]);
   const [isLoadingTabContent, setIsLoadingTabContent] = useState(false);
@@ -135,7 +116,6 @@ export const BranchesPage: React.FC = () => {
   const [assignStudentModal, setAssignStudentModal] = useState<Branch | null>(null);
   const [assignStaffModal, setAssignStaffModal] = useState<Branch | null>(null);
 
-  // Form states
   const [formData, setFormData] = useState({
     name: '',
     state: 'Karnataka',
@@ -146,14 +126,12 @@ export const BranchesPage: React.FC = () => {
     email: '',
     managerName: '',
     managerEmail: '',
-    capacity: 100,
     openingDate: new Date().toISOString().split('T')[0],
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     notes: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Student & Staff assignment state
   const [unassignedStudents, setUnassignedStudents] = useState<Lead[]>([]);
   const [selectedStudentToAssign, setSelectedStudentToAssign] = useState('');
   const [allUsers, setAllUsers] = useState<UserType[]>([]);
@@ -169,7 +147,6 @@ export const BranchesPage: React.FC = () => {
       const res = await apiClient.get<any>('/branches', {
         search: searchQuery,
         state: selectedState,
-        city: selectedCity,
         status: selectedStatus,
         sortBy,
         sortOrder,
@@ -184,15 +161,12 @@ export const BranchesPage: React.FC = () => {
           activeBranches: 0,
           inactiveBranches: 0,
           statesCovered: 0,
-          totalCapacity: 0,
           totalAssignedStudents: 0,
-          availableSeats: 0,
         }
       );
       setStateSummaries(res.data.stateSummaries || []);
       setTotalPages(res.data.pagination?.pages || 1);
 
-      // Auto expand state accordions
       const expMap: Record<string, boolean> = {};
       (res.data.stateSummaries || []).forEach((st: any) => {
         expMap[st.state.toUpperCase()] = true;
@@ -208,7 +182,31 @@ export const BranchesPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
-  }, [searchQuery, selectedState, selectedCity, selectedStatus, sortBy, sortOrder, currentPage]);
+  }, [searchQuery, selectedState, selectedStatus, sortBy, sortOrder, currentPage]);
+
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem('jaiva_crm_token') || '';
+      const res = await fetch('/api/v1/branches/export', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `crm_branches_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || 'CSV export failed');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleOpenCreateModal = () => {
     setEditingBranch(null);
@@ -222,7 +220,6 @@ export const BranchesPage: React.FC = () => {
       email: '',
       managerName: '',
       managerEmail: '',
-      capacity: 100,
       openingDate: new Date().toISOString().split('T')[0],
       status: 'ACTIVE',
       notes: '',
@@ -243,7 +240,6 @@ export const BranchesPage: React.FC = () => {
       email: branch.email || '',
       managerName: branch.managerName || '',
       managerEmail: branch.managerEmail || '',
-      capacity: branch.capacity,
       openingDate: branch.openingDate ? new Date(branch.openingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: branch.status,
       notes: branch.notes || '',
@@ -258,8 +254,6 @@ export const BranchesPage: React.FC = () => {
     if (!formData.state.trim()) errs.state = 'State is mandatory';
     if (!formData.city.trim()) errs.city = 'City is mandatory';
     if (!formData.address.trim()) errs.address = 'Full address is mandatory';
-    if (!formData.capacity || Number(formData.capacity) < 1) errs.capacity = 'Capacity must be at least 1 student';
-
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       errs.email = 'Invalid email address format';
     }
@@ -269,11 +263,6 @@ export const BranchesPage: React.FC = () => {
     if (formData.pinCode && !/^\d{6}$/.test(formData.pinCode.trim())) {
       errs.pinCode = 'PIN Code must be a 6-digit number';
     }
-
-    if (editingBranch && formData.capacity < editingBranch.assignedStudentsCount) {
-      errs.capacity = `Cannot reduce capacity below currently assigned students (${editingBranch.assignedStudentsCount})`;
-    }
-
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -333,7 +322,7 @@ export const BranchesPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = async (tab: 'overview' | 'students' | 'staff' | 'applications' | 'reports' | 'history') => {
+  const handleTabChange = async (tab: 'overview' | 'students' | 'staff' | 'applications' | 'history') => {
     setDrawerActiveTab(tab);
     if (!selectedBranchDetails) return;
 
@@ -427,7 +416,6 @@ export const BranchesPage: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header Banner */}
       <div
         style={{
           display: 'flex',
@@ -457,17 +445,16 @@ export const BranchesPage: React.FC = () => {
                 Branch Management
               </h1>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                Manage branches, state-wise operations, student capacity, staff, and performance.
+                Manage branches, assign students and staff, and track performance.
               </p>
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <a
-            href="/api/v1/branches/export"
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={handleExportCSV}
+            disabled={isExporting}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -479,12 +466,13 @@ export const BranchesPage: React.FC = () => {
               fontSize: '13px',
               fontWeight: 600,
               color: 'var(--text-primary)',
-              textDecoration: 'none',
+              cursor: 'pointer',
+              opacity: isExporting ? 0.6 : 1,
             }}
           >
             <Download size={15} />
-            <span>Export CSV</span>
-          </a>
+            <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
+          </button>
 
           <button
             onClick={() => fetchBranches(true)}
@@ -532,7 +520,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Success Notification Alert */}
       {successMsg && (
         <div
           style={{
@@ -553,7 +540,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Error Alert */}
       {error && (
         <div
           style={{
@@ -579,11 +565,10 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Summary Cards */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '14px',
           marginBottom: '24px',
         }}
@@ -591,37 +576,19 @@ export const BranchesPage: React.FC = () => {
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL BRANCHES</div>
           <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{summary.totalBranches}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>State Network</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>All Locations</div>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ACTIVE BRANCHES</div>
           <div style={{ fontSize: '24px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>{summary.activeBranches}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Operational Intake</div>
-        </div>
-
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>INACTIVE BRANCHES</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#DC2626', marginTop: '4px' }}>{summary.inactiveBranches}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Paused Operations</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Currently Operational</div>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ASSIGNED STUDENTS</div>
           <div style={{ fontSize: '24px', fontWeight: 700, color: '#D97706', marginTop: '4px' }}>{summary.totalAssignedStudents}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Enrolled Capacity</div>
-        </div>
-
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL CAPACITY</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>{summary.totalCapacity}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Max Intake Limit</div>
-        </div>
-
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>AVAILABLE SEATS</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563EB', marginTop: '4px' }}>{summary.availableSeats}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Open Vacancies</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Across All Branches</div>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
@@ -631,7 +598,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div
         style={{
           backgroundColor: '#FFFFFF',
@@ -647,7 +613,6 @@ export const BranchesPage: React.FC = () => {
         }}
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', flex: 1, minWidth: '280px' }}>
-          {/* Search Box */}
           <div style={{ position: 'relative', minWidth: '240px', flex: 1 }}>
             <Search
               size={17}
@@ -675,7 +640,6 @@ export const BranchesPage: React.FC = () => {
             />
           </div>
 
-          {/* State Filter */}
           <select
             value={selectedState}
             onChange={(e) => setSelectedState(e.target.value)}
@@ -695,7 +659,6 @@ export const BranchesPage: React.FC = () => {
             ))}
           </select>
 
-          {/* Status Filter */}
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
@@ -713,43 +676,39 @@ export const BranchesPage: React.FC = () => {
           </select>
         </div>
 
-        {/* View Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <button
-              onClick={() => setViewMode('grouped')}
-              style={{
-                padding: '7px 12px',
-                backgroundColor: viewMode === 'grouped' ? 'var(--primary-light)' : '#FFFFFF',
-                color: viewMode === 'grouped' ? 'var(--primary)' : 'var(--text-secondary)',
-                border: 'none',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              State-Wise Grouped
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '7px 12px',
-                backgroundColor: viewMode === 'list' ? 'var(--primary-light)' : '#FFFFFF',
-                color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-secondary)',
-                border: 'none',
-                borderLeft: '1px solid var(--border-color)',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Data Table
-            </button>
-          </div>
+        <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+          <button
+            onClick={() => setViewMode('grouped')}
+            style={{
+              padding: '7px 12px',
+              backgroundColor: viewMode === 'grouped' ? 'var(--primary-light)' : '#FFFFFF',
+              color: viewMode === 'grouped' ? 'var(--primary)' : 'var(--text-secondary)',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            State-Wise Grouped
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            style={{
+              padding: '7px 12px',
+              backgroundColor: viewMode === 'list' ? 'var(--primary-light)' : '#FFFFFF',
+              color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-secondary)',
+              border: 'none',
+              borderLeft: '1px solid var(--border-color)',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Data Table
+          </button>
         </div>
       </div>
 
-      {/* Main Content List / Accordion */}
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: '60px', backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
           <RefreshCw size={28} className="spin-animation" style={{ color: 'var(--primary)', marginBottom: '12px' }} />
@@ -791,7 +750,6 @@ export const BranchesPage: React.FC = () => {
           )}
         </div>
       ) : viewMode === 'grouped' ? (
-        /* State-Wise Accordion Grouping */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {stateSummaries.map((st) => {
             const stateBranches = branches.filter((b) => b.state.toUpperCase() === st.state.toUpperCase());
@@ -811,7 +769,6 @@ export const BranchesPage: React.FC = () => {
                   overflow: 'hidden',
                 }}
               >
-                {/* Accordion Header */}
                 <div
                   onClick={() => toggleStateGroup(st.state)}
                   style={{
@@ -848,21 +805,16 @@ export const BranchesPage: React.FC = () => {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
                     <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Capacity: </span>
-                      <strong style={{ color: 'var(--text-primary)' }}>{st.totalCapacity}</strong>
+                      <span style={{ color: 'var(--text-muted)' }}>Branches: </span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{st.branchCount}</strong>
                     </div>
                     <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Assigned: </span>
+                      <span style={{ color: 'var(--text-muted)' }}>Students: </span>
                       <strong style={{ color: '#D97706' }}>{st.assignedStudents}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Available: </span>
-                      <strong style={{ color: '#059669' }}>{st.availableSeats}</strong>
                     </div>
                   </div>
                 </div>
 
-                {/* State Branches Content */}
                 {isExpanded && (
                   <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
                     {stateBranches.map((b) => (
@@ -873,7 +825,6 @@ export const BranchesPage: React.FC = () => {
                           borderRadius: 'var(--radius-md)',
                           padding: '16px',
                           backgroundColor: '#FFFFFF',
-                          transition: 'all 0.15s ease',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -922,42 +873,17 @@ export const BranchesPage: React.FC = () => {
                           </div>
 
                           {b.managerName && (
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                               Manager: <strong style={{ color: 'var(--text-primary)' }}>{b.managerName}</strong>
                             </div>
                           )}
 
-                          {/* Capacity Progress Bar */}
-                          <div style={{ marginBottom: '14px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                              <span style={{ color: 'var(--text-secondary)' }}>Capacity Utilization:</span>
-                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                {b.assignedStudentsCount} / {b.capacity} ({b.utilizationPercentage || 0}%)
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                height: '8px',
-                                width: '100%',
-                                backgroundColor: '#E5E7EB',
-                                borderRadius: '4px',
-                                overflow: 'hidden',
-                              }}
-                            >
-                              <div
-                                style={{
-                                  height: '100%',
-                                  width: `${Math.min(100, b.utilizationPercentage || 0)}%`,
-                                  backgroundColor:
-                                    (b.utilizationPercentage || 0) >= 90 ? '#EF4444' : (b.utilizationPercentage || 0) >= 70 ? '#F59E0B' : '#3B82F6',
-                                  transition: 'width 0.3s ease',
-                                }}
-                              />
-                            </div>
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                            <span style={{ fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</span>
+                            <span style={{ color: 'var(--text-muted)' }}> student(s) assigned</span>
                           </div>
                         </div>
 
-                        {/* Card Actions */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
                           <button
                             onClick={() => handleViewDetails(b)}
@@ -1062,7 +988,6 @@ export const BranchesPage: React.FC = () => {
           })}
         </div>
       ) : (
-        /* Data Table View */
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', textAlign: 'left' }}>
             <thead>
@@ -1072,10 +997,7 @@ export const BranchesPage: React.FC = () => {
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>State</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>City</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch Manager</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Assigned</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Capacity</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Available Seats</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Utilization %</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Students</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Status</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
               </tr>
@@ -1089,9 +1011,6 @@ export const BranchesPage: React.FC = () => {
                   <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{b.city}</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{b.managerName || '-'}</td>
                   <td style={{ padding: '12px 16px', fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{b.capacity}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#059669' }}>{b.availableSeats}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{b.utilizationPercentage || 0}%</td>
                   <td style={{ padding: '12px 16px' }}>
                     <span
                       style={{
@@ -1145,7 +1064,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- CREATE / EDIT BRANCH MODAL --- */}
       {showCreateModal && (
         <div
           style={{
@@ -1204,7 +1122,6 @@ export const BranchesPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Branch ID Readonly Preview */}
               <div style={{ marginBottom: '16px', backgroundColor: '#F3F4F6', padding: '10px 14px', borderRadius: '6px', border: '1px solid #E5E7EB' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                   AUTOMATIC UNIQUE BRANCH ID
@@ -1214,7 +1131,6 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Basic Information Section */}
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.04em' }}>
                 Basic Information
               </div>
@@ -1366,9 +1282,8 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Management Information Section */}
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.04em' }}>
-                Management & Capacity Settings
+                Management Information
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
@@ -1411,26 +1326,7 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Max Student Capacity *
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: Number(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: formErrors.capacity ? '1px solid #EF4444' : '1px solid var(--border-color)',
-                      fontSize: '13.5px',
-                    }}
-                  />
-                </div>
-
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                     Opening Date
@@ -1507,7 +1403,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- BRANCH DETAILS 6-TAB DRAWER --- */}
       {selectedBranchDetails && (
         <div
           style={{
@@ -1534,7 +1429,6 @@ export const BranchesPage: React.FC = () => {
               boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
             }}
           >
-            {/* Drawer Header */}
             <div
               style={{
                 padding: '16px 20px',
@@ -1561,9 +1455,8 @@ export const BranchesPage: React.FC = () => {
               </button>
             </div>
 
-            {/* 6 Tabs Header */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', backgroundColor: '#FFFFFF', overflowX: 'auto' }}>
-              {(['overview', 'students', 'staff', 'applications', 'reports', 'history'] as const).map((tab) => (
+              {(['overview', 'students', 'staff', 'applications', 'history'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => handleTabChange(tab)}
@@ -1587,33 +1480,30 @@ export const BranchesPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Drawer Tab Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
               {drawerActiveTab === 'overview' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', backgroundColor: '#F9FAFB', padding: '14px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Capacity</div>
-                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedBranchDetails.branch.capacity}</div>
+                  <div style={{ display: 'flex', gap: '10px', backgroundColor: '#F9FAFB', padding: '14px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>State & City</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>{selectedBranchDetails.branch.city}, {selectedBranchDetails.branch.state}</div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Assigned</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Students Assigned</div>
                       <div style={{ fontSize: '18px', fontWeight: 700, color: '#D97706' }}>{selectedBranchDetails.branch.assignedStudentsCount}</div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Available Seats</div>
-                      <div style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{selectedBranchDetails.branch.availableSeats}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Status</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: selectedBranchDetails.branch.status === 'ACTIVE' ? '#059669' : '#DC2626', marginTop: '2px' }}>{selectedBranchDetails.branch.status}</div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13.5px' }}>
-                    <div><strong style={{ color: 'var(--text-muted)' }}>State & City: </strong>{selectedBranchDetails.branch.city}, {selectedBranchDetails.branch.state}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Full Address: </strong>{selectedBranchDetails.branch.address} {selectedBranchDetails.branch.pinCode ? `- ${selectedBranchDetails.branch.pinCode}` : ''}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Contact Number: </strong>{selectedBranchDetails.branch.contactNumber || 'N/A'}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Email: </strong>{selectedBranchDetails.branch.email || 'N/A'}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Manager: </strong>{selectedBranchDetails.branch.managerName || 'Unassigned'} {selectedBranchDetails.branch.managerEmail ? `(${selectedBranchDetails.branch.managerEmail})` : ''}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Opening Date: </strong>{selectedBranchDetails.branch.openingDate ? new Date(selectedBranchDetails.branch.openingDate).toLocaleDateString() : 'N/A'}</div>
-                    <div><strong style={{ color: 'var(--text-muted)' }}>Utilization Rate: </strong>{selectedBranchDetails.branch.utilizationPercentage || 0}%</div>
                   </div>
                 </div>
               )}
@@ -1719,18 +1609,6 @@ export const BranchesPage: React.FC = () => {
                 </div>
               )}
 
-              {drawerActiveTab === 'reports' && (
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Branch Performance Summary</h4>
-                  <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '13px' }}>
-                    <div style={{ marginBottom: '8px' }}>Capacity Utilization: <strong>{selectedBranchDetails.branch.utilizationPercentage || 0}%</strong></div>
-                    <div style={{ marginBottom: '8px' }}>Assigned Students: <strong>{selectedBranchDetails.branch.assignedStudentsCount}</strong></div>
-                    <div style={{ marginBottom: '8px' }}>Available Vacancies: <strong>{selectedBranchDetails.branch.availableSeats}</strong></div>
-                    <div>Status: <strong>{selectedBranchDetails.branch.status}</strong></div>
-                  </div>
-                </div>
-              )}
-
               {drawerActiveTab === 'history' && (
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Branch Activity Audit History</h4>
@@ -1759,7 +1637,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- ASSIGN STAFF MODAL --- */}
       {assignStaffModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250, padding: '16px' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '20px' }}>
@@ -1803,7 +1680,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- STUDENT ASSIGNMENT MODAL --- */}
       {assignStudentModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250, padding: '16px' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '20px' }}>
@@ -1815,7 +1691,7 @@ export const BranchesPage: React.FC = () => {
             </div>
 
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Assigning student to <strong>{assignStudentModal.name}</strong> ({assignStudentModal.availableSeats} available seats).
+              Assigning student to <strong>{assignStudentModal.name}</strong>.
             </p>
 
             <form onSubmit={handleAssignStudentSubmit}>
@@ -1848,7 +1724,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- SAFE DELETION BLOCK CONFIRMATION DIALOG --- */}
       {deletingBranch && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '16px' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '460px', width: '100%', padding: '24px' }}>

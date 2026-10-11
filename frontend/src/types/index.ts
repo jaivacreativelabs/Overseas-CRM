@@ -515,10 +515,7 @@ export interface Branch {
   managerEmail?: string;
   managerUserId?: any;
   assignedStaffIds?: any[];
-  capacity: number;
   assignedStudentsCount: number;
-  availableSeats: number;
-  utilizationPercentage?: number;
   openingDate?: string;
   status: 'ACTIVE' | 'INACTIVE';
   isArchived: boolean;
@@ -529,17 +526,15 @@ export interface Branch {
 
 export interface BranchSummary {
   totalBranches: number;
-  totalCapacity: number;
+  activeBranches: number;
   totalAssignedStudents: number;
-  availableSeats: number;
+  statesCovered: number;
 }
 
 export interface StateBranchSummary {
   state: string;
   branchCount: number;
-  totalCapacity: number;
   assignedStudents: number;
-  availableSeats: number;
 }
 
 export interface IntegrationConfig {
