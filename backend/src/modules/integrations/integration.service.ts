@@ -270,7 +270,15 @@ export class IntegrationService {
     let details: any = {};
 
     try {
-      switch (providerId) {
+      const builtInConfigured = config.status === IntegrationStatus.CONFIGURED;
+      const hasCredentials = !!config.credentials && Object.keys(config.credentials).length > 0;
+
+      if (!builtInConfigured && config.status === IntegrationStatus.DISCONNECTED && !hasCredentials) {
+        isSuccess = false;
+        message = `'${config.name}' is not configured. Save connection credentials before testing.`;
+        details = { hint: 'Connect the provider first' };
+      } else {
+        switch (providerId) {
         case 'email_smtp': {
           const host = config.credentials?.smtpHost || process.env.SMTP_HOST;
           const user = config.credentials?.smtpUser || process.env.SMTP_USER;
@@ -354,6 +362,19 @@ export class IntegrationService {
           break;
         }
 
+        case 'meta_ads': {
+          const { MetaAdsService } = require('./meta-ads.service');
+          const campaigns = await MetaAdsService.getCampaigns();
+          isSuccess = true;
+          message = `Meta Ads Hub verified with ${campaigns.length} campaign(s)`;
+          details = {
+            campaigns: campaigns.length,
+            forms: campaigns.reduce((acc: number, c: any) => acc + (c.forms?.length || 0), 0),
+            lastSyncAt: new Date().toISOString(),
+          };
+          break;
+        }
+
         case 'webhook_custom': {
           isSuccess = true;
           message = 'Webhook Dispatcher & HMAC-SHA256 signature generator active';
@@ -365,6 +386,7 @@ export class IntegrationService {
           isSuccess = true;
           message = `Health check passed for ${config.name}`;
           break;
+        }
         }
       }
     } catch (err: any) {

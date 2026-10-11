@@ -6,6 +6,7 @@ import { PaymentStatus, StudentStage, UserRole, OfferStatus } from '../../config
 import { NotFoundError, ValidationError, StageLockedError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
 
 export class PaymentService {
   static async getAllPayments(status?: PaymentStatus): Promise<any[]> {
@@ -202,6 +203,22 @@ export class PaymentService {
       title: `Payment ${data.status === PaymentStatus.VERIFIED ? 'Verified' : 'Rejected'}`,
       description: `Payment of ${payment.currency} ${payment.amount} was ${data.status.toLowerCase()}.${data.rejectionReason ? ` Reason: ${data.rejectionReason}` : ''}`,
     });
+
+    if (data.status === PaymentStatus.VERIFIED) {
+      void AutomationService.triggerWorkflows('payment.success', {
+        _id: payment._id.toString(),
+        paymentId: payment._id.toString(),
+        leadId: payment.leadId.toString(),
+        name: lead?.name,
+        email: lead?.email,
+        phone: lead?.phone,
+        studentEmail: lead?.email,
+        amount: payment.amount,
+        currency: payment.currency,
+        purpose: payment.purpose,
+        transactionReference: payment.transactionReference,
+      } as any).catch(() => undefined);
+    }
 
     return payment;
   }

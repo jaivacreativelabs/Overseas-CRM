@@ -23,6 +23,7 @@ import {
 } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
 
 export class LeadService {
   static async createLead(data: {
@@ -87,6 +88,18 @@ export class LeadService {
         description: `Lead created via ${lead.source} source`,
       });
     }
+
+    void AutomationService.triggerWorkflows('lead.created', {
+      _id: lead._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      targetCourse: lead.targetCourse,
+      targetCountry: lead.targetCountry,
+      counsellorId: data.counsellorId,
+    } as any).catch(() => undefined);
 
     return lead;
   }
@@ -660,6 +673,18 @@ export class LeadService {
       description: `New lead from landing page: ${data.name} (${data.email})`,
     });
 
+    void AutomationService.triggerWorkflows('lead.created', {
+      _id: lead._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      targetCourse: lead.targetCourse,
+      targetCountry: lead.targetCountry,
+      campaignName: data.campaignName,
+    } as any).catch(() => undefined);
+
     return { lead, isDuplicate: false };
   }
 
@@ -730,6 +755,19 @@ export class LeadService {
       title: 'Meta Ads Lead Ingested',
       description: `New Meta Ad Lead: ${data.name} (${data.email}) [Form: ${data.metaFormName || data.metaFormId || 'Default'}]`,
     });
+
+    void AutomationService.triggerWorkflows('lead.created', {
+      _id: lead._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      targetCourse: lead.targetCourse,
+      targetCountry: lead.targetCountry,
+      campaignName: data.campaignName,
+      branchId: data.branchId ? data.branchId.toString() : undefined,
+    } as any).catch(() => undefined);
 
     return { lead, isDuplicate: false };
   }

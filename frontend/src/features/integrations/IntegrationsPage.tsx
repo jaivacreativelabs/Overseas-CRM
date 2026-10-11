@@ -121,6 +121,7 @@ export const IntegrationsPage: React.FC = () => {
   const [csvText, setCsvText] = useState('');
   const [csvResult, setCsvResult] = useState<any | null>(null);
   const [isImportingCSV, setIsImportingCSV] = useState(false);
+  const [isExportingCSV, setIsExportingCSV] = useState(false);
 
   // AI Assistant state
   const [aiDraftPrompt, setAiDraftPrompt] = useState({ purpose: 'welcome' as const, customPrompt: '' });
@@ -358,6 +359,32 @@ export const IntegrationsPage: React.FC = () => {
       setErrorMsg(err.message || 'CSV Import failed');
     } finally {
       setIsImportingCSV(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    setIsExportingCSV(true);
+    try {
+      const token = localStorage.getItem('jaiva_crm_token') || '';
+      const res = await fetch('/api/v1/integrations/csv/export', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        throw new Error('CSV export failed');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'crm_leads_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'CSV Export failed');
+    } finally {
+      setIsExportingCSV(false);
     }
   };
 
@@ -974,7 +1001,7 @@ export const IntegrationsPage: React.FC = () => {
             <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL AD SPEND</div>
               <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                ₹{(metaAnalytics?.totalSpend || 98300).toLocaleString('en-IN')}
+                ₹{(metaAnalytics?.totalSpend ?? 0).toLocaleString('en-IN')}
               </div>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Across all active campaigns</div>
             </div>
@@ -982,7 +1009,7 @@ export const IntegrationsPage: React.FC = () => {
             <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>INGESTED RESPONSES</div>
               <div style={{ fontSize: '24px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>
-                {metaAnalytics?.totalMetaLeads || 194} Leads
+                {metaAnalytics?.totalMetaLeads ?? 0} Leads
               </div>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Real-time Instant Form leads</div>
             </div>
@@ -990,7 +1017,7 @@ export const IntegrationsPage: React.FC = () => {
             <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>AVERAGE CTR</div>
               <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563EB', marginTop: '4px' }}>
-                {metaAnalytics?.avgCtr || '5.56'}%
+                {metaAnalytics?.avgCtr ?? 0}%
               </div>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Click-through engagement rate</div>
             </div>
@@ -998,7 +1025,7 @@ export const IntegrationsPage: React.FC = () => {
             <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>AVG COST PER LEAD</div>
               <div style={{ fontSize: '24px', fontWeight: 700, color: '#D97706', marginTop: '4px' }}>
-                ₹{metaAnalytics?.avgCpl || 507}
+                ₹{metaAnalytics?.avgCpl ?? 0}
               </div>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Effective acquisition cost</div>
             </div>
@@ -1006,7 +1033,7 @@ export const IntegrationsPage: React.FC = () => {
             <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 20px' }}>
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ACTIVE FORM RULES</div>
               <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>
-                {metaAnalytics?.activeRoutingRulesCount || metaMappings.length || 4} Mapped
+                {metaAnalytics?.activeRoutingRulesCount ?? metaMappings.length} Mapped
               </div>
               <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Dedicated branch destinations</div>
             </div>
@@ -1716,15 +1743,14 @@ export const IntegrationsPage: React.FC = () => {
             />
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <a
-                href="/api/v1/integrations/csv/export"
-                target="_blank"
-                rel="noreferrer"
-                style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+              <button
+                onClick={handleExportCSV}
+                disabled={isExportingCSV}
+                style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: 0 }}
               >
                 <Download size={15} />
-                <span>Export CRM Leads CSV</span>
-              </a>
+                <span>{isExportingCSV ? 'Exporting...' : 'Export CRM Leads CSV'}</span>
+              </button>
 
               <button
                 onClick={handleImportCSV}

@@ -4,6 +4,7 @@ import { LeadModel } from '../leads/lead.model';
 import { UserModel } from '../users/user.model';
 import { ApplicationModel } from '../applications/application.model';
 import { IntegrationLogModel, LogStatus } from '../integrations/integration-log.model';
+import { AutomationService } from '../integrations/automation.service';
 import { BadRequestError, NotFoundError, ConflictError } from '../../utils/errors';
 
 // State codes lookup for Indian States & UTs
@@ -148,6 +149,15 @@ export class BranchService {
       requestData: { branchId: branch.branchId, state: branch.state, city: branch.city, capacity: branch.capacity },
       triggeredBy: performedByUserId,
     });
+
+    void AutomationService.triggerWorkflows('branch.created', {
+      branchId: branch.branchId,
+      branchName: branch.name,
+      city: branch.city,
+      state: branch.state,
+      address: branch.address,
+      performedByUserId,
+    } as any).catch(() => undefined);
 
     return branch;
   }

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { LeadService } from './lead.service';
 import { MetaAdsService } from '../integrations/meta-ads.service';
 import { ApiResponse } from '../../utils/api-response';
@@ -450,6 +451,20 @@ export class LeadController {
 
   static async handleMetaWebhook(req: Request, res: Response) {
     try {
+      const signature = req.headers['x-hub-signature-256'] as string | undefined;
+
+      if (signature) {
+        const secret = process.env.META_WEBHOOK_SECRET || process.env.META_VERIFY_TOKEN || 'jaiva_meta_token_2026';
+        const rawBody: string = (req as any).rawBody || Buffer.from(JSON.stringify(req.body)).toString('utf8');
+        const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+
+        if (!expected.startsWith('sha256=') || signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+          return res.status(401).send('Invalid signature');
+        }
+      } else if (process.env.META_REQUIRE_WEBHOOK_SIGNATURE === 'true') {
+        return res.status(401).send('Missing X-Hub-Signature-256');
+      }
+
       const entry = req.body.entry?.[0];
       const change = entry?.changes?.[0]?.value;
 
@@ -467,7 +482,7 @@ export class LeadController {
       const assignedFormName = routing?.formName || req.body.formName || formId;
 
       if (change && change.leadgen_id) {
-        await LeadService.ingestMetaLead({
+        const result = await LeadService.ingestMetaLead({
           metaLeadId: change.leadgen_id,
           name: req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
           email: req.body.email || `lead_${change.leadgen_id}@meta.com`,
@@ -477,8 +492,11 @@ export class LeadController {
           metaFormId: formId,
           metaFormName: assignedFormName,
         });
+        if (!result.isDuplicate) {
+          await MetaAdsService.recordRoutedLead(formId, campaignName);
+        }
       } else if (req.body.email || req.body.name) {
-        await LeadService.ingestMetaLead({
+        const result = await LeadService.ingestMetaLead({
           metaLeadId: req.body.metaLeadId || req.body.id || `meta_${Date.now()}`,
           name: req.body.name || 'Meta Ad Lead',
           email: req.body.email || `meta_${Date.now()}@lead.com`,
@@ -491,6 +509,9 @@ export class LeadController {
           metaFormId: formId,
           metaFormName: assignedFormName,
         });
+        if (!result.isDuplicate) {
+          await MetaAdsService.recordRoutedLead(formId, campaignName);
+        }
       }
 
       return res.status(200).send('EVENT_RECEIVED');

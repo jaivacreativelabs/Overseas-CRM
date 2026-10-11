@@ -175,7 +175,7 @@ export class MetaAdsService {
           ],
         });
 
-        const effectiveLeads = Math.max(c.leadsCount, dbLeadCount);
+        const effectiveLeads = dbLeadCount > 0 ? dbLeadCount : c.leadsCount;
         const cpl = effectiveLeads > 0 ? Math.round(c.spend / effectiveLeads) : 0;
         const ctr = c.impressions > 0 ? Number(((c.clicks / c.impressions) * 100).toFixed(2)) : 0;
 
@@ -208,7 +208,7 @@ export class MetaAdsService {
         ],
       });
 
-      if (dbLeadCount > c.leadsCount) {
+      if (dbLeadCount > 0 && dbLeadCount !== c.leadsCount) {
         c.leadsCount = dbLeadCount;
       }
       c.lastSyncAt = new Date();
@@ -217,10 +217,11 @@ export class MetaAdsService {
 
     await IntegrationLogModel.create({
       providerId: 'meta_ads',
-      action: 'CAMPAIGNS_SYNC',
+      eventType: 'meta_ads.campaigns.sync',
+      operation: 'Synced Meta Ads Campaign Metrics',
       status: LogStatus.SUCCESS,
-      requestPayload: { timestamp: new Date() },
-      responsePayload: { campaignsCount: campaigns.length },
+      requestData: { timestamp: new Date() },
+      responseData: { campaignsCount: campaigns.length },
       durationMs: 145,
     });
 
@@ -304,10 +305,11 @@ export class MetaAdsService {
 
     await IntegrationLogModel.create({
       providerId: 'meta_ads',
-      action: 'FORM_BRANCH_RULE_SAVED',
+      eventType: 'meta_ads.form_mapping.saved',
+      operation: 'Saved Form-to-Branch Routing Rule',
       status: LogStatus.SUCCESS,
-      requestPayload: { formId: data.formId, branchId: data.branchId },
-      responsePayload: { mappingId: mapping._id, branchName: branch.name },
+      requestData: { formId: data.formId, branchId: data.branchId },
+      responseData: { mappingId: mapping._id, branchName: branch.name },
       durationMs: 40,
     });
 
@@ -335,6 +337,7 @@ export class MetaAdsService {
     branchName: string;
     formName?: string;
     campaignName?: string;
+    mappingId?: Types.ObjectId;
   } | null> {
     await this.ensureInitialData();
 
@@ -352,21 +355,12 @@ export class MetaAdsService {
     }
 
     if (mapping) {
-      mapping.totalLeadsRouted += 1;
-      mapping.lastLeadAt = new Date();
-      await mapping.save();
-
-      // Increment campaign leadsCount
-      await MetaCampaignModel.updateOne(
-        { $or: [{ campaignId: mapping.campaignId }, { name: mapping.campaignName }] },
-        { $inc: { leadsCount: 1 }, $set: { lastSyncAt: new Date() } }
-      );
-
       return {
         branchId: mapping.branchId,
         branchName: mapping.branchName,
         formName: mapping.formName,
         campaignName: mapping.campaignName,
+        mappingId: mapping._id,
       };
     }
 
@@ -382,6 +376,45 @@ export class MetaAdsService {
     }
 
     return null;
+  }
+
+  /**
+   * Increments routing counters ONLY for a genuinely new (non-duplicate) lead.
+   * This prevents totalLeadsRouted / leadsCount from drifting when the same
+   * webhook payload is delivered multiple times by Meta.
+   */
+  static async recordRoutedLead(formId?: string, campaignName?: string): Promise<void> {
+    if (!formId && !campaignName) return;
+
+    const mapping = formId
+      ? await MetaFormMappingModel.findOne({ formId: formId.trim(), isActive: true })
+      : null;
+
+    if (mapping) {
+      mapping.totalLeadsRouted += 1;
+      mapping.lastLeadAt = new Date();
+      await mapping.save();
+
+      await MetaCampaignModel.updateOne(
+        {
+          $or: [{ campaignId: mapping.campaignId || undefined }, { name: mapping.campaignName }],
+        },
+        { $inc: { leadsCount: 1 }, $set: { lastSyncAt: new Date() } }
+      );
+      return;
+    }
+
+    const campaign = campaignName
+      ? await MetaCampaignModel.findOne({
+          name: { $regex: new RegExp(campaignName.trim(), 'i') },
+        })
+      : null;
+
+    if (campaign) {
+      campaign.leadsCount += 1;
+      campaign.lastSyncAt = new Date();
+      await campaign.save();
+    }
   }
 
   /**
@@ -420,12 +453,17 @@ export class MetaAdsService {
       metaFormName: routing?.formName || data.formName || data.formId,
     });
 
+    if (!result.isDuplicate) {
+      await this.recordRoutedLead(data.formId, routing?.campaignName || data.campaignName);
+    }
+
     await IntegrationLogModel.create({
       providerId: 'meta_ads',
-      action: 'LEAD_SIMULATION_ROUTED',
+      eventType: 'meta_ads.lead.simulated',
+      operation: 'Simulated Meta Lead Route',
       status: LogStatus.SUCCESS,
-      requestPayload: { formId: data.formId, email: data.email },
-      responsePayload: {
+      requestData: { formId: data.formId, email: data.email },
+      responseData: {
         leadId: result.lead._id,
         assignedBranchId: routing?.branchId,
         assignedBranchName: routing?.branchName,
