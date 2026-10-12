@@ -771,4 +771,49 @@ export class LeadService {
 
     return { lead, isDuplicate: false };
   }
+
+  static async getStudentProfileForUser(userId: string, userEmail?: string): Promise<any> {
+    const userObjectId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+    let query: any = {};
+
+    if (userObjectId && userEmail) {
+      query = {
+        $or: [
+          { studentUserId: userObjectId },
+          { email: userEmail.toLowerCase() },
+        ],
+      };
+    } else if (userObjectId) {
+      query = { studentUserId: userObjectId };
+    } else if (userEmail) {
+      query = { email: userEmail.toLowerCase() };
+    } else {
+      throw new NotFoundError('Invalid user parameters for student profile');
+    }
+
+    const lead = await LeadModel.findOne(query)
+      .populate('counsellorId', 'name email phone avatar')
+      .populate('studentUserId', 'name email isActive')
+      .lean();
+
+    if (!lead) {
+      throw new NotFoundError('No linked student record found for this account');
+    }
+
+    // Auto-heal link if missing
+    if (userObjectId && (!lead.studentUserId || lead.studentUserId.toString() !== userObjectId.toString())) {
+      await LeadModel.findByIdAndUpdate(lead._id, { studentUserId: userObjectId });
+    }
+
+    const [contactAttempts, counsellingSessions] = await Promise.all([
+      ContactAttemptModel.find({ leadId: lead._id }).sort({ attemptDate: -1 }).lean(),
+      CounsellingSessionModel.find({ leadId: lead._id }).sort({ createdAt: -1 }).lean(),
+    ]);
+
+    return {
+      ...lead,
+      contactAttempts,
+      counsellingSessions,
+    };
+  }
 }

@@ -535,5 +535,20 @@ export class LeadController {
       return res.status(200).send('EVENT_RECEIVED');
     }
   }
+
+  static async getMyStudentProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        return ApiResponse.error(res, 'Unauthenticated', 401);
+      }
+      const studentProfile = await LeadService.getStudentProfileForUser(
+        req.user.userId,
+        req.user.email
+      );
+      return ApiResponse.success(res, 'Student profile retrieved successfully', studentProfile);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 

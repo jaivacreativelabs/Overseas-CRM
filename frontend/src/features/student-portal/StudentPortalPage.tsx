@@ -27,6 +27,8 @@ import {
   Compass,
   BarChart3,
   Building2,
+  File,
+  FolderOpen,
   FileCheck,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
@@ -93,7 +95,11 @@ export const StudentPortalPage: React.FC = () => {
   // Modals for student upload actions
   const [isUploadDocOpen, setIsUploadDocOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
+  const [docFile, setDocFile] = useState<File | null>(null);
   const [docFileUrl, setDocFileUrl] = useState('');
+  const [isDraggingDoc, setIsDraggingDoc] = useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [isSignOfferOpen, setIsSignOfferOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
@@ -108,8 +114,18 @@ export const StudentPortalPage: React.FC = () => {
   const fetchStudentData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
-      const currentLead = res.data?.[0];
+      // 1. Try fetching authoritative student profile for logged-in user
+      let currentLead: Lead | null = null;
+      try {
+        const myProfileRes = await apiClient.get<Lead>('/leads/my-student-profile');
+        if (myProfileRes.data) {
+          currentLead = myProfileRes.data;
+        }
+      } catch (e) {
+        // Fallback for compatibility
+        const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
+        currentLead = res.data?.[0] || null;
+      }
       if (currentLead) {
         setLead(currentLead);
         const [shortRes, docRes, appRes, offRes, payRes, visRes, travRes, msgRes, taskRes, orientRes] =
@@ -164,16 +180,52 @@ export const StudentPortalPage: React.FC = () => {
   const handleUploadDoc = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDoc) return;
+
+    if (!docFile && !docFileUrl.trim()) {
+      error('Please select a file or enter a valid document URL.');
+      return;
+    }
+
+    if (docFile) {
+      const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx'];
+      const fileExt = '.' + (docFile.name.split('.').pop() || '').toLowerCase();
+      if (!allowedExtensions.includes(fileExt)) {
+        error(`Invalid file format "${fileExt}". Please upload PDF, JPG, PNG, or DOCX.`);
+        return;
+      }
+      if (docFile.size > 15 * 1024 * 1024) {
+        error('File exceeds the maximum limit of 15MB. Please choose a smaller file.');
+        return;
+      }
+    }
+
+    setIsUploadingDoc(true);
+    setUploadProgress(20);
+
     try {
-      await apiClient.post(`/documents/${selectedDoc._id}/upload`, {
-        fileUrl: docFileUrl,
-        originalFileName: `${selectedDoc.title.replace(/\s+/g, '_')}.pdf`,
-      });
-      success('Document uploaded for counsellor verification.');
+      if (docFile) {
+        const fd = new FormData();
+        fd.append('file', docFile);
+        setUploadProgress(60);
+        await apiClient.post(`/documents/${selectedDoc._id}/upload`, fd);
+      } else {
+        setUploadProgress(60);
+        await apiClient.post(`/documents/${selectedDoc._id}/upload`, {
+          fileUrl: docFileUrl.trim(),
+          originalFileName: `${selectedDoc.title.replace(/\s+/g, '_')}.pdf`,
+        });
+      }
+      setUploadProgress(100);
+      success('Document submitted successfully for counselor verification.');
       setIsUploadDocOpen(false);
+      setDocFile(null);
+      setDocFileUrl('');
       fetchStudentData();
     } catch (err: any) {
-      error(err.message || 'Upload failed');
+      error(err.message || 'Upload failed. Please try again.');
+    } finally {
+      setIsUploadingDoc(false);
+      setUploadProgress(0);
     }
   };
 
@@ -356,7 +408,17 @@ export const StudentPortalPage: React.FC = () => {
          ========================================================================= */}
       {activeTabParam === 'documents' && (
         <div className="card">
-          <h3 className="card-title" style={{ marginBottom: '14px' }}>📄 Document Checklist</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <h3 className="card-title">📄 Document Checklist</h3>
+              <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Please review and upload all required documents requested by your assigned counselor.
+              </p>
+            </div>
+            <Badge variant="primary">
+              {documents.filter((d) => d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL).length} / {documents.length} Verified
+            </Badge>
+          </div>
           <div className="student-table-responsive">
             <Table
               columns={[
@@ -364,8 +426,18 @@ export const StudentPortalPage: React.FC = () => {
                   header: 'DOCUMENT',
                   render: (d) => (
                     <div>
-                      <strong>{d.title}</strong>
-                      {d.isMandatory && <span style={{ color: 'var(--danger)', marginLeft: '4px' }}>*</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <strong>{d.title}</strong>
+                        {d.isMandatory ? (
+                          <span style={{ color: 'var(--danger)', fontSize: '11px', fontWeight: 600 }}>[Required]</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>[Optional]</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Category: {d.category}
+                        {d.description ? ` • Instructions: ${d.description}` : ''}
+                      </div>
                     </div>
                   ),
                 },
@@ -377,18 +449,35 @@ export const StudentPortalPage: React.FC = () => {
                   header: 'ATTACHMENT',
                   render: (d) =>
                     d.fileUrl ? (
-                      <a href={d.fileUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                        {d.originalFileName || 'View File'}
-                      </a>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <a
+                          href={d.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <FileText size={14} />
+                          {d.originalFileName || 'View Uploaded Document'}
+                        </a>
+                        {d.fileSize && (
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                            {(d.fileSize / 1024).toFixed(0)} KB
+                          </span>
+                        )}
+                      </div>
                     ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>Not Uploaded</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Awaiting Submission</span>
                     ),
                 },
                 {
-                  header: 'FEEDBACK / REASON',
+                  header: 'COUNSELOR FEEDBACK',
                   render: (d) =>
-                    d.status === DocumentStatus.REJECTED ? (
-                      <span style={{ color: 'var(--danger)', fontSize: '12px' }}>{d.rejectionReason}</span>
+                    d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED ? (
+                      <div style={{ padding: '4px 8px', backgroundColor: '#FEF2F2', borderRadius: '4px', border: '1px solid #FECACA' }}>
+                        <span style={{ color: 'var(--danger)', fontSize: '12px', fontWeight: 500 }}>
+                          {d.rejectionReason || 'Document requires re-submission'}
+                        </span>
+                      </div>
                     ) : (
                       '—'
                     ),
@@ -396,23 +485,29 @@ export const StudentPortalPage: React.FC = () => {
                 {
                   header: 'ACTION',
                   align: 'right',
-                  render: (d) => (
-                    <Button
-                      variant={d.status === DocumentStatus.APPROVED ? 'ghost' : 'secondary'}
-                      size="sm"
-                      disabled={d.status === DocumentStatus.APPROVED}
-                      onClick={() => {
-                        setSelectedDoc(d);
-                        setIsUploadDocOpen(true);
-                      }}
-                    >
-                      {d.fileUrl ? 'Re-upload' : 'Upload'}
-                    </Button>
-                  ),
+                  render: (d) => {
+                    const isApproved = d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL;
+                    const isRejected = d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED;
+                    return (
+                      <Button
+                        variant={isApproved ? 'ghost' : isRejected ? 'danger' : 'primary'}
+                        size="sm"
+                        disabled={isApproved}
+                        onClick={() => {
+                          setSelectedDoc(d);
+                          setDocFile(null);
+                          setDocFileUrl('');
+                          setIsUploadDocOpen(true);
+                        }}
+                      >
+                        {isApproved ? 'Approved ✓' : d.fileUrl || isRejected ? 'Re-upload' : 'Upload File'}
+                      </Button>
+                    );
+                  },
                 },
               ]}
               data={documents}
-              emptyMessage="No documents requested yet."
+              emptyMessage="No documents have been requested yet. Your counselor will notify you if any credentials are required."
             />
           </div>
         </div>
@@ -1167,30 +1262,147 @@ export const StudentPortalPage: React.FC = () => {
       {/* --- Student Upload Document Modal --- */}
       <Modal
         isOpen={isUploadDocOpen}
-        onClose={() => setIsUploadDocOpen(false)}
+        onClose={() => {
+          if (!isUploadingDoc) {
+            setIsUploadDocOpen(false);
+            setDocFile(null);
+            setDocFileUrl('');
+          }
+        }}
         title={`Upload Document: ${selectedDoc?.title}`}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsUploadDocOpen(false)}>
+            <Button
+              variant="secondary"
+              disabled={isUploadingDoc}
+              onClick={() => {
+                setIsUploadDocOpen(false);
+                setDocFile(null);
+                setDocFileUrl('');
+              }}
+            >
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleUploadDoc}>
-              Submit File
+            <Button
+              variant="primary"
+              disabled={isUploadingDoc || (!docFile && !docFileUrl.trim())}
+              onClick={handleUploadDoc}
+            >
+              {isUploadingDoc ? 'Uploading...' : 'Submit File'}
             </Button>
           </>
         }
       >
-        <form onSubmit={handleUploadDoc}>
+        <form onSubmit={handleUploadDoc} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {selectedDoc?.description && (
+            <div
+              style={{
+                padding: '10px 12px',
+                backgroundColor: 'var(--bg-subtle)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-color)',
+                fontSize: '12px',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <strong>Counselor Instructions:</strong> {selectedDoc.description}
+            </div>
+          )}
+
+          {/* Drag & Drop Upload Zone */}
+          <div>
+            <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+              Select File to Upload
+            </label>
+            <div
+              className={`student-dropzone ${isDraggingDoc ? 'dragging' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingDoc(true);
+              }}
+              onDragLeave={() => setIsDraggingDoc(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingDoc(false);
+                if (e.dataTransfer.files?.[0]) {
+                  setDocFile(e.dataTransfer.files[0]);
+                }
+              }}
+              onClick={() => {
+                document.getElementById('student-file-input')?.click();
+              }}
+            >
+              <div className="student-dropzone-icon">
+                <Upload size={20} />
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Click to browse or drag and drop your file here
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                Supported: PDF, JPG, PNG, DOCX (Max: 15MB)
+              </div>
+              <input
+                id="student-file-input"
+                type="file"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    setDocFile(e.target.files[0]);
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Selected File Details */}
+          {docFile && (
+            <div className="student-selected-file-badge">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <FileCheck size={18} color="var(--primary)" />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '12.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {docFile.name}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {(docFile.size / 1024).toFixed(0)} KB
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDocFile(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' }}
+                title="Remove file"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {/* Upload Progress Indicator */}
+          {isUploadingDoc && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: 'var(--primary)', fontWeight: 600 }}>
+                <span>Uploading file...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="student-upload-progress-bar">
+                <div className="student-upload-progress-fill" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ textAlign: 'center', fontSize: '11.5px', color: 'var(--text-muted)', margin: '4px 0' }}>
+            — OR provide direct document file URL —
+          </div>
+
           <Input
-            label="Document File URL / Path *"
+            label="Document URL / Cloud Storage Link"
             value={docFileUrl}
             onChange={(e) => setDocFileUrl(e.target.value)}
-            placeholder="e.g. /uploads/passport_scan.pdf"
-            required
+            placeholder="e.g. https://storage.googleapis.com/... or /uploads/my_file.pdf"
           />
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
-            Supported formats: PDF, JPG, PNG, DOCX (Max 15MB).
-          </div>
         </form>
       </Modal>
 

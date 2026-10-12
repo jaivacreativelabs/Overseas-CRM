@@ -190,6 +190,68 @@
   border-radius: 12px;
 }
 
+/* Upload Dropzone Styles */
+.student-dropzone {
+  border: 2px dashed var(--border-color, #D1D5DB);
+  border-radius: var(--radius-lg, 10px);
+  padding: 24px 16px;
+  text-align: center;
+  background-color: var(--bg-subtle, #F9FAFB);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.student-dropzone:hover,
+.student-dropzone.dragging {
+  border-color: var(--primary, #0057F8);
+  background-color: #EFF6FF;
+}
+
+.student-dropzone-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #DBEAFE;
+  color: var(--primary, #0057F8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.student-selected-file-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-top: 10px;
+}
+
+.student-upload-progress-bar {
+  width: 100%;
+  height: 6px;
+  background-color: #E5E7EB;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.student-upload-progress-fill {
+  height: 100%;
+  background-color: var(--primary, #0057F8);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
 /* ==========================================================================
    MOBILE SPECIFIC OVERRIDES (<= 768px)
    BREAKPOINT OVERRIDES

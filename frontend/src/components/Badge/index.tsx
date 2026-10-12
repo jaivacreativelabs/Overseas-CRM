@@ -21,6 +21,7 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     case 'CONTACTED':
     case 'UNDER_REVIEW':
     case 'PENDING':
+    case 'REQUESTED':
     case 'PROOF_SUBMITTED':
     case 'SIGNED_UPLOADED':
       variant = 'warning';

@@ -307,6 +307,8 @@ export interface DocumentItem {
   status: DocumentStatus;
   fileUrl?: string;
   originalFileName?: string;
+  fileSize?: number;
+  mimeType?: string;
   rejectionReason?: string;
   uploadedAt?: string;
   reviewedAt?: string;
