@@ -12,6 +12,7 @@ import { AutomationService } from '../modules/integrations/automation.service';
 import { EmailService } from '../modules/integrations/email.service';
 import { IntegrationLogModel, LogStatus } from '../modules/integrations/integration-log.model';
 import { NotificationModel } from '../modules/notifications/notification.model';
+import { env } from '../config/env';
 import { UserRole, DocumentStatus, ApplicationStatus, OfferStatus } from '../config/constants';
 import { WorkflowTrigger } from '../modules/integrations/automation-workflow.model';
 
@@ -36,6 +37,10 @@ async function runTests() {
     }
   }
   console.log('✓ Connected to test database');
+
+  const originalSmtpHost = env.SMTP_HOST;
+  env.SMTP_HOST = '';
+  EmailService.resetTransporter();
 
   try {
     await Promise.all([
@@ -383,6 +388,8 @@ async function runTests() {
       IntegrationLogModel.deleteMany({ 'requestData.to': 'student@crmtest.com' }),
       NotificationModel.deleteMany({ title: 'Document Uploaded' }),
     ]);
+    env.SMTP_HOST = originalSmtpHost;
+    EmailService.resetTransporter();
     await mongoose.disconnect();
     if (mongoServer) {
       await mongoServer.stop();

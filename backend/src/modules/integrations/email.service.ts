@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import nodemailer, { Transporter } from 'nodemailer';
 import { env } from '../../config/env';
 import { WorkflowTrigger } from './automation-workflow.model';
@@ -129,14 +131,16 @@ export class EmailService {
       <td align="center">
         <table role="presentation" class="email-card" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;background-color:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
           <tr>
-            <td style="padding:24px 32px;border-bottom:2px solid #0057F8;background-color:#FFFFFF;">
+            <td style="padding:20px 32px;border-bottom:2px solid #0057F8;background-color:#FFFFFF;">
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td align="left">
-                    <span style="font-size:18px;font-weight:700;color:#0057F8;letter-spacing:-0.5px;">IIEC Overseas Education</span>
+                  <td align="left" style="vertical-align:middle;">
+                    <a href="${escapeHtml(portalUrl)}" target="_blank" style="text-decoration:none;display:inline-block;">
+                      <img src="cid:brand-logo" alt="IIEC Overseas Education" height="40" style="display:block;height:40px;width:auto;max-width:200px;border:0;" />
+                    </a>
                   </td>
-                  <td align="right">
-                    <span style="font-size:12px;font-weight:500;color:#64748B;">Student Portal</span>
+                  <td align="right" style="vertical-align:middle;">
+                    <span style="font-size:12px;font-weight:600;color:#64748B;letter-spacing:0.5px;text-transform:uppercase;">Student Portal</span>
                   </td>
                 </tr>
               </table>
@@ -635,6 +639,24 @@ export class EmailService {
         ctaUrl: templateResult.ctaUrl,
       });
 
+      const attachments: any[] = [];
+      const possibleLogoPaths = [
+        path.resolve(__dirname, '../../assets/logo.png'),
+        path.resolve(__dirname, '../../../../frontend/public/logo.png'),
+        path.resolve(process.cwd(), 'src/assets/logo.png'),
+        path.resolve(process.cwd(), '../frontend/public/logo.png'),
+      ];
+      for (const p of possibleLogoPaths) {
+        if (fs.existsSync(p)) {
+          attachments.push({
+            filename: 'logo.png',
+            path: p,
+            cid: 'brand-logo',
+          });
+          break;
+        }
+      }
+
       const transporter = this.getTransporter();
       const info = await transporter.sendMail({
         from: env.EMAIL_FROM || 'IIEC Admissions <admissions@iiec.edu>',
@@ -642,6 +664,7 @@ export class EmailService {
         subject,
         html,
         text: templateResult.textTwin,
+        attachments: attachments.length > 0 ? attachments : undefined,
       });
 
       return {
