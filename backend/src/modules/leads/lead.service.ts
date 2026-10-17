@@ -352,6 +352,20 @@ export class LeadService {
       description: `Session scheduled on ${data.scheduledDate} at ${data.scheduledTime} with ${counsellorName}`,
     });
 
+    void AutomationService.triggerWorkflows('counselling.scheduled', {
+      _id: session._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      scheduledDate: session.scheduledDate,
+      scheduledTime: session.scheduledTime,
+      counsellorName: session.counsellorName,
+      counsellorId: session.counsellorId?.toString(),
+      googleMeetLink: session.googleMeetLink,
+    } as any).catch(() => undefined);
+
     return session;
   }
 
@@ -683,6 +697,7 @@ export class LeadService {
       targetCourse: lead.targetCourse,
       targetCountry: lead.targetCountry,
       campaignName: data.campaignName,
+      counsellorId: lead.counsellorId?.toString(),
     } as any).catch(() => undefined);
 
     return { lead, isDuplicate: false };
@@ -767,6 +782,7 @@ export class LeadService {
       targetCountry: lead.targetCountry,
       campaignName: data.campaignName,
       branchId: data.branchId ? data.branchId.toString() : undefined,
+      counsellorId: lead.counsellorId?.toString(),
     } as any).catch(() => undefined);
 
     return { lead, isDuplicate: false };
