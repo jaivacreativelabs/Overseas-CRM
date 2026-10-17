@@ -995,6 +995,8 @@ export const AppLayout: React.FC = () => {
                     ? user.adminType === 'OWNER_ADMIN'
                       ? 'Owner Admin'
                       : 'Administrator'
+                    : user?.role === UserRole.STUDENT
+                    ? 'Student'
                     : 'Counsellor'}
                 </div>
               </div>
