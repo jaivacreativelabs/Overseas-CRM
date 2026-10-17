@@ -5,6 +5,9 @@ import { DocumentStatus, StudentStage, UserRole } from '../../config/constants';
 import { NotFoundError, ValidationError, ForbiddenError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
+import { NotificationService } from '../notifications/notification.service';
+import { env } from '../../config/env';
 
 export class DocumentService {
   static async getDocumentsForLead(leadId: string, actorUserId?: string, actorRole?: UserRole): Promise<any[]> {
@@ -74,6 +77,19 @@ export class DocumentService {
       description: `Requested document: ${doc.title} (${doc.category})`,
     });
 
+    void AutomationService.triggerWorkflows('document.requested', {
+      _id: doc._id.toString(),
+      documentId: doc._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      studentEmail: lead.email,
+      title: doc.title,
+      category: doc.category,
+      isMandatory: doc.isMandatory,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
+
     return doc;
   }
 
@@ -131,6 +147,19 @@ export class DocumentService {
       title: 'Document Uploaded',
       description: `Uploaded file for: ${doc.title}`,
     });
+
+    const lead = await LeadModel.findById(doc.leadId);
+    const recipientUserId = doc.requestedById?.toString() || lead?.counsellorId?.toString();
+    if (recipientUserId) {
+      const frontendUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+      void NotificationService.createNotification({
+        userId: recipientUserId,
+        title: 'Document Uploaded',
+        message: `${lead?.name || 'Student'} uploaded ${doc.title}`,
+        type: 'INFO',
+        actionUrl: `${frontendUrl}/leads/${doc.leadId}`,
+      }).catch(() => undefined);
+    }
 
     return doc;
   }
@@ -209,6 +238,22 @@ export class DocumentService {
       title: `Document ${isApproved ? 'Approved' : 'Rejected'}`,
       description: `${doc.title} was ${isApproved ? 'approved' : 'rejected'}.${doc.rejectionReason ? ` Reason: ${doc.rejectionReason}` : ''}`,
     });
+
+    if (lead) {
+      void AutomationService.triggerWorkflows('document.reviewed', {
+        _id: doc._id.toString(),
+        documentId: doc._id.toString(),
+        leadId: lead._id.toString(),
+        name: lead.name,
+        email: lead.email,
+        studentEmail: lead.email,
+        title: doc.title,
+        status: doc.status,
+        isApproved,
+        rejectionReason: doc.rejectionReason,
+        counsellorId: lead.counsellorId?.toString(),
+      } as any).catch(() => undefined);
+    }
 
     return doc;
   }
