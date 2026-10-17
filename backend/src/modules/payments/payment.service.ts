@@ -7,6 +7,8 @@ import { NotFoundError, ValidationError, StageLockedError } from '../../utils/er
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
 import { AutomationService } from '../integrations/automation.service';
+import { NotificationService } from '../notifications/notification.service';
+import { env } from '../../config/env';
 
 export class PaymentService {
   static async getAllPayments(status?: PaymentStatus): Promise<any[]> {
@@ -94,6 +96,21 @@ export class PaymentService {
       description: `Payment request for ${payment.currency} ${payment.amount} (${payment.title})`,
     });
 
+    void AutomationService.triggerWorkflows('payment.requested', {
+      _id: payment._id.toString(),
+      paymentId: payment._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      title: payment.title,
+      amount: payment.amount,
+      currency: payment.currency,
+      dueDate: payment.dueDate,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
+
     return payment;
   }
 
@@ -145,6 +162,17 @@ export class PaymentService {
       title: 'Payment Proof Submitted',
       description: `Proof submitted for Ref: ${data.transactionReference} (${payment.currency} ${payment.amount})`,
     });
+
+    if (payment.requestedById) {
+      const frontendUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+      void NotificationService.createNotification({
+        userId: payment.requestedById.toString(),
+        title: 'Payment Proof Submitted',
+        message: `${studentName} submitted payment proof`,
+        type: 'INFO',
+        actionUrl: `${frontendUrl}/leads/${payment.leadId}`,
+      }).catch(() => undefined);
+    }
 
     return payment;
   }

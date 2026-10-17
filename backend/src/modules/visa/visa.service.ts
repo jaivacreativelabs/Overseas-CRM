@@ -5,6 +5,7 @@ import { VisaStatus, StudentStage, UserRole } from '../../config/constants';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
 
 export class VisaService {
   static async getVisaForLead(leadId: string): Promise<any> {
@@ -69,6 +70,18 @@ export class VisaService {
       title: `Visa Status: ${visa.status}`,
       description: `Visa update recorded as ${visa.status}.${visa.visaNumber ? ` Visa Number: ${visa.visaNumber}` : ''}`,
     });
+
+    void AutomationService.triggerWorkflows('visa.updated', {
+      _id: visa._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      status: visa.status,
+      rejectionReason: visa.rejectionReason,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
 
     return visa;
   }
