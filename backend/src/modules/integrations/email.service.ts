@@ -70,7 +70,11 @@ export class EmailService {
     ctaText?: string;
     ctaUrl?: string;
   }): string {
-    const portalUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '') + '/portal';
+    const defaultBaseUrl = 'https://overseas-crm-skxf.vercel.app';
+    const baseUrl = (env.FRONTEND_URL && !env.FRONTEND_URL.includes('localhost'))
+      ? env.FRONTEND_URL.replace(/\/+$/, '')
+      : defaultBaseUrl;
+    const portalUrl = `${baseUrl}/portal`;
     const ctaUrl = data.ctaUrl || portalUrl;
     const badgeHtml = data.badge
       ? `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
@@ -174,8 +178,12 @@ export class EmailService {
 
   public static renderTemplate(trigger: WorkflowTrigger, payload: Record<string, any>): TemplateResult {
     const studentName = escapeHtml(payload.name || payload.studentName || 'Student');
-    const portalUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '') + '/portal';
-    const loginUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '') + '/login';
+    const defaultBaseUrl = 'https://overseas-crm-skxf.vercel.app';
+    const baseUrl = (env.FRONTEND_URL && !env.FRONTEND_URL.includes('localhost'))
+      ? env.FRONTEND_URL.replace(/\/+$/, '')
+      : defaultBaseUrl;
+    const portalUrl = `${baseUrl}/portal`;
+    const loginUrl = 'https://overseas-crm-skxf.vercel.app/dashboard';
 
     switch (trigger) {
       case 'lead.created': {
