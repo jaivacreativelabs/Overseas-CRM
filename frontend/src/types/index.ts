@@ -78,9 +78,16 @@ export enum PaymentStatus {
 }
 
 export enum VisaStatus {
-  PENDING = 'PENDING',
+  NOT_STARTED = 'NOT_STARTED',
+  DOCUMENTS_PENDING = 'DOCUMENTS_PENDING',
+  APPLICATION_SUBMITTED = 'APPLICATION_SUBMITTED',
+  UNDER_PROCESSING = 'UNDER_PROCESSING',
+  ADDITIONAL_INFO_REQUIRED = 'ADDITIONAL_INFO_REQUIRED',
+  INTERVIEW_SCHEDULED = 'INTERVIEW_SCHEDULED',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN',
+  PENDING = 'PENDING',
 }
 
 export enum TravelItemStatus {
@@ -394,23 +401,75 @@ export interface Payment {
   createdAt: string;
 }
 
+export interface VisaStatusHistoryItem {
+  status: VisaStatus;
+  remarks?: string;
+  internalRemarks?: string;
+  studentInstructions?: string;
+  changedById?: string;
+  changedByName?: string;
+  changedAt: string;
+}
+
 export interface VisaRecord {
   _id: string;
   leadId: string;
+  studentId?: string;
+  studentName?: string;
+  studentCustomId?: string;
+  studentEmail?: string;
+  applicationId?: string;
+  applicationRef?: string;
+  universityName?: string;
   country: string;
+  destinationCountry?: string;
   visaType: string;
+  submissionDate?: string;
   applicationDate?: string;
   appointmentDate?: string;
   vfsCenterLocation?: string;
   status: VisaStatus;
+  decision?: 'APPROVED' | 'REJECTED' | null;
   decisionDate?: string;
   visaNumber?: string;
   validUntil?: string;
   rejectionReason?: string;
-  visaGrantLetterUrl?: string;
+  counsellorRemarks?: string;
+  internalRemarks?: string;
+  studentInstructions?: string;
+  decisionDocumentUrl?: string;
+  decisionDocumentName?: string;
+  additionalInfoRequired?: string;
+  statusHistory?: VisaStatusHistoryItem[];
+  counsellorId?: string;
+  counsellorName?: string;
+  assignedCounsellor?: string;
   notes?: string;
   updatedByName?: string;
+  lastUpdatedDate?: string;
   updatedAt: string;
+  createdAt?: string;
+}
+
+export interface VisaStats {
+  total: number;
+  underProcessing: number;
+  approved: number;
+  rejected: number;
+  actionRequired: number;
+  notStarted: number;
+  documentsPending: number;
+  submitted: number;
+  withdrawn: number;
+}
+
+export interface VisaListResponse {
+  items: VisaRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: VisaStats;
 }
 
 export interface TravelSupport {
