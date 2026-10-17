@@ -459,7 +459,7 @@ export class AutomationService {
               await IntegrationLogModel.create({
                 providerId: act.providerId || 'email_smtp',
                 eventType: trigger,
-                operation: `Automated Email Sent to ${emailTarget}`,
+                operation: `Automated Email ${emailResult.success ? 'Sent' : 'Failed'} to ${emailTarget}`,
                 status: emailResult.success ? LogStatus.SUCCESS : LogStatus.FAILED,
                 requestData: { to: emailTarget, subject: act.config?.subject },
                 responseData: emailResult.success ? { messageId: emailResult.messageId, delivered: true } : undefined,
