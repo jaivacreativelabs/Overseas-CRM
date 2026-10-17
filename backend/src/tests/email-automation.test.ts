@@ -4,11 +4,15 @@ import { UserModel } from '../modules/users/user.model';
 import { LeadModel } from '../modules/leads/lead.model';
 import { DocumentModel } from '../modules/documents/document.model';
 import { DocumentService } from '../modules/documents/document.service';
+import { ApplicationModel } from '../modules/applications/application.model';
+import { ApplicationService } from '../modules/applications/application.service';
+import { OfferModel } from '../modules/offers/offer.model';
+import { OfferService } from '../modules/offers/offer.service';
 import { AutomationService } from '../modules/integrations/automation.service';
 import { EmailService } from '../modules/integrations/email.service';
 import { IntegrationLogModel, LogStatus } from '../modules/integrations/integration-log.model';
 import { NotificationModel } from '../modules/notifications/notification.model';
-import { UserRole, DocumentStatus } from '../config/constants';
+import { UserRole, DocumentStatus, ApplicationStatus, OfferStatus } from '../config/constants';
 import { WorkflowTrigger } from '../modules/integrations/automation-workflow.model';
 
 async function sleep(ms: number) {
@@ -38,6 +42,8 @@ async function runTests() {
       UserModel.deleteMany({ email: { $in: ['counsellor@crmtest.com', 'student@crmtest.com'] } }),
       LeadModel.deleteMany({ email: 'student@crmtest.com' }),
       DocumentModel.deleteMany({ title: 'Passport Photo Page' }),
+      ApplicationModel.deleteMany({ applicationNumber: 'APP-998811' }),
+      OfferModel.deleteMany({ originalOfferFileName: 'original.pdf' }),
       IntegrationLogModel.deleteMany({ 'requestData.to': 'student@crmtest.com' }),
       NotificationModel.deleteMany({ title: 'Document Uploaded' }),
     ]);
@@ -144,6 +150,149 @@ async function runTests() {
     }
     console.log('✓ Verified no email was dispatched to counsellor on document upload');
 
+    const testApp = await ApplicationService.createApplication(
+      lead._id.toString(),
+      {
+        universityId: new Types.ObjectId().toString(),
+        universityName: 'University of British Columbia',
+        courseId: new Types.ObjectId().toString(),
+        courseTitle: 'MSc Computer Science',
+        country: 'Canada',
+        intake: 'Fall 2026',
+        applicationNumber: 'APP-998811',
+      },
+      counsellor._id.toString(),
+      counsellor.name,
+      UserRole.COUNSELLOR
+    );
+
+    await sleep(400);
+
+    const appSubmittedLog = await IntegrationLogModel.findOne({
+      eventType: 'application.submitted',
+      'requestData.to': 'student@crmtest.com',
+    });
+
+    if (!appSubmittedLog) {
+      throw new Error('IntegrationLogModel entry not found for application.submitted');
+    }
+    if (appSubmittedLog.status !== LogStatus.SUCCESS) {
+      throw new Error(`Expected SUCCESS status for application.submitted log but got ${appSubmittedLog.status}`);
+    }
+    console.log('✓ Verified real ApplicationService.createApplication dispatches application.submitted email log');
+
+    await ApplicationService.updateApplicationStatus(
+      testApp._id.toString(),
+      {
+        status: ApplicationStatus.REJECTED,
+        rejectionReason: 'Academic prerequisites not fulfilled',
+      },
+      counsellor._id.toString(),
+      counsellor.name,
+      UserRole.COUNSELLOR
+    );
+
+    await sleep(400);
+
+    const appRejectedLog = await IntegrationLogModel.findOne({
+      eventType: 'application.rejected',
+      'requestData.to': 'student@crmtest.com',
+    });
+
+    if (!appRejectedLog) {
+      throw new Error('IntegrationLogModel entry not found for application.rejected');
+    }
+    if (appRejectedLog.status !== LogStatus.SUCCESS) {
+      throw new Error(`Expected SUCCESS status for application.rejected log but got ${appRejectedLog.status}`);
+    }
+    console.log('✓ Verified real ApplicationService.updateApplicationStatus dispatches application.rejected email log');
+
+    const testOfferAccepted = await OfferModel.create({
+      leadId: lead._id,
+      studentId: studentUser._id,
+      applicationId: testApp._id,
+      universityName: 'University of British Columbia',
+      courseTitle: 'MSc Computer Science',
+      offerType: 'UNCONDITIONAL',
+      tuitionFee: 25000,
+      depositAmount: 5000,
+      currency: 'CAD',
+      status: OfferStatus.SIGNED_UPLOADED,
+      originalOfferUrl: 'https://storage.test.com/original.pdf',
+      originalOfferFileName: 'original.pdf',
+      signedOfferUrl: 'https://storage.test.com/signed.pdf',
+      signedOfferFileName: 'signed.pdf',
+      uploadedById: counsellor._id,
+      uploadedByName: counsellor.name,
+    });
+
+    await OfferService.reviewSignedOffer(
+      testOfferAccepted._id.toString(),
+      OfferStatus.ACCEPTED,
+      'Signed agreement is verified',
+      counsellor._id.toString(),
+      counsellor.name,
+      UserRole.COUNSELLOR
+    );
+
+    await sleep(400);
+
+    const offerAcceptedLog = await IntegrationLogModel.findOne({
+      eventType: 'offer.accepted',
+      'requestData.to': 'student@crmtest.com',
+    });
+
+    if (!offerAcceptedLog) {
+      throw new Error('IntegrationLogModel entry not found for offer.accepted');
+    }
+    if (offerAcceptedLog.status !== LogStatus.SUCCESS) {
+      throw new Error(`Expected SUCCESS status for offer.accepted log but got ${offerAcceptedLog.status}`);
+    }
+    console.log('✓ Verified real OfferService.reviewSignedOffer (ACCEPTED) dispatches offer.accepted email log');
+
+    const testOfferRejected = await OfferModel.create({
+      leadId: lead._id,
+      studentId: studentUser._id,
+      applicationId: testApp._id,
+      universityName: 'University of British Columbia',
+      courseTitle: 'MSc Computer Science',
+      offerType: 'UNCONDITIONAL',
+      tuitionFee: 25000,
+      depositAmount: 5000,
+      currency: 'CAD',
+      status: OfferStatus.SIGNED_UPLOADED,
+      originalOfferUrl: 'https://storage.test.com/original.pdf',
+      originalOfferFileName: 'original.pdf',
+      signedOfferUrl: 'https://storage.test.com/signed.pdf',
+      signedOfferFileName: 'signed.pdf',
+      uploadedById: counsellor._id,
+      uploadedByName: counsellor.name,
+    });
+
+    await OfferService.reviewSignedOffer(
+      testOfferRejected._id.toString(),
+      OfferStatus.REJECTED,
+      'Missing student signature on page 4',
+      counsellor._id.toString(),
+      counsellor.name,
+      UserRole.COUNSELLOR
+    );
+
+    await sleep(400);
+
+    const offerRejectedLog = await IntegrationLogModel.findOne({
+      eventType: 'offer.rejected',
+      'requestData.to': 'student@crmtest.com',
+    });
+
+    if (!offerRejectedLog) {
+      throw new Error('IntegrationLogModel entry not found for offer.rejected');
+    }
+    if (offerRejectedLog.status !== LogStatus.SUCCESS) {
+      throw new Error(`Expected SUCCESS status for offer.rejected log but got ${offerRejectedLog.status}`);
+    }
+    console.log('✓ Verified real OfferService.reviewSignedOffer (REJECTED) dispatches offer.rejected email log');
+
     const triggersToVerify: WorkflowTrigger[] = [
       'lead.created',
       'counselling.scheduled',
@@ -229,6 +378,8 @@ async function runTests() {
       UserModel.deleteMany({ email: { $in: ['counsellor@crmtest.com', 'student@crmtest.com'] } }),
       LeadModel.deleteMany({ email: 'student@crmtest.com' }),
       DocumentModel.deleteMany({ title: 'Passport Photo Page' }),
+      ApplicationModel.deleteMany({ applicationNumber: 'APP-998811' }),
+      OfferModel.deleteMany({ originalOfferFileName: 'original.pdf' }),
       IntegrationLogModel.deleteMany({ 'requestData.to': 'student@crmtest.com' }),
       NotificationModel.deleteMany({ title: 'Document Uploaded' }),
     ]);

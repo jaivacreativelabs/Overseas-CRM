@@ -241,6 +241,7 @@ export class PaymentService {
         email: lead?.email,
         phone: lead?.phone,
         studentEmail: lead?.email,
+        title: payment.title,
         amount: payment.amount,
         currency: payment.currency,
         purpose: payment.purpose,

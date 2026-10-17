@@ -219,6 +219,22 @@ export class OfferService {
       description: `Signed offer was ${status.toLowerCase()} by counsellor. ${notes ? `Notes: ${notes}` : ''}`,
     });
 
+    void AutomationService.triggerWorkflows(
+      status === OfferStatus.ACCEPTED ? 'offer.accepted' : 'offer.rejected',
+      {
+        _id: offer._id.toString(),
+        offerId: offer._id.toString(),
+        leadId: offer.leadId.toString(),
+        name: lead?.name,
+        email: lead?.email,
+        studentEmail: lead?.email,
+        universityName: offer.universityName,
+        courseTitle: offer.courseTitle,
+        rejectionReason: offer.rejectionReason,
+        counsellorId: lead?.counsellorId?.toString(),
+      } as any
+    ).catch(() => undefined);
+
     return offer;
   }
 }
