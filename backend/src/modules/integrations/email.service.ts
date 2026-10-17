@@ -175,24 +175,45 @@ export class EmailService {
   public static renderTemplate(trigger: WorkflowTrigger, payload: Record<string, any>): TemplateResult {
     const studentName = escapeHtml(payload.name || payload.studentName || 'Student');
     const portalUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '') + '/portal';
+    const loginUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '') + '/login';
 
     switch (trigger) {
       case 'lead.created': {
         const targetCountry = escapeHtml(payload.targetCountry || 'Abroad');
         const targetCourse = escapeHtml(payload.targetCourse || 'your desired program');
+        const username = escapeHtml(payload.portalUsername || payload.studentEmail || payload.email || '');
+        const tempPassword = payload.portalPassword || payload.password;
+
+        const credentialsHtml = tempPassword
+          ? `<div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:24px 0;">
+              <p style="margin:0 0 12px 0;font-size:13px;font-weight:700;color:#0F172A;text-transform:uppercase;letter-spacing:0.5px;">Your Student Portal Login Credentials</p>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size:14px;color:#334155;">
+                <tr><td style="padding:6px 0;color:#64748B;width:140px;">Portal Login:</td><td style="padding:6px 0;"><a href="${loginUrl}" style="color:#0057F8;text-decoration:none;font-weight:600;">${loginUrl}</a></td></tr>
+                <tr><td style="padding:6px 0;color:#64748B;">Username / Email:</td><td style="padding:6px 0;font-weight:600;color:#0F172A;">${username}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748B;">Temporary Password:</td><td style="padding:6px 0;"><span style="font-family:monospace;font-size:15px;font-weight:700;background-color:#EEF4FF;color:#0057F8;padding:3px 8px;border-radius:4px;border:1px solid #D0E2FF;">${escapeHtml(tempPassword)}</span></td></tr>
+              </table>
+              <p style="margin:12px 0 0 0;font-size:12px;color:#64748B;">Please log in to your portal to complete your student profile and access all application services.</p>
+            </div>`
+          : '';
+
+        const credentialsText = tempPassword
+          ? `\n\nYour Student Portal Login Credentials:\nPortal Login: ${loginUrl}\nUsername: ${payload.portalUsername || payload.studentEmail || payload.email}\nTemporary Password: ${tempPassword}\n`
+          : '';
+
         return {
           subject: 'Welcome to IIEC Overseas Education',
-          preheader: 'Welcome to IIEC! Start your journey to study abroad.',
+          preheader: 'Welcome to IIEC! Your student portal login credentials are ready.',
           title: 'Welcome to Your Study Abroad Journey',
           badge: 'Registration Confirmed',
           badgeBg: '#EEF4FF',
           badgeColor: '#0057F8',
           bodyHtml: `<p>Dear ${studentName},</p>
             <p>Thank you for connecting with IIEC Overseas Education. We are thrilled to partner with you on your goal of studying ${targetCourse} in ${targetCountry}.</p>
+            ${credentialsHtml}
             <p>Your dedicated counsellor will contact you shortly to review your academic aspirations, shortlist top university programs, and assist with document preparation.</p>`,
-          ctaText: 'Access Student Portal',
-          ctaUrl: portalUrl,
-          textTwin: `Dear ${studentName},\n\nThank you for connecting with IIEC Overseas Education! We are thrilled to partner with you on your journey to study ${targetCourse} in ${targetCountry}.\n\nYour assigned counsellor will contact you shortly. Access your portal at ${portalUrl}\n\nWarm regards,\nIIEC Overseas Education`,
+          ctaText: 'Log In to Student Portal',
+          ctaUrl: loginUrl,
+          textTwin: `Dear ${studentName},\n\nThank you for connecting with IIEC Overseas Education! We are thrilled to partner with you on your journey to study ${targetCourse} in ${targetCountry}.\n\nYour assigned counsellor will contact you shortly.${credentialsText}\nLog in to your portal at ${loginUrl}\n\nWarm regards,\nIIEC Overseas Education`,
         };
       }
 

@@ -91,6 +91,8 @@ export class LeadService {
       });
     }
 
+    const { temporaryPassword } = await this.ensureStudentUserForLead(lead, lead.counsellorId);
+
     void AutomationService.triggerWorkflows('lead.created', {
       _id: lead._id.toString(),
       leadId: lead._id.toString(),
@@ -101,9 +103,49 @@ export class LeadService {
       targetCourse: lead.targetCourse,
       targetCountry: lead.targetCountry,
       counsellorId: data.counsellorId,
+      portalUsername: lead.email,
+      portalPassword: temporaryPassword,
     } as any).catch(() => undefined);
 
     return lead;
+  }
+
+  private static async ensureStudentUserForLead(
+    lead: ILead,
+    counsellorId?: Types.ObjectId
+  ): Promise<{ studentUser: any; temporaryPassword?: string }> {
+    let studentUser = lead.studentUserId ? await UserModel.findById(lead.studentUserId) : null;
+    if (!studentUser) {
+      studentUser = await UserModel.findOne({ email: lead.email.toLowerCase() });
+    }
+
+    let temporaryPassword: string | undefined = undefined;
+
+    if (!studentUser) {
+      temporaryPassword = 'Student@' + Math.floor(100000 + Math.random() * 900000);
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(temporaryPassword, salt);
+
+      studentUser = await UserModel.create({
+        name: lead.name,
+        email: lead.email.toLowerCase(),
+        passwordHash,
+        phone: lead.phone,
+        role: UserRole.STUDENT,
+        leadId: lead._id,
+        assignedCounsellorId: counsellorId || lead.counsellorId,
+        stage: lead.stage || StudentStage.LEAD_CAPTURED,
+        isActive: true,
+      });
+
+      lead.studentUserId = studentUser._id as Types.ObjectId;
+      await lead.save();
+    } else if (!lead.studentUserId) {
+      lead.studentUserId = studentUser._id as Types.ObjectId;
+      await lead.save();
+    }
+
+    return { studentUser, temporaryPassword };
   }
 
   static async getLeads(query: {
@@ -701,6 +743,8 @@ export class LeadService {
       description: `New lead from landing page: ${data.name} (${data.email})`,
     });
 
+    const { temporaryPassword: landingPass } = await this.ensureStudentUserForLead(lead, lead.counsellorId);
+
     void AutomationService.triggerWorkflows('lead.created', {
       _id: lead._id.toString(),
       leadId: lead._id.toString(),
@@ -712,6 +756,8 @@ export class LeadService {
       targetCountry: lead.targetCountry,
       campaignName: data.campaignName,
       counsellorId: lead.counsellorId?.toString(),
+      portalUsername: lead.email,
+      portalPassword: landingPass,
     } as any).catch(() => undefined);
 
     return { lead, isDuplicate: false };
@@ -785,6 +831,8 @@ export class LeadService {
       description: `New Meta Ad Lead: ${data.name} (${data.email}) [Form: ${data.metaFormName || data.metaFormId || 'Default'}]`,
     });
 
+    const { temporaryPassword: metaPass } = await this.ensureStudentUserForLead(lead, lead.counsellorId);
+
     void AutomationService.triggerWorkflows('lead.created', {
       _id: lead._id.toString(),
       leadId: lead._id.toString(),
@@ -797,6 +845,8 @@ export class LeadService {
       campaignName: data.campaignName,
       branchId: data.branchId ? data.branchId.toString() : undefined,
       counsellorId: lead.counsellorId?.toString(),
+      portalUsername: lead.email,
+      portalPassword: metaPass,
     } as any).catch(() => undefined);
 
     return { lead, isDuplicate: false };
