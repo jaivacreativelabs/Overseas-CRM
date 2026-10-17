@@ -49,6 +49,7 @@ import {
   OfferStatus,
   PaymentStatus,
   Task,
+  UserRole,
 } from '../../types';
 import { PendingTasksCard } from './components/PendingTasksCard';
 import { CounsellorCard } from './components/CounsellorCard';
@@ -305,9 +306,12 @@ export const StudentPortalPage: React.FC = () => {
       {/* Student Welcome & Profile Summary Header */}
       <div className="card student-welcome-card">
         <div className="student-header-top">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <h1 className="student-welcome-title">Welcome, {user?.name}!</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <h1 className="student-welcome-title">Welcome, {lead?.name || user?.name}!</h1>
             <Badge variant="primary">{lead?.stage?.replace(/_/g, ' ') || 'PROFILE EVALUATION'}</Badge>
+            {user?.role !== UserRole.STUDENT && (
+              <Badge variant="warning">Staff Preview Mode</Badge>
+            )}
           </div>
           <p className="student-welcome-subtext">
             Target Country: <strong>{lead?.targetCountry || 'International'}</strong> • Program:{' '}

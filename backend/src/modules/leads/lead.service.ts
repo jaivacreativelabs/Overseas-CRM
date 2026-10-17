@@ -24,6 +24,8 @@ import {
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
 import { AutomationService } from '../integrations/automation.service';
+import { NotificationService } from '../notifications/notification.service';
+import { env } from '../../config/env';
 
 export class LeadService {
   static async createLead(data: {
@@ -365,6 +367,18 @@ export class LeadService {
       counsellorId: session.counsellorId?.toString(),
       googleMeetLink: session.googleMeetLink,
     } as any).catch(() => undefined);
+
+    const targetStudentUserId = lead.studentUserId || (await UserModel.findOne({ email: lead.email.toLowerCase() }))?._id;
+    if (targetStudentUserId) {
+      const frontendUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+      void NotificationService.createNotification({
+        userId: targetStudentUserId.toString(),
+        title: 'Counselling Session Scheduled',
+        message: `Your counselling session with ${counsellorName} is scheduled on ${data.scheduledDate} at ${data.scheduledTime}.`,
+        type: 'INFO',
+        actionUrl: `${frontendUrl}/portal?tab=report`,
+      }).catch(() => undefined);
+    }
 
     return session;
   }
