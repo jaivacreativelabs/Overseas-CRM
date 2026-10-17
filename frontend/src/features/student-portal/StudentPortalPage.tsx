@@ -1131,43 +1131,141 @@ export const StudentPortalPage: React.FC = () => {
              REPORT SECTION 6: VISA TRACKING
              ========================================================================= */}
           {reportSection === 'visa' && (
-            <div className="student-grid-2col">
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '12px' }}>🛂 Visa Filing & Embassy Record</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Destination Country:</span>{' '}
-                    <strong>{visa?.country || lead?.targetCountry || 'International'}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Visa Filing Status:</span>{' '}
-                    <StatusBadge status={visa?.status || 'PENDING'} />
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Visa Grant / Application #:</span>{' '}
-                    <strong>{visa?.visaNumber || 'Under Review'}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Embassy Appointment Date:</span>{' '}
-                    <strong>{visa?.appointmentDate ? new Date(visa.appointmentDate).toLocaleDateString() : 'TBD'}</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="student-grid-2col">
+                <div className="card">
+                  <h3 className="card-title" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Stamp size={18} color="var(--primary)" /> Visa Filing & Embassy Record
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Destination Country:</span>{' '}
+                      <strong>{visa?.country || lead?.targetCountry || 'International'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Target University:</span>{' '}
+                      <strong>{visa?.universityName || 'University of Oxford'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Visa Filing Status:</span>{' '}
+                      <StatusBadge status={visa?.status || 'PENDING'} />
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Visa Application / Grant #:</span>{' '}
+                      <strong>{visa?.visaNumber || visa?.applicationId || 'Under Review'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: 'var(--text-muted)' }}>Submission Date:</span>{' '}
+                      <strong>{visa?.submissionDate ? new Date(visa.submissionDate).toLocaleDateString() : 'In Progress'}</strong>
+                    </div>
+                    {visa?.appointmentDate && (
+                      <div style={{ backgroundColor: 'rgba(2, 132, 199, 0.08)', padding: '8px 10px', borderRadius: '4px' }}>
+                        <span style={{ color: '#0284C7', fontWeight: 600 }}>Embassy Appointment / Interview:</span>{' '}
+                        <strong style={{ color: '#0284C7' }}>{new Date(visa.appointmentDate).toLocaleString()}</strong>
+                        {visa.vfsCenterLocation && (
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            Location: {visa.vfsCenterLocation}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Decision Information Card if recorded */}
+                {visa?.decision ? (
+                  <div
+                    className="card"
+                    style={{
+                      border: visa.decision === 'APPROVED' ? '1px solid rgba(22, 163, 74, 0.3)' : '1px solid rgba(220, 38, 38, 0.3)',
+                      backgroundColor: visa.decision === 'APPROVED' ? 'rgba(22, 163, 74, 0.02)' : 'rgba(220, 38, 38, 0.02)',
+                    }}
+                  >
+                    <h3 className="card-title" style={{ marginBottom: '14px', color: visa.decision === 'APPROVED' ? '#16A34A' : '#DC2626' }}>
+                      {visa.decision === 'APPROVED' ? '🎉 Embassy Decision: Visa Approved' : 'Embassy Decision: Visa Refused'}
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)' }}>Decision Date:</span>{' '}
+                        <strong>{visa.decisionDate ? new Date(visa.decisionDate).toLocaleDateString() : 'Confirmed'}</strong>
+                      </div>
+                      {visa.studentInstructions && (
+                        <div style={{ backgroundColor: '#FFFFFF', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11.5px', fontWeight: 600 }}>Counsellor Instructions for You:</span>
+                          <div style={{ marginTop: '4px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                            {visa.studentInstructions}
+                          </div>
+                        </div>
+                      )}
+                      {visa.decisionDocumentUrl && (
+                        <div>
+                          <a
+                            href={visa.decisionDocumentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-secondary btn-sm"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+                          >
+                            <Download size={14} /> Download Official Decision Document
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="card">
+                    <h3 className="card-title" style={{ marginBottom: '12px' }}>📋 Visa Requirements & Checklist</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CheckCircle2 size={16} color="var(--success)" /> Valid Passport (Minimum 6 Months Validity)
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CheckCircle2 size={16} color="var(--success)" /> Official CAS / I-20 / Offer Letter
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CheckCircle2 size={16} color="var(--success)" /> Financial Proof & Bank Wire Receipts
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <CheckCircle2 size={16} color="var(--success)" /> Biometric Enrollment Appointment
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '12px' }}>📋 Visa Checklist</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={16} color="var(--success)" /> Valid Passport (Minimum 6 Months Validity)
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={16} color="var(--success)" /> Official CAS / I-20 / Offer Letter
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CheckCircle2 size={16} color="var(--success)" /> Financial Proof & Bank Wire Receipts
+              {/* Status Update History Timeline */}
+              {visa?.statusHistory && visa.statusHistory.length > 0 && (
+                <div className="card">
+                  <h3 className="card-title" style={{ marginBottom: '12px', fontSize: '14px' }}>
+                    ⏱️ Visa Status Updates & Timeline
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {visa.statusHistory.slice().reverse().map((hist: any, index: number) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '12px',
+                          fontSize: '12.5px',
+                          paddingBottom: '8px',
+                          borderBottom: index !== visa.statusHistory!.length - 1 ? '1px dashed var(--border-color)' : 'none',
+                        }}
+                      >
+                        <StatusBadge status={hist.status} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: 'var(--text-secondary)' }}>
+                            {hist.studentInstructions || hist.remarks || `Status transitioned to ${hist.status.replace(/_/g, ' ')}`}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {new Date(hist.changedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
