@@ -443,6 +443,8 @@ export interface CounsellingFeeDetail extends CounsellingFeeSummary {
   setByName?: string;
   setAt?: string;
   updatedAt?: string;
+}
+
 export interface VisaStatusHistoryItem {
   status: VisaStatus;
   remarks?: string;
