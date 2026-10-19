@@ -5,6 +5,7 @@ import { ApplicationStatus, StudentStage, UserRole } from '../../config/constant
 import { NotFoundError, ValidationError, StageLockedError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
 
 const VALID_APPLICATION_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   [ApplicationStatus.SUBMITTED]: [ApplicationStatus.UNDER_REVIEW, ApplicationStatus.REJECTED],
@@ -114,6 +115,20 @@ export class ApplicationService {
       description: `Application submitted for ${application.courseTitle} at ${application.universityName}`,
     });
 
+    void AutomationService.triggerWorkflows('application.submitted', {
+      _id: application._id.toString(),
+      applicationId: application._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      studentEmail: lead.email,
+      universityName: application.universityName,
+      courseTitle: application.courseTitle,
+      intake: application.intake,
+      applicationNumber: application.applicationNumber,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
+
     return application;
   }
 
@@ -195,6 +210,37 @@ export class ApplicationService {
       title: `Application Status: ${data.status}`,
       description: `Status for ${app.universityName} changed to ${data.status}.${data.rejectionReason ? ` Reason: ${data.rejectionReason}` : ''}`,
     });
+
+    if (data.status === ApplicationStatus.OFFER_RECEIVED) {
+      void AutomationService.triggerWorkflows('offer.received', {
+        _id: app._id.toString(),
+        applicationId: app._id.toString(),
+        leadId: app.leadId.toString(),
+        name: lead?.name,
+        email: lead?.email,
+        phone: lead?.phone,
+        studentEmail: lead?.email,
+        counsellorId: (lead as any)?.counsellorId?.toString?.() || (lead as any)?.assignedCounsellorId?.toString?.(),
+        universityName: app.universityName,
+        courseTitle: (app as any).courseTitle,
+      } as any).catch(() => undefined);
+    }
+
+    if (data.status === ApplicationStatus.REJECTED) {
+      void AutomationService.triggerWorkflows('application.rejected', {
+        _id: app._id.toString(),
+        applicationId: app._id.toString(),
+        leadId: app.leadId.toString(),
+        name: lead?.name,
+        email: lead?.email,
+        studentEmail: lead?.email,
+        universityName: app.universityName,
+        courseTitle: app.courseTitle,
+        intake: app.intake,
+        rejectionReason: app.rejectionReason,
+        counsellorId: lead?.counsellorId?.toString(),
+      } as any).catch(() => undefined);
+    }
 
     return app;
   }

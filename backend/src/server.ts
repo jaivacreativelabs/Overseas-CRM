@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { connectDatabase } from './config/database';
 import { env } from './config/env';
 import { logger } from './utils/logger';
+import { AutomationService } from './modules/integrations/automation.service';
 import { seedDatabase } from './database/seeders/seed';
 
 const startServer = async () => {
@@ -17,7 +18,10 @@ const startServer = async () => {
 
     // 3. Connect to Database & Seed asynchronously
     connectDatabase()
-      .then(() => seedDatabase())
+      .then(async () => {
+        await seedDatabase();
+        await AutomationService.initializeDefaultWorkflows();
+      })
       .catch((err) => logger.error('Database connection error:', err));
 
     // Graceful shutdown handling

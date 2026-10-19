@@ -6,6 +6,9 @@ import { OfferStatus, StudentStage, UserRole } from '../../config/constants';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
+import { NotificationService } from '../notifications/notification.service';
+import { env } from '../../config/env';
 
 export class OfferService {
   static async getAllOffers(status?: OfferStatus): Promise<any[]> {
@@ -127,6 +130,18 @@ export class OfferService {
         : 'Student submitted their signed acceptance for the offer letter.',
     });
 
+    const lead = await LeadModel.findById(offer.leadId);
+    if (lead?.counsellorId) {
+      const frontendUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+      void NotificationService.createNotification({
+        userId: lead.counsellorId.toString(),
+        title: 'Signed Offer Uploaded',
+        message: `${studentName} uploaded their signed offer`,
+        type: 'INFO',
+        actionUrl: `${frontendUrl}/leads/${offer.leadId}`,
+      }).catch(() => undefined);
+    }
+
     return offer;
   }
 
@@ -203,6 +218,22 @@ export class OfferService {
       title: `Signed Offer ${status === OfferStatus.ACCEPTED ? 'Accepted' : 'Rejected'}`,
       description: `Signed offer was ${status.toLowerCase()} by counsellor. ${notes ? `Notes: ${notes}` : ''}`,
     });
+
+    void AutomationService.triggerWorkflows(
+      status === OfferStatus.ACCEPTED ? 'offer.accepted' : 'offer.rejected',
+      {
+        _id: offer._id.toString(),
+        offerId: offer._id.toString(),
+        leadId: offer.leadId.toString(),
+        name: lead?.name,
+        email: lead?.email,
+        studentEmail: lead?.email,
+        universityName: offer.universityName,
+        courseTitle: offer.courseTitle,
+        rejectionReason: offer.rejectionReason,
+        counsellorId: lead?.counsellorId?.toString(),
+      } as any
+    ).catch(() => undefined);
 
     return offer;
   }

@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   GitFork,
-  Building2,
   Users,
   CheckCircle2,
   AlertTriangle,
   Search,
-  Filter,
   Plus,
   RefreshCw,
   Edit,
@@ -15,24 +13,24 @@ import {
   ChevronDown,
   ChevronRight,
   ShieldAlert,
-  ArrowUpDown,
   MapPin,
   X,
   UserCheck,
   Download,
-  Phone,
-  Mail,
-  User,
-  Calendar,
-  FileText,
-  Activity,
-  BarChart3,
-  UserPlus,
-  Zap,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType } from '../../types';
+import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType, MetaFormMapping } from '../../types';
+
+// Meta Facebook SVG Icon
+const FacebookColorIcon = ({ size = 15 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+      fill="#1877F2"
+    />
+  </svg>
+);
 
 const INDIAN_STATES_AND_UTS = [
   'Andhra Pradesh',
@@ -78,9 +76,7 @@ export interface ExtendedBranchSummary {
   activeBranches: number;
   inactiveBranches: number;
   statesCovered: number;
-  totalCapacity: number;
   totalAssignedStudents: number;
-  availableSeats: number;
 }
 
 export const BranchesPage: React.FC = () => {
@@ -95,38 +91,33 @@ export const BranchesPage: React.FC = () => {
     activeBranches: 0,
     inactiveBranches: 0,
     statesCovered: 0,
-    totalCapacity: 0,
     totalAssignedStudents: 0,
-    availableSeats: 0,
   });
   const [stateSummaries, setStateSummaries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Filters & Controls
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
-  const [selectedCity, setSelectedCity] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
   const [expandedStates, setExpandedStates] = useState<Record<string, boolean>>({});
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Modals & Drawers
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [selectedBranchDetails, setSelectedBranchDetails] = useState<{
     branch: Branch;
     assignedStudents: Lead[];
   } | null>(null);
-  const [drawerActiveTab, setDrawerActiveTab] = useState<'overview' | 'students' | 'staff' | 'applications' | 'reports' | 'history'>('overview');
+  const [drawerActiveTab, setDrawerActiveTab] = useState<'overview' | 'students' | 'staff' | 'applications' | 'history'>('overview');
   const [branchApplications, setBranchApplications] = useState<Application[]>([]);
   const [branchLogs, setBranchLogs] = useState<IntegrationLog[]>([]);
   const [isLoadingTabContent, setIsLoadingTabContent] = useState(false);
@@ -135,7 +126,6 @@ export const BranchesPage: React.FC = () => {
   const [assignStudentModal, setAssignStudentModal] = useState<Branch | null>(null);
   const [assignStaffModal, setAssignStaffModal] = useState<Branch | null>(null);
 
-  // Form states
   const [formData, setFormData] = useState({
     name: '',
     state: 'Karnataka',
@@ -146,19 +136,125 @@ export const BranchesPage: React.FC = () => {
     email: '',
     managerName: '',
     managerEmail: '',
-    capacity: 100,
-    openingDate: new Date().toISOString().split('T')[0],
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     notes: '',
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Student & Staff assignment state
   const [unassignedStudents, setUnassignedStudents] = useState<Lead[]>([]);
   const [selectedStudentToAssign, setSelectedStudentToAssign] = useState('');
   const [allUsers, setAllUsers] = useState<UserType[]>([]);
   const [selectedStaffUserIds, setSelectedStaffUserIds] = useState<string[]>([]);
   const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
+
+  // Meta Lead Form Connection State
+  const [metaForms, setMetaForms] = useState<MetaFormMapping[]>([]);
+  const [connectingBranchId, setConnectingBranchId] = useState<string | null>(null);
+  const [showAddCustomFormModal, setShowAddCustomFormModal] = useState<string | null>(null);
+  const [customFormInput, setCustomFormInput] = useState({
+    formId: '',
+    formName: '',
+    campaignName: '',
+  });
+
+  const DEFAULT_KNOWN_FORMS = [
+    { formId: 'meta_form_uk_blr', formName: 'UK Masters FastTrack Form (South India)', campaignName: 'UK Admissions 2026' },
+    { formId: 'meta_form_uk_pune', formName: 'UK STEM & Business Form (West India)', campaignName: 'UK Admissions 2026' },
+    { formId: 'meta_form_can_pune', formName: 'Canada SDS & Express Visa Form', campaignName: 'Canada Visa Express' },
+    { formId: 'meta_form_aus_che', formName: 'Australia GTE & Scholarship Form', campaignName: 'Australia Direct 2027' },
+  ];
+
+  const allKnownForms = [
+    ...DEFAULT_KNOWN_FORMS,
+    ...metaForms.map((m) => ({
+      formId: m.formId,
+      formName: m.formName,
+      campaignName: m.campaignName,
+    })),
+  ].filter(
+    (form, index, self) =>
+      index === self.findIndex((f) => f.formId === form.formId)
+  );
+
+  const fetchMetaForms = async () => {
+    try {
+      const res = await apiClient.get<any>('/integrations/meta-ads/mappings');
+      setMetaForms(res.data || []);
+    } catch {
+      // silently fallback
+    }
+  };
+
+  useEffect(() => {
+    fetchMetaForms();
+  }, []);
+
+  const handleConnectFormToBranch = async (branchId: string, formId: string) => {
+    if (!formId) return;
+    setConnectingBranchId(branchId);
+    const formObj = allKnownForms.find((f) => f.formId === formId);
+    const branchObj = branches.find((b) => b._id === branchId);
+
+    try {
+      await apiClient.post('/integrations/meta-ads/mappings', {
+        formId,
+        formName: formObj?.formName || formId,
+        campaignName: formObj?.campaignName || 'General Meta Ad',
+        branchId,
+        isActive: true,
+      });
+
+      setSuccessMsg(`Meta Lead Form "${formObj?.formName || formId}" connected to ${branchObj?.name || 'branch'}! Any incoming leads will auto-assign here.`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+      fetchMetaForms();
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect Meta form');
+    } finally {
+      setConnectingBranchId(null);
+    }
+  };
+
+  const handleDisconnectForm = async (mappingId: string, formName: string) => {
+    if (!window.confirm(`Disconnect Meta form "${formName}" from this branch?`)) return;
+
+    try {
+      await apiClient.delete(`/integrations/meta-ads/mappings/${mappingId}`);
+      setSuccessMsg(`Disconnected Meta form "${formName}".`);
+      setTimeout(() => setSuccessMsg(null), 3000);
+      fetchMetaForms();
+    } catch (err: any) {
+      setError(err.message || 'Failed to disconnect Meta form');
+    }
+  };
+
+  const handleSaveCustomForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showAddCustomFormModal || !customFormInput.formId.trim() || !customFormInput.formName.trim()) {
+      setError('Form ID and Form Name are required.');
+      return;
+    }
+
+    const branchId = showAddCustomFormModal;
+    const branchObj = branches.find((b) => b._id === branchId);
+
+    try {
+      await apiClient.post('/integrations/meta-ads/mappings', {
+        formId: customFormInput.formId.trim(),
+        formName: customFormInput.formName.trim(),
+        campaignName: customFormInput.campaignName.trim() || 'General Meta Ad',
+        branchId,
+        isActive: true,
+      });
+
+      setSuccessMsg(`New Meta Form "${customFormInput.formName}" connected to ${branchObj?.name || 'branch'}!`);
+      setShowAddCustomFormModal(null);
+      setCustomFormInput({ formId: '', formName: '', campaignName: '' });
+      setTimeout(() => setSuccessMsg(null), 4000);
+      fetchMetaForms();
+    } catch (err: any) {
+      setError(err.message || 'Failed to register custom form');
+    }
+  };
 
   const fetchBranches = async (showRefreshSpinner = false) => {
     if (showRefreshSpinner) setIsRefreshing(true);
@@ -169,7 +265,6 @@ export const BranchesPage: React.FC = () => {
       const res = await apiClient.get<any>('/branches', {
         search: searchQuery,
         state: selectedState,
-        city: selectedCity,
         status: selectedStatus,
         sortBy,
         sortOrder,
@@ -184,15 +279,12 @@ export const BranchesPage: React.FC = () => {
           activeBranches: 0,
           inactiveBranches: 0,
           statesCovered: 0,
-          totalCapacity: 0,
           totalAssignedStudents: 0,
-          availableSeats: 0,
         }
       );
       setStateSummaries(res.data.stateSummaries || []);
       setTotalPages(res.data.pagination?.pages || 1);
 
-      // Auto expand state accordions
       const expMap: Record<string, boolean> = {};
       (res.data.stateSummaries || []).forEach((st: any) => {
         expMap[st.state.toUpperCase()] = true;
@@ -208,7 +300,31 @@ export const BranchesPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
-  }, [searchQuery, selectedState, selectedCity, selectedStatus, sortBy, sortOrder, currentPage]);
+  }, [searchQuery, selectedState, selectedStatus, sortBy, sortOrder, currentPage]);
+
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem('jaiva_crm_token') || '';
+      const res = await fetch('/api/v1/branches/export', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `crm_branches_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || 'CSV export failed');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleOpenCreateModal = () => {
     setEditingBranch(null);
@@ -222,8 +338,6 @@ export const BranchesPage: React.FC = () => {
       email: '',
       managerName: '',
       managerEmail: '',
-      capacity: 100,
-      openingDate: new Date().toISOString().split('T')[0],
       status: 'ACTIVE',
       notes: '',
     });
@@ -243,8 +357,6 @@ export const BranchesPage: React.FC = () => {
       email: branch.email || '',
       managerName: branch.managerName || '',
       managerEmail: branch.managerEmail || '',
-      capacity: branch.capacity,
-      openingDate: branch.openingDate ? new Date(branch.openingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: branch.status,
       notes: branch.notes || '',
     });
@@ -258,8 +370,6 @@ export const BranchesPage: React.FC = () => {
     if (!formData.state.trim()) errs.state = 'State is mandatory';
     if (!formData.city.trim()) errs.city = 'City is mandatory';
     if (!formData.address.trim()) errs.address = 'Full address is mandatory';
-    if (!formData.capacity || Number(formData.capacity) < 1) errs.capacity = 'Capacity must be at least 1 student';
-
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       errs.email = 'Invalid email address format';
     }
@@ -269,11 +379,6 @@ export const BranchesPage: React.FC = () => {
     if (formData.pinCode && !/^\d{6}$/.test(formData.pinCode.trim())) {
       errs.pinCode = 'PIN Code must be a 6-digit number';
     }
-
-    if (editingBranch && formData.capacity < editingBranch.assignedStudentsCount) {
-      errs.capacity = `Cannot reduce capacity below currently assigned students (${editingBranch.assignedStudentsCount})`;
-    }
-
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -333,7 +438,7 @@ export const BranchesPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = async (tab: 'overview' | 'students' | 'staff' | 'applications' | 'reports' | 'history') => {
+  const handleTabChange = async (tab: 'overview' | 'students' | 'staff' | 'applications' | 'history') => {
     setDrawerActiveTab(tab);
     if (!selectedBranchDetails) return;
 
@@ -427,7 +532,6 @@ export const BranchesPage: React.FC = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header Banner */}
       <div
         style={{
           display: 'flex',
@@ -457,17 +561,16 @@ export const BranchesPage: React.FC = () => {
                 Branch Management
               </h1>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                Manage branches, state-wise operations, student capacity, staff, and performance.
+                Manage branches, assign students and staff, and track performance.
               </p>
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <a
-            href="/api/v1/branches/export"
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={handleExportCSV}
+            disabled={isExporting}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -479,12 +582,13 @@ export const BranchesPage: React.FC = () => {
               fontSize: '13px',
               fontWeight: 600,
               color: 'var(--text-primary)',
-              textDecoration: 'none',
+              cursor: 'pointer',
+              opacity: isExporting ? 0.6 : 1,
             }}
           >
             <Download size={15} />
-            <span>Export CSV</span>
-          </a>
+            <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
+          </button>
 
           <button
             onClick={() => fetchBranches(true)}
@@ -532,7 +636,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Success Notification Alert */}
       {successMsg && (
         <div
           style={{
@@ -553,7 +656,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Error Alert */}
       {error && (
         <div
           style={{
@@ -579,11 +681,10 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* Summary Cards */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '14px',
           marginBottom: '24px',
         }}
@@ -591,37 +692,19 @@ export const BranchesPage: React.FC = () => {
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL BRANCHES</div>
           <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{summary.totalBranches}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>State Network</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>All Locations</div>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ACTIVE BRANCHES</div>
           <div style={{ fontSize: '24px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>{summary.activeBranches}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Operational Intake</div>
-        </div>
-
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>INACTIVE BRANCHES</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#DC2626', marginTop: '4px' }}>{summary.inactiveBranches}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Paused Operations</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Currently Operational</div>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ASSIGNED STUDENTS</div>
           <div style={{ fontSize: '24px', fontWeight: 700, color: '#D97706', marginTop: '4px' }}>{summary.totalAssignedStudents}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Enrolled Capacity</div>
-        </div>
-
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>TOTAL CAPACITY</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--primary)', marginTop: '4px' }}>{summary.totalCapacity}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Max Intake Limit</div>
-        </div>
-
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>AVAILABLE SEATS</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#2563EB', marginTop: '4px' }}>{summary.availableSeats}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Open Vacancies</div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Across All Branches</div>
         </div>
 
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
@@ -631,7 +714,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div
         style={{
           backgroundColor: '#FFFFFF',
@@ -647,7 +729,6 @@ export const BranchesPage: React.FC = () => {
         }}
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', flex: 1, minWidth: '280px' }}>
-          {/* Search Box */}
           <div style={{ position: 'relative', minWidth: '240px', flex: 1 }}>
             <Search
               size={17}
@@ -675,7 +756,6 @@ export const BranchesPage: React.FC = () => {
             />
           </div>
 
-          {/* State Filter */}
           <select
             value={selectedState}
             onChange={(e) => setSelectedState(e.target.value)}
@@ -695,7 +775,6 @@ export const BranchesPage: React.FC = () => {
             ))}
           </select>
 
-          {/* Status Filter */}
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
@@ -713,43 +792,39 @@ export const BranchesPage: React.FC = () => {
           </select>
         </div>
 
-        {/* View Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            <button
-              onClick={() => setViewMode('grouped')}
-              style={{
-                padding: '7px 12px',
-                backgroundColor: viewMode === 'grouped' ? 'var(--primary-light)' : '#FFFFFF',
-                color: viewMode === 'grouped' ? 'var(--primary)' : 'var(--text-secondary)',
-                border: 'none',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              State-Wise Grouped
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '7px 12px',
-                backgroundColor: viewMode === 'list' ? 'var(--primary-light)' : '#FFFFFF',
-                color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-secondary)',
-                border: 'none',
-                borderLeft: '1px solid var(--border-color)',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Data Table
-            </button>
-          </div>
+        <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+          <button
+            onClick={() => setViewMode('grouped')}
+            style={{
+              padding: '7px 12px',
+              backgroundColor: viewMode === 'grouped' ? 'var(--primary-light)' : '#FFFFFF',
+              color: viewMode === 'grouped' ? 'var(--primary)' : 'var(--text-secondary)',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            State-Wise Grouped
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            style={{
+              padding: '7px 12px',
+              backgroundColor: viewMode === 'list' ? 'var(--primary-light)' : '#FFFFFF',
+              color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-secondary)',
+              border: 'none',
+              borderLeft: '1px solid var(--border-color)',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Data Table
+          </button>
         </div>
       </div>
 
-      {/* Main Content List / Accordion */}
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: '60px', backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
           <RefreshCw size={28} className="spin-animation" style={{ color: 'var(--primary)', marginBottom: '12px' }} />
@@ -791,7 +866,6 @@ export const BranchesPage: React.FC = () => {
           )}
         </div>
       ) : viewMode === 'grouped' ? (
-        /* State-Wise Accordion Grouping */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {stateSummaries.map((st) => {
             const stateBranches = branches.filter((b) => b.state.toUpperCase() === st.state.toUpperCase());
@@ -811,7 +885,6 @@ export const BranchesPage: React.FC = () => {
                   overflow: 'hidden',
                 }}
               >
-                {/* Accordion Header */}
                 <div
                   onClick={() => toggleStateGroup(st.state)}
                   style={{
@@ -848,21 +921,16 @@ export const BranchesPage: React.FC = () => {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
                     <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Capacity: </span>
-                      <strong style={{ color: 'var(--text-primary)' }}>{st.totalCapacity}</strong>
+                      <span style={{ color: 'var(--text-muted)' }}>Branches: </span>
+                      <strong style={{ color: 'var(--text-primary)' }}>{st.branchCount}</strong>
                     </div>
                     <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Assigned: </span>
+                      <span style={{ color: 'var(--text-muted)' }}>Students: </span>
                       <strong style={{ color: '#D97706' }}>{st.assignedStudents}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Available: </span>
-                      <strong style={{ color: '#059669' }}>{st.availableSeats}</strong>
                     </div>
                   </div>
                 </div>
 
-                {/* State Branches Content */}
                 {isExpanded && (
                   <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
                     {stateBranches.map((b) => (
@@ -873,7 +941,6 @@ export const BranchesPage: React.FC = () => {
                           borderRadius: 'var(--radius-md)',
                           padding: '16px',
                           backgroundColor: '#FFFFFF',
-                          transition: 'all 0.15s ease',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
@@ -922,42 +989,158 @@ export const BranchesPage: React.FC = () => {
                           </div>
 
                           {b.managerName && (
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                               Manager: <strong style={{ color: 'var(--text-primary)' }}>{b.managerName}</strong>
                             </div>
                           )}
 
-                          {/* Capacity Progress Bar */}
-                          <div style={{ marginBottom: '14px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                              <span style={{ color: 'var(--text-secondary)' }}>Capacity Utilization:</span>
-                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                {b.assignedStudentsCount} / {b.capacity} ({b.utilizationPercentage || 0}%)
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                height: '8px',
-                                width: '100%',
-                                backgroundColor: '#E5E7EB',
-                                borderRadius: '4px',
-                                overflow: 'hidden',
-                              }}
-                            >
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                            <span style={{ fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</span>
+                            <span style={{ color: 'var(--text-muted)' }}> student(s) assigned</span>
+                          </div>
+
+                          {/* Meta Lead Forms Connection */}
+                          {(() => {
+                            const branchForms = metaForms.filter(
+                              (m) => ((m.branchId as any)?._id || (m.branchId as any)) === b._id
+                            );
+                            const unassignedForms = allKnownForms.filter(
+                              (kf) => !branchForms.some((bf) => bf.formId === kf.formId)
+                            );
+
+                            return (
                               <div
                                 style={{
-                                  height: '100%',
-                                  width: `${Math.min(100, b.utilizationPercentage || 0)}%`,
-                                  backgroundColor:
-                                    (b.utilizationPercentage || 0) >= 90 ? '#EF4444' : (b.utilizationPercentage || 0) >= 70 ? '#F59E0B' : '#3B82F6',
-                                  transition: 'width 0.3s ease',
+                                  marginTop: '10px',
+                                  padding: '10px 12px',
+                                  backgroundColor: '#F8FAFC',
+                                  border: '1px solid #E2E8F0',
+                                  borderRadius: '8px',
                                 }}
-                              />
-                            </div>
-                          </div>
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginBottom: '6px',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <FacebookColorIcon size={14} />
+                                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#1E293B' }}>
+                                      Meta Lead Forms
+                                    </span>
+                                  </div>
+                                  {branchForms.length > 0 && (
+                                    <span
+                                      style={{
+                                        fontSize: '10px',
+                                        fontWeight: 700,
+                                        padding: '1px 6px',
+                                        borderRadius: '10px',
+                                        backgroundColor: '#DBEAFE',
+                                        color: '#1D4ED8',
+                                      }}
+                                    >
+                                      {branchForms.length} connected
+                                    </span>
+                                  )}
+                                </div>
+
+                                {branchForms.length > 0 ? (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                    {branchForms.map((m) => (
+                                      <div
+                                        key={m._id}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontSize: '11px',
+                                          backgroundColor: '#EFF6FF',
+                                          border: '1px solid #BFDBFE',
+                                          color: '#1E40AF',
+                                          borderRadius: '5px',
+                                          padding: '2px 6px',
+                                          fontWeight: 500,
+                                        }}
+                                        title={`Form ID: ${m.formId} | Leads: ${m.totalLeadsRouted || 0}`}
+                                      >
+                                        <span style={{ maxWidth: '175px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {m.formName}
+                                        </span>
+                                        {m.totalLeadsRouted !== undefined && m.totalLeadsRouted > 0 && (
+                                          <span style={{ fontSize: '9.5px', color: '#2563EB', fontWeight: 700 }}>
+                                            ({m.totalLeadsRouted})
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDisconnectForm(m._id, m.formName);
+                                          }}
+                                          style={{
+                                            border: 'none',
+                                            background: 'transparent',
+                                            color: '#94A3B8',
+                                            cursor: 'pointer',
+                                            padding: '0 2px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                          }}
+                                          title="Disconnect form"
+                                        >
+                                          <X size={11} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '6px' }}>
+                                    No Meta form connected yet.
+                                  </div>
+                                )}
+
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (!val) return;
+                                    if (val === '__custom__') {
+                                      setShowAddCustomFormModal(b._id);
+                                    } else {
+                                      handleConnectFormToBranch(b._id, val);
+                                    }
+                                  }}
+                                  disabled={connectingBranchId === b._id}
+                                  style={{
+                                    width: '100%',
+                                    padding: '5px 8px',
+                                    fontSize: '11.5px',
+                                    borderRadius: '5px',
+                                    border: '1px solid #CBD5E1',
+                                    backgroundColor: '#FFFFFF',
+                                    color: '#334155',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  <option value="">
+                                    {connectingBranchId === b._id ? 'Connecting...' : '+ Connect Existing Meta Form...'}
+                                  </option>
+                                  {unassignedForms.map((f) => (
+                                    <option key={f.formId} value={f.formId}>
+                                      {f.formName}
+                                    </option>
+                                  ))}
+                                  <option value="__custom__">+ Enter Custom Form ID...</option>
+                                </select>
+                              </div>
+                            );
+                          })()}
                         </div>
 
-                        {/* Card Actions */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
                           <button
                             onClick={() => handleViewDetails(b)}
@@ -1062,7 +1245,6 @@ export const BranchesPage: React.FC = () => {
           })}
         </div>
       ) : (
-        /* Data Table View */
         <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', textAlign: 'left' }}>
             <thead>
@@ -1072,10 +1254,8 @@ export const BranchesPage: React.FC = () => {
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>State</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>City</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch Manager</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Assigned</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Capacity</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Available Seats</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Utilization %</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Students</th>
+                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Meta Forms</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600 }}>Status</th>
                 <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
               </tr>
@@ -1089,9 +1269,68 @@ export const BranchesPage: React.FC = () => {
                   <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{b.city}</td>
                   <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{b.managerName || '-'}</td>
                   <td style={{ padding: '12px 16px', fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{b.capacity}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#059669' }}>{b.availableSeats}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{b.utilizationPercentage || 0}%</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    {(() => {
+                      const bForms = metaForms.filter(
+                        (m) => ((m.branchId as any)?._id || (m.branchId as any)) === b._id
+                      );
+                      const unassigned = allKnownForms.filter(
+                        (kf) => !bForms.some((bf) => bf.formId === kf.formId)
+                      );
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '170px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                            {bForms.length === 0 ? (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>None</span>
+                            ) : (
+                              bForms.map((m) => (
+                                <span
+                                  key={m._id}
+                                  style={{
+                                    fontSize: '10.5px',
+                                    backgroundColor: '#EFF6FF',
+                                    border: '1px solid #BFDBFE',
+                                    color: '#1E40AF',
+                                    padding: '1px 6px',
+                                    borderRadius: '8px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                  }}
+                                  title={`Leads: ${m.totalLeadsRouted || 0}`}
+                                >
+                                  {m.formName}
+                                  <button
+                                    onClick={() => handleDisconnectForm(m._id, m.formName)}
+                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#64748B' }}
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </span>
+                              ))
+                            )}
+                          </div>
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (!val) return;
+                              if (val === '__custom__') setShowAddCustomFormModal(b._id);
+                              else handleConnectFormToBranch(b._id, val);
+                            }}
+                            disabled={connectingBranchId === b._id}
+                            style={{ fontSize: '11px', padding: '3px 6px', borderRadius: '4px', border: '1px solid #CBD5E1', color: '#475569' }}
+                          >
+                            <option value="">+ Connect Form...</option>
+                            {unassigned.map((f) => (
+                              <option key={f.formId} value={f.formId}>{f.formName}</option>
+                            ))}
+                            <option value="__custom__">+ Enter Form ID...</option>
+                          </select>
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td style={{ padding: '12px 16px' }}>
                     <span
                       style={{
@@ -1145,7 +1384,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- CREATE / EDIT BRANCH MODAL --- */}
       {showCreateModal && (
         <div
           style={{
@@ -1204,7 +1442,6 @@ export const BranchesPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Branch ID Readonly Preview */}
               <div style={{ marginBottom: '16px', backgroundColor: '#F3F4F6', padding: '10px 14px', borderRadius: '6px', border: '1px solid #E5E7EB' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                   AUTOMATIC UNIQUE BRANCH ID
@@ -1214,7 +1451,6 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Basic Information Section */}
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.04em' }}>
                 Basic Information
               </div>
@@ -1366,9 +1602,8 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Management Information Section */}
               <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.04em' }}>
-                Management & Capacity Settings
+                Management Information
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
@@ -1411,64 +1646,25 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Max Student Capacity *
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: Number(e.target.value) })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: formErrors.capacity ? '1px solid #EF4444' : '1px solid var(--border-color)',
-                      fontSize: '13.5px',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Opening Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.openingDate}
-                    onChange={(e) => setFormData({ ...formData, openingDate: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '13.5px',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Branch Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-color)',
-                      fontSize: '13.5px',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-                </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Branch Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    fontSize: '13.5px',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
@@ -1507,7 +1703,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- BRANCH DETAILS 6-TAB DRAWER --- */}
       {selectedBranchDetails && (
         <div
           style={{
@@ -1534,7 +1729,6 @@ export const BranchesPage: React.FC = () => {
               boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
             }}
           >
-            {/* Drawer Header */}
             <div
               style={{
                 padding: '16px 20px',
@@ -1561,9 +1755,8 @@ export const BranchesPage: React.FC = () => {
               </button>
             </div>
 
-            {/* 6 Tabs Header */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', backgroundColor: '#FFFFFF', overflowX: 'auto' }}>
-              {(['overview', 'students', 'staff', 'applications', 'reports', 'history'] as const).map((tab) => (
+              {(['overview', 'students', 'staff', 'applications', 'history'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => handleTabChange(tab)}
@@ -1587,33 +1780,98 @@ export const BranchesPage: React.FC = () => {
               ))}
             </div>
 
-            {/* Drawer Tab Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
               {drawerActiveTab === 'overview' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', backgroundColor: '#F9FAFB', padding: '14px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Capacity</div>
-                      <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedBranchDetails.branch.capacity}</div>
+                  <div style={{ display: 'flex', gap: '10px', backgroundColor: '#F9FAFB', padding: '14px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>State & City</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>{selectedBranchDetails.branch.city}, {selectedBranchDetails.branch.state}</div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Assigned</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Students Assigned</div>
                       <div style={{ fontSize: '18px', fontWeight: 700, color: '#D97706' }}>{selectedBranchDetails.branch.assignedStudentsCount}</div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Available Seats</div>
-                      <div style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{selectedBranchDetails.branch.availableSeats}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Status</div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: selectedBranchDetails.branch.status === 'ACTIVE' ? '#059669' : '#DC2626', marginTop: '2px' }}>{selectedBranchDetails.branch.status}</div>
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13.5px' }}>
-                    <div><strong style={{ color: 'var(--text-muted)' }}>State & City: </strong>{selectedBranchDetails.branch.city}, {selectedBranchDetails.branch.state}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Full Address: </strong>{selectedBranchDetails.branch.address} {selectedBranchDetails.branch.pinCode ? `- ${selectedBranchDetails.branch.pinCode}` : ''}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Contact Number: </strong>{selectedBranchDetails.branch.contactNumber || 'N/A'}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Email: </strong>{selectedBranchDetails.branch.email || 'N/A'}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Manager: </strong>{selectedBranchDetails.branch.managerName || 'Unassigned'} {selectedBranchDetails.branch.managerEmail ? `(${selectedBranchDetails.branch.managerEmail})` : ''}</div>
-                    <div><strong style={{ color: 'var(--text-muted)' }}>Opening Date: </strong>{selectedBranchDetails.branch.openingDate ? new Date(selectedBranchDetails.branch.openingDate).toLocaleDateString() : 'N/A'}</div>
-                    <div><strong style={{ color: 'var(--text-muted)' }}>Utilization Rate: </strong>{selectedBranchDetails.branch.utilizationPercentage || 0}%</div>
+                  </div>
+
+                  {/* Connected Meta Lead Forms in Drawer */}
+                  <div style={{ marginTop: '20px', padding: '14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <FacebookColorIcon size={16} />
+                        <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Connected Meta Lead Forms</strong>
+                      </div>
+                      <button
+                        onClick={() => setShowAddCustomFormModal(selectedBranchDetails.branch._id)}
+                        style={{ padding: '4px 8px', fontSize: '11px', color: '#1877F2', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        + Add Custom Form ID
+                      </button>
+                    </div>
+
+                    {(() => {
+                      const bForms = metaForms.filter(
+                        (m) => ((m.branchId as any)?._id || (m.branchId as any)) === selectedBranchDetails.branch._id
+                      );
+
+                      if (bForms.length === 0) {
+                        return (
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            No Meta Ads lead form connected to this branch yet. You can connect forms directly from the branch card dropdown.
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {bForms.map((m) => (
+                            <div
+                              key={m._id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '6px',
+                              }}
+                            >
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                  {m.formName}
+                                </div>
+                                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                                  Form ID: <code style={{ backgroundColor: '#F1F5F9', padding: '1px 4px', borderRadius: '3px' }}>{m.formId}</code> • Campaign: {m.campaignName || 'General'}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: 600, color: '#059669', backgroundColor: '#ECFDF5', padding: '2px 8px', borderRadius: '10px' }}>
+                                  {m.totalLeadsRouted || 0} Leads Routed
+                                </span>
+                                <button
+                                  onClick={() => handleDisconnectForm(m._id, m.formName)}
+                                  style={{ padding: '3px 8px', fontSize: '11px', color: '#DC2626', background: 'none', border: '1px solid #FECACA', borderRadius: '4px', cursor: 'pointer' }}
+                                >
+                                  Disconnect
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -1719,18 +1977,6 @@ export const BranchesPage: React.FC = () => {
                 </div>
               )}
 
-              {drawerActiveTab === 'reports' && (
-                <div>
-                  <h4 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Branch Performance Summary</h4>
-                  <div style={{ padding: '16px', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '13px' }}>
-                    <div style={{ marginBottom: '8px' }}>Capacity Utilization: <strong>{selectedBranchDetails.branch.utilizationPercentage || 0}%</strong></div>
-                    <div style={{ marginBottom: '8px' }}>Assigned Students: <strong>{selectedBranchDetails.branch.assignedStudentsCount}</strong></div>
-                    <div style={{ marginBottom: '8px' }}>Available Vacancies: <strong>{selectedBranchDetails.branch.availableSeats}</strong></div>
-                    <div>Status: <strong>{selectedBranchDetails.branch.status}</strong></div>
-                  </div>
-                </div>
-              )}
-
               {drawerActiveTab === 'history' && (
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Branch Activity Audit History</h4>
@@ -1759,7 +2005,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- ASSIGN STAFF MODAL --- */}
       {assignStaffModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250, padding: '16px' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '20px' }}>
@@ -1803,7 +2048,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- STUDENT ASSIGNMENT MODAL --- */}
       {assignStudentModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250, padding: '16px' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '20px' }}>
@@ -1815,7 +2059,7 @@ export const BranchesPage: React.FC = () => {
             </div>
 
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Assigning student to <strong>{assignStudentModal.name}</strong> ({assignStudentModal.availableSeats} available seats).
+              Assigning student to <strong>{assignStudentModal.name}</strong>.
             </p>
 
             <form onSubmit={handleAssignStudentSubmit}>
@@ -1848,7 +2092,6 @@ export const BranchesPage: React.FC = () => {
         </div>
       )}
 
-      {/* --- SAFE DELETION BLOCK CONFIRMATION DIALOG --- */}
       {deletingBranch && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '16px' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '460px', width: '100%', padding: '24px' }}>
@@ -1881,6 +2124,94 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal to Register Custom Meta Lead Form ID */}
+      {showAddCustomFormModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: '16px' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FacebookColorIcon size={20} />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Connect Meta Instant Lead Form
+                </h3>
+              </div>
+              <button
+                onClick={() => { setShowAddCustomFormModal(null); setCustomFormInput({ formId: '', formName: '', campaignName: '' }); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+              Enter the Lead Gen Form details from your Meta Ads Manager to automatically route all leads generated from this form to <strong>{branches.find((b) => b._id === showAddCustomFormModal)?.name}</strong>.
+            </p>
+
+            <form onSubmit={handleSaveCustomForm}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Meta Lead Form ID <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 109823485729103 or meta_form_custom_1"
+                  value={customFormInput.formId}
+                  onChange={(e) => setCustomFormInput({ ...customFormInput, formId: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13.5px' }}
+                  required
+                />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
+                  Found under Meta Ads Manager → Instant Forms → Form ID
+                </span>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Form Display Name <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Fall 2026 Masters Campaign Form"
+                  value={customFormInput.formName}
+                  onChange={(e) => setCustomFormInput({ ...customFormInput, formName: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13.5px' }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  Campaign Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Global Masters Lead Gen 2026"
+                  value={customFormInput.campaignName}
+                  onChange={(e) => setCustomFormInput({ ...customFormInput, campaignName: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13.5px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowAddCustomFormModal(null); setCustomFormInput({ formId: '', formName: '', campaignName: '' }); }}
+                  style={{ padding: '8px 16px', border: '1px solid var(--border-color)', borderRadius: '6px', background: '#FFF' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ padding: '8px 18px', backgroundColor: '#1877F2', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Connect Form
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

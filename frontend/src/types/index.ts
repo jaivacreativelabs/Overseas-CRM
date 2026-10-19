@@ -78,9 +78,16 @@ export enum PaymentStatus {
 }
 
 export enum VisaStatus {
-  PENDING = 'PENDING',
+  NOT_STARTED = 'NOT_STARTED',
+  DOCUMENTS_PENDING = 'DOCUMENTS_PENDING',
+  APPLICATION_SUBMITTED = 'APPLICATION_SUBMITTED',
+  UNDER_PROCESSING = 'UNDER_PROCESSING',
+  ADDITIONAL_INFO_REQUIRED = 'ADDITIONAL_INFO_REQUIRED',
+  INTERVIEW_SCHEDULED = 'INTERVIEW_SCHEDULED',
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN',
+  PENDING = 'PENDING',
 }
 
 export enum TravelItemStatus {
@@ -307,6 +314,8 @@ export interface DocumentItem {
   status: DocumentStatus;
   fileUrl?: string;
   originalFileName?: string;
+  fileSize?: number;
+  mimeType?: string;
   rejectionReason?: string;
   uploadedAt?: string;
   reviewedAt?: string;
@@ -434,25 +443,75 @@ export interface CounsellingFeeDetail extends CounsellingFeeSummary {
   setByName?: string;
   setAt?: string;
   updatedAt?: string;
+export interface VisaStatusHistoryItem {
+  status: VisaStatus;
+  remarks?: string;
+  internalRemarks?: string;
+  studentInstructions?: string;
+  changedById?: string;
+  changedByName?: string;
+  changedAt: string;
 }
 
 export interface VisaRecord {
   _id: string;
   leadId: string;
+  studentId?: string;
+  studentName?: string;
+  studentCustomId?: string;
+  studentEmail?: string;
+  applicationId?: string;
+  applicationRef?: string;
+  universityName?: string;
   country: string;
+  destinationCountry?: string;
   visaType: string;
+  submissionDate?: string;
   applicationDate?: string;
   appointmentDate?: string;
   vfsCenterLocation?: string;
   status: VisaStatus;
+  decision?: 'APPROVED' | 'REJECTED' | null;
   decisionDate?: string;
   visaNumber?: string;
   validUntil?: string;
   rejectionReason?: string;
-  visaGrantLetterUrl?: string;
+  counsellorRemarks?: string;
+  internalRemarks?: string;
+  studentInstructions?: string;
+  decisionDocumentUrl?: string;
+  decisionDocumentName?: string;
+  additionalInfoRequired?: string;
+  statusHistory?: VisaStatusHistoryItem[];
+  counsellorId?: string;
+  counsellorName?: string;
+  assignedCounsellor?: string;
   notes?: string;
   updatedByName?: string;
+  lastUpdatedDate?: string;
   updatedAt: string;
+  createdAt?: string;
+}
+
+export interface VisaStats {
+  total: number;
+  underProcessing: number;
+  approved: number;
+  rejected: number;
+  actionRequired: number;
+  notStarted: number;
+  documentsPending: number;
+  submitted: number;
+  withdrawn: number;
+}
+
+export interface VisaListResponse {
+  items: VisaRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  stats: VisaStats;
 }
 
 export interface TravelSupport {
@@ -559,10 +618,7 @@ export interface Branch {
   managerEmail?: string;
   managerUserId?: any;
   assignedStaffIds?: any[];
-  capacity: number;
   assignedStudentsCount: number;
-  availableSeats: number;
-  utilizationPercentage?: number;
   openingDate?: string;
   status: 'ACTIVE' | 'INACTIVE';
   isArchived: boolean;
@@ -573,17 +629,15 @@ export interface Branch {
 
 export interface BranchSummary {
   totalBranches: number;
-  totalCapacity: number;
+  activeBranches: number;
   totalAssignedStudents: number;
-  availableSeats: number;
+  statesCovered: number;
 }
 
 export interface StateBranchSummary {
   state: string;
   branchCount: number;
-  totalCapacity: number;
   assignedStudents: number;
-  availableSeats: number;
 }
 
 export interface IntegrationConfig {
@@ -650,7 +704,9 @@ export interface MetaCampaign {
   ctr: number;
   leadsCount: number;
   costPerLead?: number;
-  forms: Array<{
+  dailyBudget?: number;
+  lifetimeBudget?: number;
+  forms?: Array<{
     formId: string;
     formName: string;
     branchId?: string;

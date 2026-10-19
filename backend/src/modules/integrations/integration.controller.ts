@@ -152,4 +152,25 @@ export class IntegrationController {
     const summary = await MetaAdsService.getAnalyticsSummary();
     return ApiResponse.success(res, 'Meta Ads analytics summary fetched', summary);
   };
+
+  public static toggleMetaCampaign = async (req: Request, res: Response) => {
+    const { campaignId } = req.params;
+    const campaign = await MetaAdsService.toggleCampaign(campaignId);
+    return ApiResponse.success(res, `Campaign '${campaign.name}' status updated`, campaign);
+  };
+
+  public static connectRealMeta = async (req: Request, res: Response) => {
+    const result = await MetaAdsService.verifyAndConnectMeta(req.body);
+    return ApiResponse.success(res, 'Successfully connected to Meta Graph API', result);
+  };
+
+  public static getMetaStatus = async (req: Request, res: Response) => {
+    const status = await MetaAdsService.getMetaStatus();
+    return ApiResponse.success(res, 'Meta Ads integration status', status);
+  };
+
+  public static disconnectMeta = async (req: Request, res: Response) => {
+    await MetaAdsService.disconnectMeta();
+    return ApiResponse.success(res, 'Meta Ads disconnected successfully');
+  };
 }

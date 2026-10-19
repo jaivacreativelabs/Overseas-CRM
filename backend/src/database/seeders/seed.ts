@@ -458,7 +458,6 @@ export const seedDatabase = async () => {
       state: 'Karnataka',
       city: 'Bangalore',
       address: '#402 100ft Road, Indiranagar, Bangalore 560038',
-      capacity: 250,
       assignedStudentsCount: 1,
       status: 'ACTIVE',
     });
@@ -469,7 +468,6 @@ export const seedDatabase = async () => {
       state: 'Maharashtra',
       city: 'Pune',
       address: 'Suite 201, FC Road, Shivajinagar, Pune 411005',
-      capacity: 200,
       assignedStudentsCount: 0,
       status: 'ACTIVE',
     });
@@ -480,7 +478,6 @@ export const seedDatabase = async () => {
       state: 'Tamil Nadu',
       city: 'Chennai',
       address: 'Level 4, Mahatma Gandhi Rd, Nungambakkam, Chennai 600034',
-      capacity: 150,
       assignedStudentsCount: 0,
       status: 'ACTIVE',
     });

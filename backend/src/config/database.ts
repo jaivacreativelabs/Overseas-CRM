@@ -34,7 +34,7 @@ export const connectDatabase = async (): Promise<void> => {
   } catch (error: any) {
     logger.warn(`Primary database connection failed (${error.message}). Attempting in-memory database fallback for local dev...`);
     
-    if (env.NODE_ENV !== 'production') {
+    if (env.NODE_ENV !== 'production' && !process.env.VERCEL) {
       try {
         const { MongoMemoryServer } = await import('mongodb-memory-server');
         const mongod = await MongoMemoryServer.create();

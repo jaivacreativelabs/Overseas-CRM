@@ -23,6 +23,9 @@ import {
 } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
+import { NotificationService } from '../notifications/notification.service';
+import { env } from '../../config/env';
 
 export class LeadService {
   static async createLead(data: {
@@ -88,7 +91,61 @@ export class LeadService {
       });
     }
 
+    const { temporaryPassword } = await this.ensureStudentUserForLead(lead, lead.counsellorId);
+
+    void AutomationService.triggerWorkflows('lead.created', {
+      _id: lead._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      targetCourse: lead.targetCourse,
+      targetCountry: lead.targetCountry,
+      counsellorId: data.counsellorId,
+      portalUsername: lead.email,
+      portalPassword: temporaryPassword,
+    } as any).catch(() => undefined);
+
     return lead;
+  }
+
+  private static async ensureStudentUserForLead(
+    lead: ILead,
+    counsellorId?: Types.ObjectId
+  ): Promise<{ studentUser: any; temporaryPassword?: string }> {
+    let studentUser = lead.studentUserId ? await UserModel.findById(lead.studentUserId) : null;
+    if (!studentUser) {
+      studentUser = await UserModel.findOne({ email: lead.email.toLowerCase() });
+    }
+
+    let temporaryPassword: string | undefined = undefined;
+
+    if (!studentUser) {
+      temporaryPassword = 'Student@' + Math.floor(100000 + Math.random() * 900000);
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(temporaryPassword, salt);
+
+      studentUser = await UserModel.create({
+        name: lead.name,
+        email: lead.email.toLowerCase(),
+        passwordHash,
+        phone: lead.phone,
+        role: UserRole.STUDENT,
+        leadId: lead._id,
+        assignedCounsellorId: counsellorId || lead.counsellorId,
+        stage: lead.stage || StudentStage.LEAD_CAPTURED,
+        isActive: true,
+      });
+
+      lead.studentUserId = studentUser._id as Types.ObjectId;
+      await lead.save();
+    } else if (!lead.studentUserId) {
+      lead.studentUserId = studentUser._id as Types.ObjectId;
+      await lead.save();
+    }
+
+    return { studentUser, temporaryPassword };
   }
 
   static async getLeads(query: {
@@ -338,6 +395,32 @@ export class LeadService {
       title: 'Preliminary Counselling Scheduled',
       description: `Session scheduled on ${data.scheduledDate} at ${data.scheduledTime} with ${counsellorName}`,
     });
+
+    void AutomationService.triggerWorkflows('counselling.scheduled', {
+      _id: session._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      scheduledDate: session.scheduledDate,
+      scheduledTime: session.scheduledTime,
+      counsellorName: session.counsellorName,
+      counsellorId: session.counsellorId?.toString(),
+      googleMeetLink: session.googleMeetLink,
+    } as any).catch(() => undefined);
+
+    const targetStudentUserId = lead.studentUserId || (await UserModel.findOne({ email: lead.email.toLowerCase() }))?._id;
+    if (targetStudentUserId) {
+      const frontendUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+      void NotificationService.createNotification({
+        userId: targetStudentUserId.toString(),
+        title: 'Counselling Session Scheduled',
+        message: `Your counselling session with ${counsellorName} is scheduled on ${data.scheduledDate} at ${data.scheduledTime}.`,
+        type: 'INFO',
+        actionUrl: `${frontendUrl}/portal?tab=report`,
+      }).catch(() => undefined);
+    }
 
     return session;
   }
@@ -660,6 +743,23 @@ export class LeadService {
       description: `New lead from landing page: ${data.name} (${data.email})`,
     });
 
+    const { temporaryPassword: landingPass } = await this.ensureStudentUserForLead(lead, lead.counsellorId);
+
+    void AutomationService.triggerWorkflows('lead.created', {
+      _id: lead._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      targetCourse: lead.targetCourse,
+      targetCountry: lead.targetCountry,
+      campaignName: data.campaignName,
+      counsellorId: lead.counsellorId?.toString(),
+      portalUsername: lead.email,
+      portalPassword: landingPass,
+    } as any).catch(() => undefined);
+
     return { lead, isDuplicate: false };
   }
 
@@ -731,6 +831,69 @@ export class LeadService {
       description: `New Meta Ad Lead: ${data.name} (${data.email}) [Form: ${data.metaFormName || data.metaFormId || 'Default'}]`,
     });
 
+    const { temporaryPassword: metaPass } = await this.ensureStudentUserForLead(lead, lead.counsellorId);
+
+    void AutomationService.triggerWorkflows('lead.created', {
+      _id: lead._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      targetCourse: lead.targetCourse,
+      targetCountry: lead.targetCountry,
+      campaignName: data.campaignName,
+      branchId: data.branchId ? data.branchId.toString() : undefined,
+      counsellorId: lead.counsellorId?.toString(),
+      portalUsername: lead.email,
+      portalPassword: metaPass,
+    } as any).catch(() => undefined);
+
     return { lead, isDuplicate: false };
+  }
+
+  static async getStudentProfileForUser(userId: string, userEmail?: string): Promise<any> {
+    const userObjectId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+    let query: any = {};
+
+    if (userObjectId && userEmail) {
+      query = {
+        $or: [
+          { studentUserId: userObjectId },
+          { email: userEmail.toLowerCase() },
+        ],
+      };
+    } else if (userObjectId) {
+      query = { studentUserId: userObjectId };
+    } else if (userEmail) {
+      query = { email: userEmail.toLowerCase() };
+    } else {
+      throw new NotFoundError('Invalid user parameters for student profile');
+    }
+
+    const lead = await LeadModel.findOne(query)
+      .populate('counsellorId', 'name email phone avatar')
+      .populate('studentUserId', 'name email isActive')
+      .lean();
+
+    if (!lead) {
+      throw new NotFoundError('No linked student record found for this account');
+    }
+
+    // Auto-heal link if missing
+    if (userObjectId && (!lead.studentUserId || lead.studentUserId.toString() !== userObjectId.toString())) {
+      await LeadModel.findByIdAndUpdate(lead._id, { studentUserId: userObjectId });
+    }
+
+    const [contactAttempts, counsellingSessions] = await Promise.all([
+      ContactAttemptModel.find({ leadId: lead._id }).sort({ attemptDate: -1 }).lean(),
+      CounsellingSessionModel.find({ leadId: lead._id }).sort({ createdAt: -1 }).lean(),
+    ]);
+
+    return {
+      ...lead,
+      contactAttempts,
+      counsellingSessions,
+    };
   }
 }

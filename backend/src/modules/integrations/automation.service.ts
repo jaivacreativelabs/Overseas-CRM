@@ -8,16 +8,142 @@ import { IntegrationConfigModel, IntegrationStatus } from './integration-config.
 import { TaskModel } from '../tasks/task.model';
 import { LeadModel } from '../leads/lead.model';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
+import { EmailService } from './email.service';
 
 export class AutomationService {
   /**
    * Initialize default pre-configured workflows if none exist
    */
   public static async initializeDefaultWorkflows(): Promise<void> {
-    const count = await AutomationWorkflowModel.countDocuments();
-    if (count > 0) return;
-
     const defaults = [
+      {
+        name: 'New Lead Welcome Workflow',
+        description: 'Sends automated welcome email and WhatsApp message upon lead registration.',
+        trigger: 'lead.created' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Welcome to IIEC Overseas Education',
+              template: 'lead_welcome',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Counselling Scheduled Notification',
+        description: 'Sends session confirmation to student when counselling is scheduled.',
+        trigger: 'counselling.scheduled' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Your Counselling Session is Scheduled',
+              template: 'counselling_scheduled',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Profile Evaluation Verified Notification',
+        description: 'Notifies student upon profile evaluation completion.',
+        trigger: 'profile.verified' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Profile Evaluation Verified & Completed',
+              template: 'profile_verified',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Shortlist Updated Notification',
+        description: 'Notifies student when new university options are shortlisted.',
+        trigger: 'shortlist.updated' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'New University Shortlisted for Your Profile',
+              template: 'shortlist_updated',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Document Requested Notification',
+        description: 'Alerts student when a counsellor requests a required document.',
+        trigger: 'document.requested' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Action Required: Document Requested',
+              template: 'document_requested',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Document Reviewed Notification',
+        description: 'Notifies student of document approval or rejection status.',
+        trigger: 'document.reviewed' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Document Review Status Update',
+              template: 'document_reviewed',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Application Submitted Notification',
+        description: 'Notifies student upon formal university application submission.',
+        trigger: 'application.submitted' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'University Application Submitted',
+              template: 'application_submitted',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Application Decision Notification',
+        description: 'Notifies student when an application decision update is recorded.',
+        trigger: 'application.rejected' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Application Decision Update',
+              template: 'application_rejected',
+            },
+          },
+        ],
+      },
       {
         name: 'Offer Received Automation',
         description: 'When an application status changes to Offer Received, notify student via Email & create follow-up task.',
@@ -44,31 +170,56 @@ export class AutomationService {
         ],
       },
       {
-        name: 'New Lead Welcome Workflow',
-        description: 'Sends automated welcome email and WhatsApp message upon lead registration.',
-        trigger: 'lead.created' as WorkflowTrigger,
+        name: 'Offer Accepted Confirmation',
+        description: 'Notifies student when their signed offer acceptance is approved.',
+        trigger: 'offer.accepted' as WorkflowTrigger,
         isActive: true,
         actions: [
           {
             actionType: 'SEND_EMAIL',
             providerId: 'email_smtp',
             config: {
-              subject: 'Welcome to Overseas Education Services',
-              template: 'lead_welcome',
+              subject: 'Signed Offer Letter Approved & Confirmed',
+              template: 'offer_accepted',
             },
           },
+        ],
+      },
+      {
+        name: 'Offer Revision Required Notification',
+        description: 'Notifies student if uploaded signed offer requires revision.',
+        trigger: 'offer.rejected' as WorkflowTrigger,
+        isActive: true,
+        actions: [
           {
-            actionType: 'SEND_WHATSAPP',
-            providerId: 'whatsapp_business',
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
             config: {
-              templateName: 'welcome_counselling_invite',
+              subject: 'Action Required: Signed Offer Letter Revision',
+              template: 'offer_rejected',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Payment Requested Notification',
+        description: 'Notifies student when a fee payment request is generated.',
+        trigger: 'payment.requested' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Fee Payment Request',
+              template: 'payment_requested',
             },
           },
         ],
       },
       {
         name: 'Payment Verified Notification',
-        description: 'Sends instant receipt and SMS update when fee payment is verified.',
+        description: 'Sends instant receipt when fee payment is verified.',
         trigger: 'payment.success' as WorkflowTrigger,
         isActive: true,
         actions: [
@@ -80,11 +231,84 @@ export class AutomationService {
               template: 'payment_receipt',
             },
           },
+        ],
+      },
+      {
+        name: 'Visa Status Update Notification',
+        description: 'Notifies student when visa application decision is updated.',
+        trigger: 'visa.updated' as WorkflowTrigger,
+        isActive: true,
+        actions: [
           {
-            actionType: 'SEND_SMS',
-            providerId: 'sms_twilio',
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
             config: {
-              message: 'Your fee payment has been successfully verified. Receipt sent to your email.',
+              subject: 'Visa Application Status Update',
+              template: 'visa_updated',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Travel Details Update Notification',
+        description: 'Notifies student when travel or accommodation details are updated.',
+        trigger: 'travel.updated' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Pre-Departure Travel & Accommodation Details Updated',
+              template: 'travel_updated',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Departure Confirmation Notification',
+        description: 'Sends pre-departure confirmation to student.',
+        trigger: 'departure.recorded' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Bon Voyage! Departure Confirmed',
+              template: 'departure_recorded',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Arrival Confirmation Notification',
+        description: 'Sends destination welcome upon arrival confirmation.',
+        trigger: 'arrival.confirmed' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Welcome to Your Study Destination! Arrival Confirmed',
+              template: 'arrival_confirmed',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Orientation Invitation Notification',
+        description: 'Invites student to pre-departure orientation briefing.',
+        trigger: 'orientation.invited' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Invitation: Pre-Departure Orientation Briefing',
+              template: 'orientation_invited',
             },
           },
         ],
@@ -107,7 +331,11 @@ export class AutomationService {
     ];
 
     for (const d of defaults) {
-      await AutomationWorkflowModel.create(d);
+      await AutomationWorkflowModel.findOneAndUpdate(
+        { name: d.name },
+        { $setOnInsert: d },
+        { upsert: true }
+      );
     }
   }
 
@@ -226,18 +454,22 @@ export class AutomationService {
           // Execute action based on type
           switch (act.actionType) {
             case 'SEND_EMAIL': {
-              const emailTarget = payload.studentEmail || payload.email || 'student@example.com';
-              const subject = act.config.subject || `Notification regarding ${trigger}`;
+              const emailTarget = payload.studentEmail || payload.email || '';
+              const emailResult = await EmailService.sendLifecycleEmail(trigger, payload, act.config);
               await IntegrationLogModel.create({
                 providerId: act.providerId || 'email_smtp',
                 eventType: trigger,
-                operation: `Automated Email Sent to ${emailTarget}`,
-                status: LogStatus.SUCCESS,
-                requestData: { to: emailTarget, subject },
-                responseData: { delivered: true, sentAt: new Date() },
-                durationMs: Date.now() - startTime,
+                operation: `Automated Email ${emailResult.success ? 'Sent' : 'Failed'} to ${emailTarget}`,
+                status: emailResult.success ? LogStatus.SUCCESS : LogStatus.FAILED,
+                requestData: { to: emailTarget, subject: act.config?.subject },
+                responseData: emailResult.success ? { messageId: emailResult.messageId, delivered: true } : undefined,
+                errorMessage: emailResult.errorMessage,
+                durationMs: emailResult.durationMs,
                 triggeredBy: triggeredByUserId,
               });
+              if (!emailResult.success) {
+                wfSuccess = false;
+              }
               break;
             }
 

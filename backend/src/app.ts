@@ -46,7 +46,14 @@ export const createApp = (): Express => {
   app.use(cors(corsOptions));
   app.options('*', cors(corsOptions));
   app.use(compression());
-  app.use(express.json({ limit: '10mb' }));
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf.toString('utf8');
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan('dev'));
 
@@ -98,15 +105,21 @@ export const createApp = (): Express => {
   app.use('/api/v1/integrations', integrationRoutes);
 
   // Serve static frontend build (merged single-port application)
-  const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
-  if (fs.existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
-    app.get('*', (req: Request, res: Response, next) => {
-      if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
-        return next();
+  if (!process.env.VERCEL) {
+    try {
+      const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
+      if (fs.existsSync(frontendDist)) {
+        app.use(express.static(frontendDist));
+        app.get('*', (req: Request, res: Response, next) => {
+          if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/health')) {
+            return next();
+          }
+          res.sendFile(path.resolve(frontendDist, 'index.html'));
+        });
       }
-      res.sendFile(path.resolve(frontendDist, 'index.html'));
-    });
+    } catch {
+      // Graceful fallback for serverless
+    }
   }
 
   // 404 Route handler

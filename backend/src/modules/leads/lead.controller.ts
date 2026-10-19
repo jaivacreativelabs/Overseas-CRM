@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { LeadService } from './lead.service';
 import { MetaAdsService } from '../integrations/meta-ads.service';
 import { ApiResponse } from '../../utils/api-response';
@@ -450,6 +451,20 @@ export class LeadController {
 
   static async handleMetaWebhook(req: Request, res: Response) {
     try {
+      const signature = req.headers['x-hub-signature-256'] as string | undefined;
+
+      if (signature) {
+        const secret = process.env.META_WEBHOOK_SECRET || process.env.META_VERIFY_TOKEN || 'jaiva_meta_token_2026';
+        const rawBody: string = (req as any).rawBody || Buffer.from(JSON.stringify(req.body)).toString('utf8');
+        const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+
+        if (!expected.startsWith('sha256=') || signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+          return res.status(401).send('Invalid signature');
+        }
+      } else if (process.env.META_REQUIRE_WEBHOOK_SIGNATURE === 'true') {
+        return res.status(401).send('Missing X-Hub-Signature-256');
+      }
+
       const entry = req.body.entry?.[0];
       const change = entry?.changes?.[0]?.value;
 
@@ -467,18 +482,36 @@ export class LeadController {
       const assignedFormName = routing?.formName || req.body.formName || formId;
 
       if (change && change.leadgen_id) {
-        await LeadService.ingestMetaLead({
+        // Fetch real lead data from Meta Graph API if access token is available
+        let leadData: any = null;
+        try {
+          const { IntegrationConfigModel } = require('../integrations/integration-config.model');
+          const { MetaGraphApiService } = require('../integrations/meta-graph-api.service');
+          const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
+          const token = metaConfig?.credentials?.pageAccessToken || metaConfig?.credentials?.accessToken || process.env.META_ACCESS_TOKEN;
+          if (token) {
+            leadData = await MetaGraphApiService.getLeadData(change.leadgen_id, token);
+          }
+        } catch (err: any) {
+          // Graceful fallback if token is invalid or permissions pending
+        }
+
+        const result = await LeadService.ingestMetaLead({
           metaLeadId: change.leadgen_id,
-          name: req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
-          email: req.body.email || `lead_${change.leadgen_id}@meta.com`,
-          phone: req.body.phone || '0000000000',
-          campaignName: campaignName || 'Meta Ad Campaign',
+          name: leadData?.name || req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
+          email: leadData?.email || req.body.email || `lead_${change.leadgen_id}@meta.com`,
+          phone: leadData?.phone || req.body.phone || '0000000000',
+          preferredCountry: leadData?.country || req.body.preferredCountry,
+          campaignName: leadData?.campaignName || campaignName || 'Meta Ad Campaign',
           branchId: assignedBranchId,
-          metaFormId: formId,
+          metaFormId: leadData?.formId || formId,
           metaFormName: assignedFormName,
         });
+        if (!result.isDuplicate) {
+          await MetaAdsService.recordRoutedLead(formId, campaignName);
+        }
       } else if (req.body.email || req.body.name) {
-        await LeadService.ingestMetaLead({
+        const result = await LeadService.ingestMetaLead({
           metaLeadId: req.body.metaLeadId || req.body.id || `meta_${Date.now()}`,
           name: req.body.name || 'Meta Ad Lead',
           email: req.body.email || `meta_${Date.now()}@lead.com`,
@@ -491,12 +524,30 @@ export class LeadController {
           metaFormId: formId,
           metaFormName: assignedFormName,
         });
+        if (!result.isDuplicate) {
+          await MetaAdsService.recordRoutedLead(formId, campaignName);
+        }
       }
 
       return res.status(200).send('EVENT_RECEIVED');
     } catch (error) {
       // Always return 200 to prevent Meta webhook retry loop
       return res.status(200).send('EVENT_RECEIVED');
+    }
+  }
+
+  static async getMyStudentProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        return ApiResponse.error(res, 'Unauthenticated', 401);
+      }
+      const studentProfile = await LeadService.getStudentProfileForUser(
+        req.user.userId,
+        req.user.email
+      );
+      return ApiResponse.success(res, 'Student profile retrieved successfully', studentProfile);
+    } catch (error) {
+      next(error);
     }
   }
 }
