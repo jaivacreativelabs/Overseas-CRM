@@ -66,12 +66,14 @@ import { Badge, StatusBadge } from '../../components/Badge';
 import { Table } from '../../components/Table';
 import { Modal, Drawer, ConfirmDialog } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
+import { CounsellingFeeModal } from '../counselling-fees';
 import { PinButton } from '../../components/PinButton';
 
 type ActiveSection =
   | 'overview'
   | 'currentProcess'
   | 'documents'
+  | 'requestFee'
   | 'counselling'
   | 'profile'
   | 'universities'
@@ -107,6 +109,9 @@ const getCurrentProcessInfo = (stage?: StudentStage) => {
   }
 };
 
+const resolveStudentStage = (stage?: string): StudentStage =>
+  Object.values(StudentStage).find((knownStage) => knownStage === stage) ?? StudentStage.PROFILE_EVALUATION;
+
 export const LeadDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -121,7 +126,7 @@ export const LeadDetailPage: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const secParam = params.get('section') as ActiveSection | null;
     const tabParam = params.get('tab');
-    if (secParam && ['overview', 'currentProcess', 'documents', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
+    if (secParam && ['overview', 'currentProcess', 'documents', 'requestFee', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
       return secParam;
     }
     if (tabParam === 'documents') return 'documents';
@@ -146,7 +151,7 @@ export const LeadDetailPage: React.FC = () => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const secParam = params.get('section') as ActiveSection | null;
-      if (secParam && ['overview', 'currentProcess', 'documents', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
+      if (secParam && ['overview', 'currentProcess', 'documents', 'requestFee', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
         setActiveSection(secParam);
       } else {
         setActiveSection('overview');
@@ -430,9 +435,15 @@ export const LeadDetailPage: React.FC = () => {
     const selectedShortlist = shortlist.find((s) => s.status === 'SELECTED_BY_STUDENT') || shortlist[0];
     if (selectedShortlist) {
       setAppForm({
-        universityId: selectedShortlist.universityId,
+        universityId:
+          typeof selectedShortlist.universityId === 'string'
+            ? selectedShortlist.universityId
+            : selectedShortlist.universityId._id,
         universityName: selectedShortlist.universityName,
-        courseId: selectedShortlist.courseId,
+        courseId:
+          typeof selectedShortlist.courseId === 'string'
+            ? selectedShortlist.courseId
+            : selectedShortlist.courseId._id,
         courseTitle: selectedShortlist.courseTitle,
         country: selectedShortlist.country,
         intake: selectedShortlist.intake,
@@ -783,9 +794,10 @@ export const LeadDetailPage: React.FC = () => {
     return <div style={{ padding: '40px', textAlign: 'center' }}>Student / Lead record not found.</div>;
   }
 
-  const currentProcessInfo = getCurrentProcessInfo(lead.stage);
+  const currentProcessInfo = getCurrentProcessInfo(resolveStudentStage(lead.stage));
   const isOverview = activeSection === 'overview';
   const isDocuments = activeSection === 'documents';
+  const isRequestFee = activeSection === 'requestFee';
   const isCurrentProcess = activeSection === 'currentProcess' || activeSection === currentProcessInfo.key;
 
   return (
@@ -927,12 +939,12 @@ export const LeadDetailPage: React.FC = () => {
 
       {/* 12-Stage Student Journey Stepper */}
       <StageStepper
-        currentStage={lead.stage}
+        currentStage={resolveStudentStage(lead.stage)}
         activeStage={activeStage}
         onStageClick={handleStageClick}
       />
 
-      {/* Navigation Tabs Header: Overview | [Current Process] | Documents */}
+      {/* Navigation Tabs Header: Overview | [Current Process] | Documents | Request Fee */}
       <div className="tabs-header" role="tablist">
         <button
           type="button"
@@ -963,9 +975,34 @@ export const LeadDetailPage: React.FC = () => {
         >
           Documents
         </button>
+
+        {isStaff && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isRequestFee}
+            className={`tab-btn ${isRequestFee ? 'active' : ''}`}
+            onClick={() => handleSectionChange('requestFee')}
+          >
+            Request Fee
+          </button>
+        )}
       </div>
 
       {/* --- NAVIGATION CONTENT --- */}
+
+      {isRequestFee && isStaff && (
+        <div className="card">
+          <CounsellingFeeModal
+            isOpen={true}
+            leadId={lead._id}
+            leadName={lead.name}
+            onClose={() => handleSectionChange('overview')}
+            onUpdated={() => handleSectionChange('overview')}
+            requestOnOpen={true}
+          />
+        </div>
+      )}
 
       {/* 1. Overview Section */}
       {isOverview && (
@@ -2446,9 +2483,9 @@ export const LeadDetailPage: React.FC = () => {
                   if (s) {
                     setAppForm((prev) => ({
                       ...prev,
-                      universityId: s.universityId,
+                      universityId: typeof s.universityId === 'string' ? s.universityId : s.universityId._id,
                       universityName: s.universityName,
-                      courseId: s.courseId,
+                      courseId: typeof s.courseId === 'string' ? s.courseId : s.courseId._id,
                       courseTitle: s.courseTitle,
                       country: s.country,
                       intake: s.intake,
