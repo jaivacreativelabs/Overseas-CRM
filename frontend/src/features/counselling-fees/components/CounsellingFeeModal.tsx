@@ -50,6 +50,7 @@ export const CounsellingFeeModal: React.FC<CounsellingFeeModalProps> = ({
 
   const [feeForm, setFeeForm] = useState({
     feeType: CounsellingFeeType.COUNSELLING_FEE,
+    customFeeName: '',
     description: '',
     totalFee: '',
     currency: 'INR',
@@ -74,6 +75,7 @@ export const CounsellingFeeModal: React.FC<CounsellingFeeModalProps> = ({
         setDetail(data);
         setFeeForm({
           feeType: data.feeType || CounsellingFeeType.COUNSELLING_FEE,
+          customFeeName: data.customFeeName || '',
           description: data.description || '',
           totalFee: data.isSet ? String(data.totalFee) : '',
           currency: data.currency || 'INR',
@@ -100,6 +102,7 @@ export const CounsellingFeeModal: React.FC<CounsellingFeeModalProps> = ({
     setFormError(null);
     setFeeForm({
       feeType: detail?.feeType || CounsellingFeeType.COUNSELLING_FEE,
+      customFeeName: detail?.customFeeName || '',
       description: detail?.description || '',
       totalFee: detail?.isSet ? String(detail.totalFee) : '',
       currency: detail?.currency || 'INR',
@@ -132,8 +135,8 @@ export const CounsellingFeeModal: React.FC<CounsellingFeeModalProps> = ({
       setFormError('Total counselling fee must be greater than 0.');
       return;
     }
-    if (feeForm.feeType === CounsellingFeeType.OTHER && !feeForm.description.trim()) {
-      setFormError('A description is required for Other fee types.');
+    if (feeForm.feeType === CounsellingFeeType.OTHER && !feeForm.customFeeName.trim()) {
+      setFormError('A custom fee name is required for Other fee types.');
       return;
     }
     if (detail && detail.amountPaid > 0 && totalFee < detail.amountPaid) {
@@ -146,8 +149,9 @@ export const CounsellingFeeModal: React.FC<CounsellingFeeModalProps> = ({
     try {
       const updated = await counsellingFeeService.setFee(leadId, {
         feeType: feeForm.feeType,
-        description:
-          feeForm.feeType === CounsellingFeeType.OTHER ? feeForm.description.trim() : undefined,
+        customFeeName:
+          feeForm.feeType === CounsellingFeeType.OTHER ? feeForm.customFeeName.trim() : undefined,
+        description: feeForm.description.trim() ? feeForm.description.trim() : undefined,
         totalFee,
         currency: feeForm.currency,
         notes: feeForm.notes.trim() ? feeForm.notes.trim() : undefined,
@@ -326,18 +330,36 @@ export const CounsellingFeeModal: React.FC<CounsellingFeeModalProps> = ({
                 setFeeForm({
                   ...feeForm,
                   feeType,
+                  customFeeName: feeType === CounsellingFeeType.OTHER ? feeForm.customFeeName : '',
                   description: feeType === CounsellingFeeType.OTHER ? feeForm.description : '',
                 });
               }}
               options={COUNSELLING_FEE_TYPES}
             />
             {feeForm.feeType === CounsellingFeeType.OTHER && (
+              <>
+                <Input
+                  label="Custom Fee Name *"
+                  placeholder="e.g. Visa Documentation Fee"
+                  value={feeForm.customFeeName}
+                  required
+                  onChange={(e) => setFeeForm({ ...feeForm, customFeeName: e.target.value })}
+                />
+                <Textarea
+                  label="Description"
+                  rows={2}
+                  placeholder="Optional details for this custom fee"
+                  value={feeForm.description}
+                  onChange={(e) => setFeeForm({ ...feeForm, description: e.target.value })}
+                />
+              </>
+            )}
+            {feeForm.feeType !== CounsellingFeeType.OTHER && (
               <Textarea
-                label="Description *"
+                label="Description"
                 rows={2}
-                placeholder="Describe the other fee"
+                placeholder="Optional details for this fee"
                 value={feeForm.description}
-                required
                 onChange={(e) => setFeeForm({ ...feeForm, description: e.target.value })}
               />
             )}

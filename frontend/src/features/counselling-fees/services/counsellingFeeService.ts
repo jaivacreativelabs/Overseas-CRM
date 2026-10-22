@@ -3,6 +3,7 @@ import { CounsellingFeeDetail, CounsellingFeeSummary, CounsellingFeeType } from 
 
 export interface SetCounsellingFeePayload {
   feeType: CounsellingFeeType;
+  customFeeName?: string;
   description?: string;
   totalFee: number;
   currency?: string;

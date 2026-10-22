@@ -43,6 +43,7 @@ export interface CounsellingFeeSummary {
 
 export interface CounsellingFeeDetail extends CounsellingFeeSummary {
   feeType: CounsellingFeeType;
+  customFeeName?: string;
   description?: string;
   payments: CounsellingFeePaymentView[];
   notes?: string;
@@ -87,6 +88,7 @@ export class CounsellingFeeService {
     return {
       ...summary,
       feeType: record?.feeType || 'COUNSELLING_FEE',
+      customFeeName: record?.customFeeName,
       description: record?.description,
       payments:
         record?.payments
@@ -113,6 +115,15 @@ export class CounsellingFeeService {
     return this.buildDetail(record, leadId);
   }
 
+  static async getFeeByStudentLead(leadId: string, studentUserId?: string): Promise<CounsellingFeeDetail> {
+    const record = await CounsellingFeeModel.findOne({ leadId: new Types.ObjectId(leadId) });
+    if (!record) return this.buildDetail(null, leadId);
+    if (studentUserId && record.studentId && record.studentId.toString() !== studentUserId) {
+      throw new ValidationError('Student is not authorized to access this fee record.');
+    }
+    return this.buildDetail(record, leadId);
+  }
+
   static async getSummaries(leadIds: string[]): Promise<CounsellingFeeSummary[]> {
     const uniqueIds = Array.from(new Set(leadIds.filter(Boolean)));
 
@@ -134,6 +145,7 @@ export class CounsellingFeeService {
     leadId: string,
     data: {
       feeType: CounsellingFeeType;
+      customFeeName?: string;
       description?: string;
       totalFee: number;
       currency?: string;
@@ -148,9 +160,11 @@ export class CounsellingFeeService {
     if (!totalFee || totalFee <= 0) {
       throw new ValidationError('Total counselling fee must be greater than 0.');
     }
+
+    const customFeeName = data.customFeeName?.trim();
     const description = data.description?.trim();
-    if (data.feeType === 'OTHER' && !description) {
-      throw new ValidationError('A description is required for Other fee types.');
+    if (data.feeType === 'OTHER' && !customFeeName) {
+      throw new ValidationError('A custom fee name is required for Other fee types.');
     }
 
     const existing = await CounsellingFeeModel.findOne({ leadId: lead._id });
@@ -166,7 +180,8 @@ export class CounsellingFeeService {
 
       existing.totalFee = totalFee;
       existing.feeType = data.feeType;
-      existing.description = data.feeType === 'OTHER' ? description : undefined;
+      existing.customFeeName = data.feeType === 'OTHER' ? customFeeName : undefined;
+      existing.description = description;
       existing.currency = data.currency || existing.currency || COUNSELLING_FEE_DEFAULT_CURRENCY;
       existing.notes = data.notes;
       existing.setById = new Types.ObjectId(actor.userId);
@@ -179,7 +194,8 @@ export class CounsellingFeeService {
         leadId: lead._id,
         studentId: lead.studentUserId,
         feeType: data.feeType,
-        description: data.feeType === 'OTHER' ? description : undefined,
+        customFeeName: data.feeType === 'OTHER' ? customFeeName : undefined,
+        description,
         totalFee,
         currency: data.currency || COUNSELLING_FEE_DEFAULT_CURRENCY,
         notes: data.notes,

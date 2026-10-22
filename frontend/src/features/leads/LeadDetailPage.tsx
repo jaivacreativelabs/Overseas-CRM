@@ -73,6 +73,7 @@ type ActiveSection =
   | 'overview'
   | 'currentProcess'
   | 'documents'
+  | 'requestFee'
   | 'counselling'
   | 'profile'
   | 'universities'
@@ -120,13 +121,12 @@ export const LeadDetailPage: React.FC = () => {
   const { user, isStaff, isAdmin } = useAuth();
 
   const [lead, setLead] = useState<Lead | null>(null);
-  const [isCounsellingFeeModalOpen, setIsCounsellingFeeModalOpen] = useState(false);
 
   const getInitialSection = (): ActiveSection => {
     const params = new URLSearchParams(window.location.search);
     const secParam = params.get('section') as ActiveSection | null;
     const tabParam = params.get('tab');
-    if (secParam && ['overview', 'currentProcess', 'documents', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
+    if (secParam && ['overview', 'currentProcess', 'documents', 'requestFee', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
       return secParam;
     }
     if (tabParam === 'documents') return 'documents';
@@ -151,7 +151,7 @@ export const LeadDetailPage: React.FC = () => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const secParam = params.get('section') as ActiveSection | null;
-      if (secParam && ['overview', 'currentProcess', 'documents', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
+      if (secParam && ['overview', 'currentProcess', 'documents', 'requestFee', 'profile', 'universities', 'applications', 'offers', 'payments', 'visa_travel'].includes(secParam)) {
         setActiveSection(secParam);
       } else {
         setActiveSection('overview');
@@ -797,6 +797,7 @@ export const LeadDetailPage: React.FC = () => {
   const currentProcessInfo = getCurrentProcessInfo(resolveStudentStage(lead.stage));
   const isOverview = activeSection === 'overview';
   const isDocuments = activeSection === 'documents';
+  const isRequestFee = activeSection === 'requestFee';
   const isCurrentProcess = activeSection === 'currentProcess' || activeSection === currentProcessInfo.key;
 
   return (
@@ -839,17 +840,6 @@ export const LeadDetailPage: React.FC = () => {
 
         {/* Organized Lead Actions Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {isStaff && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<Plus size={14} />}
-              onClick={() => setIsCounsellingFeeModalOpen(true)}
-            >
-              Request Fee
-            </Button>
-          )}
-
           <Button
             variant="secondary"
             size="sm"
@@ -954,7 +944,7 @@ export const LeadDetailPage: React.FC = () => {
         onStageClick={handleStageClick}
       />
 
-      {/* Navigation Tabs Header: Overview | [Current Process] | Documents */}
+      {/* Navigation Tabs Header: Overview | [Current Process] | Documents | Request Fee */}
       <div className="tabs-header" role="tablist">
         <button
           type="button"
@@ -985,9 +975,34 @@ export const LeadDetailPage: React.FC = () => {
         >
           Documents
         </button>
+
+        {isStaff && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={isRequestFee}
+            className={`tab-btn ${isRequestFee ? 'active' : ''}`}
+            onClick={() => handleSectionChange('requestFee')}
+          >
+            Request Fee
+          </button>
+        )}
       </div>
 
       {/* --- NAVIGATION CONTENT --- */}
+
+      {isRequestFee && isStaff && (
+        <div className="card">
+          <CounsellingFeeModal
+            isOpen={true}
+            leadId={lead._id}
+            leadName={lead.name}
+            onClose={() => handleSectionChange('overview')}
+            onUpdated={() => handleSectionChange('overview')}
+            requestOnOpen={true}
+          />
+        </div>
+      )}
 
       {/* 1. Overview Section */}
       {isOverview && (
@@ -2750,16 +2765,6 @@ export const LeadDetailPage: React.FC = () => {
           />
         </form>
       </Modal>
-
-      {isStaff && id && lead && (
-        <CounsellingFeeModal
-          isOpen={isCounsellingFeeModalOpen}
-          leadId={id}
-          leadName={lead.name}
-          onClose={() => setIsCounsellingFeeModalOpen(false)}
-          requestOnOpen
-        />
-      )}
 
       {/* --- Application Details Drawer --- */}
       <Drawer

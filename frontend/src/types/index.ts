@@ -437,6 +437,7 @@ export interface CounsellingFeeSummary {
 
 export interface CounsellingFeeDetail extends CounsellingFeeSummary {
   feeType: CounsellingFeeType;
+  customFeeName?: string;
   description?: string;
   payments: CounsellingFeePayment[];
   notes?: string;

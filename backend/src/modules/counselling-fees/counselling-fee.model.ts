@@ -20,6 +20,7 @@ export interface ICounsellingFee extends Document {
   leadId: Types.ObjectId;
   studentId?: Types.ObjectId;
   feeType?: CounsellingFeeType;
+  customFeeName?: string;
   description?: string;
   totalFee: number;
   currency: string;
@@ -51,6 +52,7 @@ const counsellingFeeSchema = new Schema<ICounsellingFee>(
     leadId: { type: Schema.Types.ObjectId, ref: 'Lead', required: true, unique: true, index: true },
     studentId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     feeType: { type: String, enum: COUNSELLING_FEE_TYPES, default: 'COUNSELLING_FEE' },
+    customFeeName: { type: String, trim: true, maxlength: 200 },
     description: { type: String, trim: true, maxlength: 200 },
     totalFee: { type: Number, required: true, min: 0 },
     currency: { type: String, default: COUNSELLING_FEE_DEFAULT_CURRENCY, uppercase: true, trim: true },

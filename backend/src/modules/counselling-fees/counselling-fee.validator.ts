@@ -16,6 +16,7 @@ export const counsellingFeeLeadParamSchema = z.object({
 export const setCounsellingFeeSchema = counsellingFeeLeadParamSchema.extend({
   body: z.object({
     feeType: z.enum(COUNSELLING_FEE_TYPES),
+    customFeeName: z.string().trim().max(200, 'Custom fee name cannot exceed 200 characters').optional(),
     description: z.string().trim().max(200, 'Description cannot exceed 200 characters').optional(),
     totalFee: z.coerce
       .number({ invalid_type_error: 'Total counselling fee must be a number' })
@@ -23,12 +24,15 @@ export const setCounsellingFeeSchema = counsellingFeeLeadParamSchema.extend({
     currency: z.enum(COUNSELLING_FEE_CURRENCIES).optional(),
     notes: z.string().trim().max(1000, 'Notes cannot exceed 1000 characters').optional(),
   }).superRefine((data, context) => {
-    if (data.feeType === 'OTHER' && !data.description?.trim()) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['description'],
-        message: 'A description is required for Other fee types',
-      });
+    if (data.feeType === 'OTHER') {
+      const customFeeName = data.customFeeName?.trim();
+      if (!customFeeName) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['customFeeName'],
+          message: 'Custom fee name is required for Other fee types',
+        });
+      }
     }
   }),
 });

@@ -25,7 +25,10 @@ export class CounsellingFeeController {
 
   static async getFeeByLeadId(req: Request, res: Response, next: NextFunction) {
     try {
-      const detail = await CounsellingFeeService.getFeeByLeadId(req.params.leadId);
+      const studentUserId = req.user?.role === 'STUDENT' ? req.user.userId : undefined;
+      const detail = studentUserId
+        ? await CounsellingFeeService.getFeeByStudentLead(req.params.leadId, studentUserId)
+        : await CounsellingFeeService.getFeeByLeadId(req.params.leadId);
       return ApiResponse.success(res, 'Counselling fee retrieved', detail);
     } catch (error) {
       next(error);

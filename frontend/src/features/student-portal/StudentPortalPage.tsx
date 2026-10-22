@@ -82,6 +82,7 @@ export const StudentPortalPage: React.FC = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [counsellingFee, setCounsellingFee] = useState<any>(null);
   const [visa, setVisa] = useState<VisaRecord | null>(null);
   const [travel, setTravel] = useState<TravelSupport | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -129,13 +130,14 @@ export const StudentPortalPage: React.FC = () => {
       }
       if (currentLead) {
         setLead(currentLead);
-        const [shortRes, docRes, appRes, offRes, payRes, visRes, travRes, msgRes, taskRes, orientRes] =
+        const [shortRes, docRes, appRes, offRes, payRes, feeRes, visRes, travRes, msgRes, taskRes, orientRes] =
           await Promise.all([
             apiClient.get<Shortlist[]>(`/universities/shortlists/${currentLead._id}`).catch(() => ({ data: [] })),
             apiClient.get<DocumentItem[]>(`/documents/lead/${currentLead._id}`).catch(() => ({ data: [] })),
             apiClient.get<Application[]>(`/applications/lead/${currentLead._id}`).catch(() => ({ data: [] })),
             apiClient.get<Offer[]>(`/offers/lead/${currentLead._id}`).catch(() => ({ data: [] })),
             apiClient.get<Payment[]>(`/payments/lead/${currentLead._id}`).catch(() => ({ data: [] })),
+            apiClient.get<any>(`/counselling-fees/lead/${currentLead._id}`).catch(() => ({ data: { isSet: false, currency: 'INR', totalFee: 0, amountPaid: 0, outstanding: 0, status: 'NOT_SET', paymentCount: 0, feeType: 'COUNSELLING_FEE', payments: [] } })),
             apiClient.get<VisaRecord>(`/visa/lead/${currentLead._id}`).catch(() => ({ data: null })),
             apiClient.get<TravelSupport>(`/travel/lead/${currentLead._id}`).catch(() => ({ data: null })),
             apiClient.get<Message[]>(`/messages/lead/${currentLead._id}`).catch(() => ({ data: [] })),
@@ -148,6 +150,7 @@ export const StudentPortalPage: React.FC = () => {
         setApplications(appRes.data || []);
         setOffers(offRes.data || []);
         setPayments(payRes.data || []);
+        setCounsellingFee(feeRes.data || { isSet: false, currency: 'INR', totalFee: 0, amountPaid: 0, outstanding: 0, status: 'NOT_SET', paymentCount: 0, feeType: 'COUNSELLING_FEE', payments: [] });
         setVisa(visRes.data);
         setTravel(travRes.data);
         setMessages(msgRes.data || []);
@@ -1084,45 +1087,87 @@ export const StudentPortalPage: React.FC = () => {
              REPORT SECTION 5: PAYMENTS
              ========================================================================= */}
           {reportSection === 'payments' && (
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '14px' }}>💳 Tuition Fee Deposits & Payment Receipts</h3>
-              <div className="student-table-responsive">
-                <Table
-                  columns={[
-                    { header: 'PAYMENT TITLE', accessor: 'title' },
-                    {
-                      header: 'AMOUNT DUE',
-                      render: (p) => (
-                        <strong>
-                          {p.currency} {p.amount.toLocaleString()}
-                        </strong>
-                      ),
-                    },
-                    {
-                      header: 'STATUS',
-                      render: (p) => <StatusBadge status={p.status} />,
-                    },
-                    {
-                      header: 'ACTION',
-                      align: 'right',
-                      render: (p) => (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={p.status === PaymentStatus.VERIFIED}
-                          onClick={() => {
-                            setSelectedPayment(p);
-                            setIsSubmitPaymentOpen(true);
-                          }}
-                        >
-                          {p.status === PaymentStatus.VERIFIED ? 'Verified ✓' : 'Submit Payment Proof'}
-                        </Button>
-                      ),
-                    },
-                  ]}
-                  data={payments}
-                  emptyMessage="No payment requests generated yet."
-                />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '12px' }}>💳 Pay Fee</h3>
+                {!counsellingFee?.isSet ? (
+                  <div style={{ color: 'var(--text-muted)', padding: '18px 12px', background: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
+                    No fee request has been submitted for this student yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                    <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Fee Name</div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                        {counsellingFee.customFeeName || counsellingFee.feeType || 'Counselling Fee'}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Amount</div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                        {counsellingFee.currency} {Number(counsellingFee.totalFee || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Status</div>
+                      <div style={{ marginTop: '6px' }}><StatusBadge status={counsellingFee.status === 'PAID' ? 'VERIFIED' : 'REQUESTED'} /></div>
+                    </div>
+                    <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Outstanding</div>
+                      <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                        {counsellingFee.currency} {Number(counsellingFee.outstanding || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    {counsellingFee.description && (
+                      <div style={{ gridColumn: '1 / -1', background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Description</div>
+                        <div style={{ color: 'var(--text-primary)', marginTop: '4px' }}>{counsellingFee.description}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '14px' }}>💳 Tuition Fee Deposits & Payment Receipts</h3>
+                <div className="student-table-responsive">
+                  <Table
+                    columns={[
+                      { header: 'PAYMENT TITLE', accessor: 'title' },
+                      {
+                        header: 'AMOUNT DUE',
+                        render: (p) => (
+                          <strong>
+                            {p.currency} {p.amount.toLocaleString()}
+                          </strong>
+                        ),
+                      },
+                      {
+                        header: 'STATUS',
+                        render: (p) => <StatusBadge status={p.status} />,
+                      },
+                      {
+                        header: 'ACTION',
+                        align: 'right',
+                        render: (p) => (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            disabled={p.status === PaymentStatus.VERIFIED}
+                            onClick={() => {
+                              setSelectedPayment(p);
+                              setIsSubmitPaymentOpen(true);
+                            }}
+                          >
+                            {p.status === PaymentStatus.VERIFIED ? 'Verified ✓' : 'Submit Payment Proof'}
+                          </Button>
+                        ),
+                      },
+                    ]}
+                    data={payments}
+                    emptyMessage="No payment requests generated yet."
+                  />
+                </div>
               </div>
             </div>
           )}

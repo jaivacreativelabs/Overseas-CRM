@@ -3,6 +3,7 @@ import { CounsellingFeeController } from './counselling-fee.controller';
 import { authenticate } from '../../middleware/auth.middleware';
 import { authorize } from '../../middleware/rbac.middleware';
 import { validate } from '../../middleware/validate.middleware';
+import { UserRole } from '../../config/constants';
 import { COUNSELLING_FEE_ROLES } from './counselling-fee.constants';
 import {
   counsellingFeeLeadParamSchema,
@@ -12,16 +13,23 @@ import {
 } from './counselling-fee.validator';
 
 const router = Router();
+const requireFeeStaffAccess = authorize(...COUNSELLING_FEE_ROLES);
 
-const requireCounsellingFeeAccess = authorize(...COUNSELLING_FEE_ROLES);
+const allowStudentFeeRead = (req: any, res: any, next: any) => {
+  if (req.user?.role === UserRole.STUDENT) {
+    return next();
+  }
+  return requireFeeStaffAccess(req, res, next);
+};
 
-router.use(authenticate, requireCounsellingFeeAccess);
+router.use(authenticate);
 
-router.get('/summaries', validate(counsellingFeeSummariesSchema), CounsellingFeeController.getSummaries);
-router.get('/lead/:leadId', validate(counsellingFeeLeadParamSchema), CounsellingFeeController.getFeeByLeadId);
-router.put('/lead/:leadId', validate(setCounsellingFeeSchema), CounsellingFeeController.setFee);
+router.get('/summaries', requireFeeStaffAccess, validate(counsellingFeeSummariesSchema), CounsellingFeeController.getSummaries);
+router.get('/lead/:leadId', allowStudentFeeRead, validate(counsellingFeeLeadParamSchema), CounsellingFeeController.getFeeByLeadId);
+router.put('/lead/:leadId', requireFeeStaffAccess, validate(setCounsellingFeeSchema), CounsellingFeeController.setFee);
 router.post(
   '/lead/:leadId/payments',
+  requireFeeStaffAccess,
   validate(recordCounsellingFeePaymentSchema),
   CounsellingFeeController.recordPayment
 );
