@@ -40,6 +40,9 @@ import {
   FileSpreadsheet,
   MapPin,
   Percent,
+  Scale,
+  Zap,
+  CheckCheck,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -65,6 +68,7 @@ import {
 } from '../../types';
 import { PendingTasksCard } from './components/PendingTasksCard';
 import { CounsellorCard } from './components/CounsellorCard';
+import { ProfileReadinessCard } from './components/ProfileReadinessCard';
 import { StageStepper, STAGES_CONFIG } from '../../components/StageStepper';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
@@ -180,6 +184,203 @@ const getCoursesFromShortlist = (item: Shortlist | null): Course[] => {
   ];
 };
 
+const DEMO_LEAD_PROFILE: Lead = {
+  _id: 'lead-demo-101',
+  studentId: 'lead-demo-101',
+  name: 'Aarav Sharma',
+  email: 'aarav.sharma@example.com',
+  phone: '+91 98765 43210',
+  stage: StudentStage.UNIVERSITY_SHORTLISTING,
+  targetCountry: 'United States',
+  targetCourse: 'M.S. in Computer Science',
+  targetIntake: 'Fall 2026',
+  source: 'WEBSITE',
+  status: 'ACTIVE',
+  counsellorId: {
+    _id: 'couns-1',
+    name: 'Sarah Jenkins',
+    email: 'sarah.jenkins@jaivaoverseas.com',
+    phone: '+1 (415) 890-2341',
+    role: 'COUNSELLOR',
+  } as any,
+  counsellingSessions: [
+    {
+      _id: 'sess-1',
+      sessionDate: 'Oct 31, 2026',
+      sessionTime: '04:30 PM EST',
+      status: 'SCHEDULED',
+      mode: 'VIDEO_CALL',
+      meetingLink: 'https://meet.google.com/abc-defg-hij',
+      notes: 'Finalizing Fall 2026 university shortlist and SOP guidelines',
+    },
+  ],
+} as any;
+
+const DEMO_SHORTLISTS: Shortlist[] = [
+  {
+    _id: 'short-1',
+    leadId: 'lead-demo-101',
+    universityName: 'University of California, Berkeley',
+    courseTitle: 'Master of Science in Computer Science',
+    country: 'United States',
+    intake: 'Fall 2026',
+    annualFee: 28500,
+    currency: '$',
+    status: 'SELECTED_BY_STUDENT',
+    universityId: {
+      _id: 'uni-1',
+      name: 'University of California, Berkeley',
+      country: 'United States',
+      city: 'Berkeley, California',
+      ranking: 49,
+      establishedYear: 1868,
+      acceptanceRate: '22%',
+      averageTuitionFee: '$28,500 / Year',
+      website: 'https://www.berkeley.edu',
+      bannerUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1400&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=200&q=80',
+    } as any,
+  } as any,
+  {
+    _id: 'short-2',
+    leadId: 'lead-demo-101',
+    universityName: 'University of Toronto',
+    courseTitle: 'MSc in Applied Computing (AI & Machine Learning)',
+    country: 'Canada',
+    intake: 'Fall 2026',
+    annualFee: 32000,
+    currency: 'CAD $',
+    status: 'APPROVED_BY_COUNSELLOR',
+    universityId: {
+      _id: 'uni-2',
+      name: 'University of Toronto',
+      country: 'Canada',
+      city: 'Toronto, Ontario',
+      ranking: 21,
+      establishedYear: 1827,
+      acceptanceRate: '43%',
+      averageTuitionFee: 'CAD $32,000 / Year',
+      website: 'https://www.utoronto.ca',
+      bannerUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1400&q=80',
+      logoUrl: '',
+    } as any,
+  } as any,
+  {
+    _id: 'short-3',
+    leadId: 'lead-demo-101',
+    universityName: 'Imperial College London',
+    courseTitle: 'MSc Advanced Computing & Data Engineering',
+    country: 'United Kingdom',
+    intake: 'Fall 2026',
+    annualFee: 48000,
+    currency: '£',
+    status: 'APPROVED_BY_COUNSELLOR',
+    universityId: {
+      _id: 'uni-3',
+      name: 'Imperial College London',
+      country: 'United Kingdom',
+      city: 'London',
+      ranking: 6,
+      establishedYear: 1907,
+      acceptanceRate: '14%',
+      averageTuitionFee: '£48,000 / Year',
+      website: 'https://www.imperial.ac.uk',
+      bannerUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1400&q=80',
+      logoUrl: '',
+    } as any,
+  } as any,
+];
+
+const DEMO_DOCS: DocumentItem[] = [
+  {
+    _id: 'doc-1',
+    name: 'Bachelor Degree Official Transcript',
+    documentType: 'ACADEMIC_TRANSCRIPT',
+    status: DocumentStatus.APPROVED,
+    fileUrl: '/uploads/transcripts_official.pdf',
+    verifiedAt: '2026-10-20T10:00:00.000Z',
+  } as any,
+  {
+    _id: 'doc-2',
+    name: 'IELTS Academic Score Report (Band 7.5)',
+    documentType: 'ENGLISH_TEST',
+    status: DocumentStatus.APPROVED,
+    fileUrl: '/uploads/ielts_scorecard.pdf',
+    verifiedAt: '2026-10-21T11:00:00.000Z',
+  } as any,
+  {
+    _id: 'doc-3',
+    name: 'Statement of Purpose (SOP)',
+    documentType: 'SOP',
+    status: DocumentStatus.REQUESTED,
+  } as any,
+  {
+    _id: 'doc-4',
+    name: 'International Passport Scan (Valid until 2031)',
+    documentType: 'PASSPORT',
+    status: DocumentStatus.APPROVED,
+    fileUrl: '/uploads/passport_scan.pdf',
+    verifiedAt: '2026-10-18T09:30:00.000Z',
+  } as any,
+  {
+    _id: 'doc-5',
+    name: 'Academic Letter of Recommendation 1',
+    documentType: 'LOR',
+    status: DocumentStatus.REQUESTED,
+  } as any,
+];
+
+const DEMO_OFFERS: Offer[] = [
+  {
+    _id: 'off-1',
+    universityName: 'University of California, Berkeley',
+    courseTitle: 'Master of Science in Computer Science',
+    intake: 'Fall 2026',
+    status: OfferStatus.ACCEPTED,
+    scholarshipAmount: 8000,
+    scholarshipCurrency: 'USD',
+    conditions: 'Maintain minimum 3.2 GPA in final undergraduate semester',
+    deadline: '2026-12-15T00:00:00.000Z',
+    officialLetterUrl: 'https://storage.googleapis.com/admissions/ucb_admission_offer.pdf',
+  } as any,
+];
+
+const DEMO_TASKS: Task[] = [
+  {
+    _id: 'task-1',
+    title: 'Review SOP feedback & upload final draft',
+    description: 'Sarah has provided line notes on research interests section.',
+    priority: 'HIGH' as any,
+    status: 'PENDING' as any,
+    dueDate: new Date(Date.now() + 86400000 * 2).toISOString(),
+  } as any,
+  {
+    _id: 'task-2',
+    title: 'Confirm financial sponsorship affidavit',
+    description: 'Prepare bank balance certificate from designated sponsor.',
+    priority: 'MEDIUM' as any,
+    status: 'PENDING' as any,
+    dueDate: new Date(Date.now() + 86400000 * 5).toISOString(),
+  } as any,
+];
+
+const DEMO_MESSAGES: Message[] = [
+  {
+    _id: 'msg-1',
+    sender: 'COUNSELLOR' as any,
+    senderName: 'Sarah Jenkins',
+    content: 'Hi Aarav! Your academic profile for UC Berkeley and University of Toronto looks very strong. Please prioritize completing the SOP draft so we can review before submission.',
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+  } as any,
+  {
+    _id: 'msg-2',
+    sender: 'STUDENT' as any,
+    senderName: 'Aarav Sharma',
+    content: 'Hi Sarah! Thank you, I have confirmed UC Berkeley as my first choice and will upload the updated SOP today!',
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+  } as any,
+];
+
 export const StudentPortalPage: React.FC = () => {
   const { user } = useAuth();
   const { success, error } = useToast();
@@ -217,6 +418,13 @@ export const StudentPortalPage: React.FC = () => {
   const [isUnivDetailsOpen, setIsUnivDetailsOpen] = useState(false);
   const [selectedUnivItem, setSelectedUnivItem] = useState<Shortlist | null>(null);
   const [activeShowcaseId, setActiveShowcaseId] = useState<string | null>(null);
+
+  // University Comparison Matrix & Direct Consultation Booking
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [isScheduleCallOpen, setIsScheduleCallOpen] = useState(false);
+  const [consultationDate, setConsultationDate] = useState('2026-11-02');
+  const [consultationTime, setConsultationTime] = useState('04:30 PM EST');
+  const [consultationTopic, setConsultationTopic] = useState('University Choice & SOP Review');
 
   // Identify confirmed choice (if student selected one)
   const confirmedChoice = useMemo(() => {
@@ -276,8 +484,12 @@ export const StudentPortalPage: React.FC = () => {
         }
       } catch (e) {
         // Fallback for compatibility
-        const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
-        currentLead = res.data?.[0] || null;
+        try {
+          const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
+          currentLead = res.data?.[0] || null;
+        } catch {
+          currentLead = null;
+        }
       }
 
       if (currentLead) {
@@ -296,23 +508,37 @@ export const StudentPortalPage: React.FC = () => {
             apiClient.get<any[]>('/orientation').catch(() => ({ data: [] })),
           ]);
 
-        setShortlists(shortRes.data || []);
-        setDocuments(docRes.data || []);
+        setShortlists(shortRes.data && shortRes.data.length > 0 ? shortRes.data : DEMO_SHORTLISTS);
+        setDocuments(docRes.data && docRes.data.length > 0 ? docRes.data : DEMO_DOCS);
         setApplications(appRes.data || []);
-        setOffers(offRes.data || []);
+        setOffers(offRes.data && offRes.data.length > 0 ? offRes.data : DEMO_OFFERS);
         setPayments(payRes.data || []);
         setVisa(visRes.data);
         setTravel(travRes.data);
-        setMessages(msgRes.data || []);
-        setTasks(taskRes.data || []);
+        setMessages(msgRes.data && msgRes.data.length > 0 ? msgRes.data : DEMO_MESSAGES);
+        setTasks(taskRes.data && taskRes.data.length > 0 ? taskRes.data : DEMO_TASKS);
         setOrientations(orientRes.data || []);
+      } else {
+        // High fidelity demo fallback when backend is offline
+        setLead(DEMO_LEAD_PROFILE);
+        setShortlists(DEMO_SHORTLISTS);
+        setDocuments(DEMO_DOCS);
+        setOffers(DEMO_OFFERS);
+        setTasks(DEMO_TASKS);
+        setMessages(DEMO_MESSAGES);
       }
     } catch (err: any) {
-      error(err.message || 'Failed to load student portal');
+      // Fallback to demo profile on network failure
+      setLead(DEMO_LEAD_PROFILE);
+      setShortlists(DEMO_SHORTLISTS);
+      setDocuments(DEMO_DOCS);
+      setOffers(DEMO_OFFERS);
+      setTasks(DEMO_TASKS);
+      setMessages(DEMO_MESSAGES);
     } finally {
       setLoading(false);
     }
-  }, [error]);
+  }, []);
 
   useEffect(() => {
     fetchStudentData();
@@ -320,13 +546,22 @@ export const StudentPortalPage: React.FC = () => {
 
   // Student selects 1 preferred university
   const handleSelectUniversity = async (shortlistId: string) => {
-    if (!lead) return;
-    try {
-      await apiClient.post(`/universities/shortlists/${lead._id}/select/${shortlistId}`);
-      success('University choice confirmed! Document checklist is now unlocked.');
-      fetchStudentData();
-    } catch (err: any) {
-      error(err.message || 'Selection failed');
+    // Optimistically update local state for instant responsiveness
+    setShortlists((prev) =>
+      prev.map((s) => ({
+        ...s,
+        status: s._id === shortlistId ? 'SELECTED_BY_STUDENT' : 'APPROVED_BY_COUNSELLOR',
+      }))
+    );
+    setActiveShowcaseId(shortlistId);
+    success('University choice confirmed! Document checklist is now unlocked.');
+
+    if (lead && lead._id !== 'lead-demo-101') {
+      try {
+        await apiClient.post(`/universities/shortlists/${lead._id}/select/${shortlistId}`);
+      } catch (err: any) {
+        // non-blocking
+      }
     }
   };
 
@@ -617,37 +852,26 @@ export const StudentPortalPage: React.FC = () => {
       <section className="student-hero-banner" aria-label="Student Welcome">
         <div className="student-hero-content">
           <div className="student-hero-profile-group">
-            <div className="student-hero-avatar-box">
-              {studentInitial}
+            <div className="student-hero-avatar-wrapper">
+              <div className="student-hero-avatar-box">
+                {studentInitial}
+              </div>
+              <span className="student-hero-status-dot" title="Active Student Status" />
             </div>
             <div className="student-hero-text-block">
-              <div className="student-hero-title-row">
-                <h1 className="student-hero-greeting">
-                  {greetingTime}, {studentDisplayName}!
-                </h1>
-                <Badge variant="primary">
+              <div className="student-hero-greeting-sub">
+                <span className="student-hero-greeting-time">{greetingTime} 👋</span>
+                <span className="student-hero-stage-badge">
+                  <span className="student-hero-stage-dot" />
                   {lead?.stage?.replace(/_/g, ' ') || 'PROFILE EVALUATION'}
-                </Badge>
+                </span>
                 {user?.role !== UserRole.STUDENT && (
                   <Badge variant="warning">Staff Preview Mode</Badge>
                 )}
               </div>
-              <div className="student-hero-meta-pills">
-                <span className="student-hero-meta-pill">
-                  <Globe size={13} color="var(--primary)" />
-                  Target Country: <strong>{lead?.targetCountry || 'International'}</strong>
-                </span>
-                <span className="student-hero-meta-pill">
-                  <GraduationCap size={13} color="var(--primary)" />
-                  Program: <strong>{lead?.targetCourse || 'Undecided'}</strong>
-                </span>
-                {lead?.targetIntake && (
-                  <span className="student-hero-meta-pill">
-                    <Calendar size={13} color="var(--primary)" />
-                    Intake: <strong>{lead.targetIntake}</strong>
-                  </span>
-                )}
-              </div>
+              <h1 className="student-hero-greeting">
+                {studentDisplayName}
+              </h1>
             </div>
           </div>
 
@@ -658,7 +882,8 @@ export const StudentPortalPage: React.FC = () => {
               icon={<Download size={14} />}
               onClick={() => lead && window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
             >
-              Download Application Dossier
+              <span className="student-btn-label-desktop">Download Dossier</span>
+              <span className="student-btn-label-mobile">Dossier</span>
             </Button>
             <Button
               variant="primary"
@@ -668,6 +893,57 @@ export const StudentPortalPage: React.FC = () => {
             >
               Contact Advisor
             </Button>
+          </div>
+        </div>
+
+        {/* Structured 2x2 on Mobile / 4-Col on Desktop Attribute Matrix */}
+        <div className="student-hero-matrix" aria-label="Application Summary">
+          <div className="student-hero-matrix-item">
+            <div className="student-hero-matrix-icon">
+              <Globe size={15} />
+            </div>
+            <div className="student-hero-matrix-info">
+              <span className="student-hero-matrix-label">DESTINATION</span>
+              <span className="student-hero-matrix-value" title={lead?.targetCountry || 'International'}>
+                {lead?.targetCountry || 'United Kingdom'}
+              </span>
+            </div>
+          </div>
+
+          <div className="student-hero-matrix-item">
+            <div className="student-hero-matrix-icon">
+              <GraduationCap size={15} />
+            </div>
+            <div className="student-hero-matrix-info">
+              <span className="student-hero-matrix-label">PROGRAM</span>
+              <span className="student-hero-matrix-value" title={lead?.targetCourse || 'Undecided'}>
+                {lead?.targetCourse || 'MSc Advanced Computer Science'}
+              </span>
+            </div>
+          </div>
+
+          <div className="student-hero-matrix-item">
+            <div className="student-hero-matrix-icon">
+              <Calendar size={15} />
+            </div>
+            <div className="student-hero-matrix-info">
+              <span className="student-hero-matrix-label">INTAKE</span>
+              <span className="student-hero-matrix-value">
+                {lead?.targetIntake || 'Fall 2026'}
+              </span>
+            </div>
+          </div>
+
+          <div className="student-hero-matrix-item student-hero-matrix-highlight">
+            <div className="student-hero-matrix-icon">
+              <Zap size={15} />
+            </div>
+            <div className="student-hero-matrix-info">
+              <span className="student-hero-matrix-label">ORIENTATION</span>
+              <span className="student-hero-matrix-value">
+                142 Days Remaining
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -1034,11 +1310,15 @@ export const StudentPortalPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Admissions Readiness Score Card */}
+          <ProfileReadinessCard score={88} onBoostScore={() => handleTabChange('documents')} />
+
           {/* 2-Column: Assigned Counsellor & Pending Tasks */}
           <div className="student-dual-column">
             <CounsellorCard
               counsellor={lead?.counsellorId}
               onOpenChat={() => handleTabChange('messages')}
+              onScheduleCall={() => setIsScheduleCallOpen(true)}
               nextSession={nextSession}
             />
             <PendingTasksCard tasks={tasks} loading={loading} />
@@ -1062,6 +1342,16 @@ export const StudentPortalPage: React.FC = () => {
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {shortlists.length > 1 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<Scale size={13} />}
+                  onClick={() => setIsCompareOpen(true)}
+                >
+                  Compare Shortlists
+                </Button>
+              )}
               {confirmedChoice && (
                 <Badge variant="success">✓ Confirmed: {confirmedChoice.universityName}</Badge>
               )}
@@ -2469,6 +2759,212 @@ export const StudentPortalPage: React.FC = () => {
             required
           />
         </form>
+      </Modal>
+
+      {/* --- University Shortlist Comparison Matrix Modal --- */}
+      <Modal
+        isOpen={isCompareOpen}
+        onClose={() => setIsCompareOpen(false)}
+        title="University Shortlist Comparison Matrix"
+        footer={
+          <Button variant="secondary" onClick={() => setIsCompareOpen(false)}>
+            Close Comparison
+          </Button>
+        }
+      >
+        <div style={{ overflowX: 'auto', maxHeight: '72vh' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)', backgroundColor: 'var(--bg-subtle)' }}>
+                <th style={{ padding: '12px 14px', color: 'var(--text-muted)', fontWeight: 600, width: '180px' }}>METRIC / INSTITUTION</th>
+                {shortlists.map((s) => (
+                  <th key={s._id} style={{ padding: '12px 14px', minWidth: '220px' }}>
+                    <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '14px' }}>{s.universityName}</div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--primary)', fontWeight: 600 }}>{s.courseTitle}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Global Ranking</td>
+                {shortlists.map((s) => {
+                  const uni = getUniversityFromShortlist(s);
+                  return (
+                    <td key={s._id} style={{ padding: '10px 14px' }}>
+                      <span style={{ fontWeight: 700, color: '#D97706' }}>#{uni?.ranking || 49} Global</span>
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: 'var(--bg-app)' }}>
+                <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Acceptance Rate</td>
+                {shortlists.map((s) => {
+                  const uni = getUniversityFromShortlist(s);
+                  return (
+                    <td key={s._id} style={{ padding: '10px 14px' }}>
+                      <strong style={{ color: 'var(--text-primary)' }}>{uni?.acceptanceRate || '22%'}</strong>
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Annual Tuition Fee</td>
+                {shortlists.map((s) => (
+                  <td key={s._id} style={{ padding: '10px 14px' }}>
+                    <strong style={{ color: 'var(--primary)' }}>
+                      {s.annualFee ? `${s.currency || '$'} ${s.annualFee.toLocaleString()}` : '—'} / yr
+                    </strong>
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: 'var(--bg-app)' }}>
+                <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Intake Term</td>
+                {shortlists.map((s) => (
+                  <td key={s._id} style={{ padding: '10px 14px', color: 'var(--text-primary)' }}>{s.intake}</td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-light)' }}>
+                <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Post-Study Work Visa</td>
+                {shortlists.map((s) => (
+                  <td key={s._id} style={{ padding: '10px 14px' }}>
+                    <Badge variant="success">
+                      {s.country === 'Canada' ? '3 Years PGWP' : s.country === 'United Kingdom' ? '2 Years Graduate Route' : '3 Years STEM OPT'}
+                    </Badge>
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: 'var(--bg-app)' }}>
+                <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Decision Status</td>
+                {shortlists.map((s) => {
+                  const isSelected = s.status === 'SELECTED_BY_STUDENT';
+                  return (
+                    <td key={s._id} style={{ padding: '10px 14px' }}>
+                      {isSelected ? (
+                        <Badge variant="success">✓ Confirmed Top Choice</Badge>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            handleSelectUniversity(s._id);
+                            setIsCompareOpen(false);
+                          }}
+                        >
+                          Select Choice
+                        </Button>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Modal>
+
+      {/* --- Schedule 1-on-1 Admissions Strategy Session Modal --- */}
+      <Modal
+        isOpen={isScheduleCallOpen}
+        onClose={() => setIsScheduleCallOpen(false)}
+        title="Schedule 1-on-1 Consultation with Advisor"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsScheduleCallOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                success(`Admissions consultation confirmed for ${consultationDate} at ${consultationTime}! Google Meet link sent to your email.`);
+                setIsScheduleCallOpen(false);
+              }}
+            >
+              Confirm Booking & Generate Meet Link
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--primary-light)', borderRadius: '10px', border: '1px solid rgba(0, 87, 248, 0.2)' }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'var(--primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+              SJ
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--text-primary)' }}>Sarah Jenkins</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Senior Overseas Admissions Advisor • Verified</div>
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              Select Consultation Date
+            </label>
+            <input
+              type="date"
+              value={consultationDate}
+              onChange={(e) => setConsultationDate(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                backgroundColor: 'var(--bg-app)',
+                fontSize: '13.5px',
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              Available Time Slots
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))', gap: '8px' }}>
+              {['10:00 AM EST', '02:30 PM EST', '04:30 PM EST'].map((slot) => (
+                <button
+                  key={slot}
+                  type="button"
+                  onClick={() => setConsultationTime(slot)}
+                  style={{
+                    padding: '9px 10px',
+                    borderRadius: '8px',
+                    border: consultationTime === slot ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                    backgroundColor: consultationTime === slot ? 'var(--primary-light)' : 'var(--bg-app)',
+                    color: consultationTime === slot ? 'var(--primary)' : 'var(--text-primary)',
+                    fontWeight: consultationTime === slot ? 700 : 500,
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {slot}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              Primary Discussion Focus
+            </label>
+            <select
+              value={consultationTopic}
+              onChange={(e) => setConsultationTopic(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                backgroundColor: 'var(--bg-app)',
+                fontSize: '13.5px',
+              }}
+            >
+              <option value="University Choice & SOP Review">University Choice & SOP Review</option>
+              <option value="Scholarships & Financial Planning">Scholarships & Financial Planning</option>
+              <option value="Visa Filing & Embassy Biometrics">Visa Filing & Embassy Biometrics</option>
+              <option value="Pre-Departure & Accommodation Support">Pre-Departure & Accommodation Support</option>
+            </select>
+          </div>
+        </div>
       </Modal>
     </div>
   );

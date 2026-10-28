@@ -1,11 +1,12 @@
 import React from 'react';
-import { MessageSquare, UserX, Mail, Phone, Calendar, ShieldCheck } from 'lucide-react';
+import { MessageSquare, UserX, Mail, Phone, Calendar, ShieldCheck, Video } from 'lucide-react';
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 
 interface CounsellorCardProps {
   counsellor?: { name?: string; email?: string; phone?: string; avatar?: string } | null;
   onOpenChat?: () => void;
+  onScheduleCall?: () => void;
   nextSession?: {
     scheduledDate?: string;
     scheduledTime?: string;
@@ -16,6 +17,7 @@ interface CounsellorCardProps {
 export const CounsellorCard: React.FC<CounsellorCardProps> = ({
   counsellor,
   onOpenChat,
+  onScheduleCall,
   nextSession,
 }) => {
   if (!counsellor || !counsellor.name) {
@@ -104,17 +106,30 @@ export const CounsellorCard: React.FC<CounsellorCardProps> = ({
         </div>
       )}
 
-      {onOpenChat && (
-        <div className="student-counsellor-action-row">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onOpenChat}
-            className="student-card-btn-full"
-            icon={<MessageSquare size={14} />}
-          >
-            Message Advisor
-          </Button>
+      {(onOpenChat || onScheduleCall) && (
+        <div className="student-counsellor-action-row" style={{ display: 'flex', gap: '8px' }}>
+          {onOpenChat && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onOpenChat}
+              style={{ flex: 1 }}
+              icon={<MessageSquare size={14} />}
+            >
+              Message Advisor
+            </Button>
+          )}
+          {onScheduleCall && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onScheduleCall}
+              style={{ flex: 1 }}
+              icon={<Video size={14} />}
+            >
+              Book Session
+            </Button>
+          )}
         </div>
       )}
     </div>
