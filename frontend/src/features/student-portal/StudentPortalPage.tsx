@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Video,
   Check,
+  Lock,
   X,
   Calendar,
   Compass,
@@ -314,7 +315,8 @@ export const StudentPortalPage: React.FC = () => {
 
   // Compute stage indexes and progress
   const currentStageIndex = STAGES_CONFIG.findIndex((s) => s.stage === lead?.stage);
-  const activeStageNum = currentStageIndex >= 0 ? currentStageIndex + 1 : 1;
+  const activeStageIndex = currentStageIndex >= 0 ? currentStageIndex : 0;
+  const activeStageNum = activeStageIndex + 1;
   const progressPercentage = Math.round((activeStageNum / STAGES_CONFIG.length) * 100);
   const counsellingSessions = lead?.counsellingSessions || [];
   const nextSession = counsellingSessions.find((s) => s.status === 'SCHEDULED') || null;
@@ -340,22 +342,6 @@ export const StudentPortalPage: React.FC = () => {
     (d) => d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED
   ).length;
   const pendingDocsCount = documents.filter((d) => d.status === DocumentStatus.REQUESTED).length;
-
-  // Milestone list (7 High-Level Journey Phases)
-  const journeyMilestones = [
-    { id: 1, name: 'Profile Evaluation', stages: [StudentStage.LEAD_CAPTURED, StudentStage.PRELIMINARY_COUNSELLING, StudentStage.PROFILE_EVALUATION] },
-    { id: 2, name: 'Shortlists', stages: [StudentStage.UNIVERSITY_SHORTLISTING] },
-    { id: 3, name: 'Documents', stages: [StudentStage.DOCUMENT_COLLECTION] },
-    { id: 4, name: 'Applications & Offers', stages: [StudentStage.APPLICATION_SUBMISSION, StudentStage.OFFER_MANAGEMENT] },
-    { id: 5, name: 'Fee Deposit', stages: [StudentStage.FEE_PAYMENT] },
-    { id: 6, name: 'Visa Processing', stages: [StudentStage.VISA_PROCESSING] },
-    { id: 7, name: 'Departure & Arrival', stages: [StudentStage.PRE_DEPARTURE, StudentStage.DEPARTURE, StudentStage.ARRIVAL_CONFIRMED] },
-  ];
-
-  const currentMilestoneIndex = journeyMilestones.findIndex((m) =>
-    lead?.stage ? m.stages.includes(lead.stage) : false
-  );
-  const activeMilestoneIndex = currentMilestoneIndex >= 0 ? currentMilestoneIndex : 0;
 
   // Dynamic Next Best Action Spotlight Data
   const spotlightAction = useMemo(() => {
@@ -551,43 +537,61 @@ export const StudentPortalPage: React.FC = () => {
           <span className="student-lifecycle-percentage">{progressPercentage}% Completed</span>
         </div>
 
-        {/* Stepper with progress line right through checkpoints */}
+        {/* Stepper with progress line right through the 12 lifecycle checkpoints */}
         <div className="student-stepper-wrapper">
           <div className="student-stepper-track">
-            {journeyMilestones.map((m, idx) => {
-              const isCompleted = idx < activeMilestoneIndex;
-              const isCurrent = idx === activeMilestoneIndex;
-              const isLast = idx === journeyMilestones.length - 1;
+            {STAGES_CONFIG.map((item, index) => {
+              const isCompleted = index < activeStageIndex;
+              const isCurrent = index === activeStageIndex;
+              const isLocked = index > activeStageIndex;
+              const isLast = index === STAGES_CONFIG.length - 1;
+              const cleanLabel = item.label.replace(/^\d+\.\s*/, '');
 
               return (
                 <div
-                  key={m.id}
-                  className={`student-stepper-step ${isCompleted ? 'is-completed' : ''} ${isCurrent ? 'is-current' : ''}`}
+                  key={item.stage}
+                  className={`student-stepper-step ${isCompleted ? 'is-completed' : ''} ${isCurrent ? 'is-current' : ''} ${isLocked ? 'is-locked' : ''}`}
+                  title={isLocked ? `Stage ${index + 1}: ${cleanLabel} (${item.lockReason || 'Locked'})` : `Stage ${index + 1}: ${cleanLabel}`}
+                  onClick={() => {
+                    if (item.stage === StudentStage.PRELIMINARY_COUNSELLING) handleTabChange('messages');
+                    else if (item.stage === StudentStage.UNIVERSITY_SHORTLISTING) handleTabChange('universities');
+                    else if (item.stage === StudentStage.DOCUMENT_COLLECTION) handleTabChange('documents');
+                    else if (item.stage === StudentStage.APPLICATION_SUBMISSION || item.stage === StudentStage.OFFER_MANAGEMENT) handleTabChange('applications');
+                    else if (item.stage === StudentStage.FEE_PAYMENT) handleTabChange('payments');
+                    else if (item.stage === StudentStage.VISA_PROCESSING) handleTabChange('visa');
+                    else if (item.stage === StudentStage.PRE_DEPARTURE || item.stage === StudentStage.DEPARTURE || item.stage === StudentStage.ARRIVAL_CONFIRMED) handleTabChange('travel');
+                  }}
                 >
                   <div className="student-stepper-node-row">
                     {/* Left connecting segment */}
                     <div
                       className={`student-stepper-line ${
-                        idx > 0 && idx <= activeMilestoneIndex ? 'is-active' : ''
-                      } ${idx === 0 ? 'is-hidden' : ''}`}
+                        index > 0 && index <= activeStageIndex ? 'is-active' : ''
+                      } ${index === 0 ? 'is-hidden' : ''}`}
                     />
 
                     {/* Checkpoint Circle */}
                     <div className="student-stepper-circle">
-                      {isCompleted ? <Check size={14} strokeWidth={2.5} /> : m.id}
+                      {isCompleted ? (
+                        <Check size={13} strokeWidth={2.5} />
+                      ) : isLocked ? (
+                        <Lock size={11} />
+                      ) : (
+                        index + 1
+                      )}
                     </div>
 
                     {/* Right connecting segment */}
                     <div
                       className={`student-stepper-line ${
-                        idx < activeMilestoneIndex ? 'is-active' : ''
+                        index < activeStageIndex ? 'is-active' : ''
                       } ${isLast ? 'is-hidden' : ''}`}
                     />
                   </div>
 
-                  {/* Milestone Label */}
-                  <span className="student-stepper-label" title={m.name}>
-                    {m.name}
+                  {/* Checkpoint Label */}
+                  <span className="student-stepper-label" title={cleanLabel}>
+                    {cleanLabel}
                   </span>
                 </div>
               );
