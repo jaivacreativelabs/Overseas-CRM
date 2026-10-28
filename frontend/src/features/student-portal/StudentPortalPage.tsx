@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import './student-portal.css';
 import {
@@ -461,6 +461,42 @@ export const StudentPortalPage: React.FC = () => {
   const counsellingSessions = lead?.counsellingSessions || [];
   const nextSession = counsellingSessions.find((s) => s.status === 'SCHEDULED') || null;
 
+  // Mobile responsive refs for smooth touch auto-scrolling
+  const stepperRef = useRef<HTMLDivElement>(null);
+  const navBarRef = useRef<HTMLElement>(null);
+
+  // Auto-center active stage on mobile
+  useEffect(() => {
+    if (stepperRef.current) {
+      const activeEl = stepperRef.current.querySelector('.student-stepper-step.is-current') as HTMLElement;
+      if (activeEl) {
+        const containerWidth = stepperRef.current.offsetWidth;
+        const stepLeft = activeEl.offsetLeft;
+        const stepWidth = activeEl.offsetWidth;
+        stepperRef.current.scrollTo({
+          left: Math.max(0, stepLeft - containerWidth / 2 + stepWidth / 2),
+          behavior: 'smooth',
+        });
+      }
+    }
+  }, [activeStageIndex]);
+
+  // Auto-scroll active tab into view on mobile
+  useEffect(() => {
+    if (navBarRef.current) {
+      const activeTabEl = navBarRef.current.querySelector('.student-nav-item.is-active') as HTMLElement;
+      if (activeTabEl) {
+        const containerWidth = navBarRef.current.offsetWidth;
+        const tabLeft = activeTabEl.offsetLeft;
+        const tabWidth = activeTabEl.offsetWidth;
+        navBarRef.current.scrollTo({
+          left: Math.max(0, tabLeft - containerWidth / 2 + tabWidth / 2),
+          behavior: 'smooth',
+        });
+      }
+    }
+  }, [activeTab]);
+
   // Filtered documents
   const filteredDocuments = useMemo(() => {
     if (docFilter === 'VERIFIED') {
@@ -678,7 +714,7 @@ export const StudentPortalPage: React.FC = () => {
         </div>
 
         {/* Stepper with progress line right through the 12 lifecycle checkpoints */}
-        <div className="student-stepper-wrapper">
+        <div className="student-stepper-wrapper" ref={stepperRef}>
           <div className="student-stepper-track">
             {STAGES_CONFIG.map((item, index) => {
               const isCompleted = index < activeStageIndex;
@@ -759,7 +795,7 @@ export const StudentPortalPage: React.FC = () => {
       {/* =========================================================================
          4. PRIMARY NAVIGATION TAB BAR
          ========================================================================= */}
-      <nav className="student-nav-bar" aria-label="Student Portal Sections">
+      <nav className="student-nav-bar" ref={navBarRef} aria-label="Student Portal Sections">
         <button
           type="button"
           className={`student-nav-item ${activeTab === 'overview' ? 'is-active' : ''}`}

@@ -1524,7 +1524,7 @@
 @media (max-width: 768px) {
   .student-portal-container {
     gap: 16px;
-    padding-bottom: 20px;
+    padding-bottom: 92px !important;
   }
 
   .student-hero-banner {
@@ -1550,10 +1550,13 @@
 
   .student-hero-actions {
     width: 100%;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .student-hero-actions .btn {
     width: 100%;
+    min-height: 44px;
     justify-content: center;
   }
 
@@ -1561,6 +1564,7 @@
     flex-direction: column;
     align-items: stretch;
     padding: 14px 16px;
+    gap: 14px;
   }
 
   .student-spotlight-cta {
@@ -1569,12 +1573,26 @@
 
   .student-spotlight-cta .btn {
     width: 100%;
+    min-height: 44px;
     justify-content: center;
   }
 
   .student-bento-grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .student-bento-card {
+    padding: 16px;
+  }
+
+  .student-stepper-wrapper {
+    scroll-snap-type: x proximity;
+    scroll-padding: 0 16px;
+  }
+
+  .student-stepper-step {
+    scroll-snap-align: center;
   }
 
   .student-univ-stats-strip {
@@ -1592,7 +1610,7 @@
   }
 
   .student-univ-showcase-banner {
-    height: 170px !important;
+    height: 180px !important;
   }
 
   .student-univ-showcase-logo {
@@ -1601,19 +1619,61 @@
     margin-top: -32px !important;
   }
 
+  .student-univ-showcase-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .student-univ-showcase-actions .btn {
+    width: 100% !important;
+    min-height: 42px !important;
+    justify-content: center !important;
+  }
+
   .student-univ-showcase-body {
     padding: 0 16px 20px 16px !important;
   }
 
+  .student-counsellor-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .student-uni-card-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .student-uni-card-actions .btn {
+    width: 100% !important;
+    min-height: 40px !important;
+    justify-content: center !important;
+  }
+
   .student-nav-bar {
     position: sticky;
-    top: 0;
-    z-index: 20;
-    margin-left: -4px;
-    margin-right: -4px;
+    top: 56px;
+    z-index: 80;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 8px 12px;
     border-radius: 0;
     border-left: none;
     border-right: none;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color, #E5E7EB);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  }
+
+  .student-nav-item {
+    min-height: 42px;
+    padding: 8px 14px;
+    font-size: 13px;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .student-docs-summary-strip {
@@ -1622,7 +1682,7 @@
   }
 
   .student-chat-bubble {
-    max-width: 88%;
+    max-width: 90%;
   }
 
   .student-card-btn-full {

@@ -15,6 +15,9 @@ import {
   BarChart3,
   Eye,
   Pin,
+  LayoutDashboard,
+  Award,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NAVIGATION_SECTIONS } from '../routes/NavigationConfig';
@@ -30,6 +33,14 @@ import {
   toggleCounsellorPin,
   CounsellorPinnedItem,
 } from '../utils/counsellorPinManager';
+
+const MOBILE_STUDENT_NAV_ITEMS = [
+  { tab: 'overview', label: 'Dashboard', icon: LayoutDashboard },
+  { tab: 'universities', label: 'Universities', icon: Building2 },
+  { tab: 'documents', label: 'Documents', icon: FileText },
+  { tab: 'applications', label: 'Offers', icon: Award },
+  { tab: 'messages', label: 'Advisor', icon: MessageSquare },
+];
 
 export const AppLayout: React.FC = () => {
   const { user, logout, isStaff, isStudent } = useAuth();
@@ -224,6 +235,73 @@ export const AppLayout: React.FC = () => {
             display: none !important;
           }
         }
+
+        .app-student-mobile-bottom-nav {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .app-main-content-area {
+            padding: 12px 12px 80px 12px !important;
+          }
+
+          .app-student-mobile-bottom-nav {
+            display: flex;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border-color);
+            align-items: center;
+            justify-content: space-around;
+            z-index: 1000;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            box-shadow: 0 -3px 16px rgba(0, 0, 0, 0.07);
+          }
+
+          .app-mobile-nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 6px 8px;
+            flex: 1;
+            height: 100%;
+            transition: color 0.15s ease;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
+          }
+
+          .app-mobile-nav-btn.is-active {
+            color: var(--primary);
+            font-weight: 700;
+          }
+
+          .app-mobile-nav-btn span {
+            font-size: 10.5px;
+            font-weight: inherit;
+            margin-top: 3px;
+            letter-spacing: -0.01em;
+          }
+
+          .app-mobile-nav-btn.is-active::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 28px;
+            height: 3px;
+            border-radius: 0 0 4px 4px;
+            background-color: var(--primary);
+          }
+        }
       `}</style>
 
       {/* Backdrop overlay when left panel is open on mobile */}
@@ -334,94 +412,33 @@ export const AppLayout: React.FC = () => {
         >
           {isStudent || location.pathname.startsWith('/portal') ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
-                <div
-                  style={{
-                    fontSize: '10.5px',
-                    fontWeight: 700,
-                    color: 'var(--text-muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.07em',
-                    padding: '4px 10px 3px',
-                  }}
-                >
-                  STUDENT JOURNEY
-                </div>
+              <NavLink
+                to="/portal"
+                onClick={handleNavClick}
+                style={() => {
+                  const active = location.pathname.startsWith('/portal');
+                  return {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    color: active ? 'var(--primary)' : 'var(--text-secondary)',
+                    backgroundColor: active ? 'var(--primary-light)' : 'transparent',
+                    fontWeight: active ? 600 : 500,
+                    fontSize: '13.5px',
+                    transition: 'all 0.15s ease',
+                    textDecoration: 'none',
+                  };
+                }}
+              >
+                <LayoutDashboard size={18} strokeWidth={2} />
+                <span>Student Dashboard</span>
+              </NavLink>
 
-                <NavLink
-                  to="/portal?tab=universities"
-                  onClick={handleNavClick}
-                  style={() => {
-                    const active = location.pathname.startsWith('/portal') && location.search.includes('tab=universities');
-                    return {
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '9px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      color: active ? 'var(--primary)' : 'var(--text-secondary)',
-                      backgroundColor: active ? 'var(--primary-light)' : 'transparent',
-                      fontWeight: active ? 600 : 500,
-                      fontSize: '13.5px',
-                      transition: 'all 0.15s ease',
-                      textDecoration: 'none',
-                    };
-                  }}
-                >
-                  <Building2 size={18} strokeWidth={2} />
-                  <span>📍 Universities</span>
-                </NavLink>
-
-                <NavLink
-                  to="/portal?tab=documents"
-                  onClick={handleNavClick}
-                  style={() => {
-                    const active = location.pathname.startsWith('/portal') && location.search.includes('tab=documents');
-                    return {
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '9px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      color: active ? 'var(--primary)' : 'var(--text-secondary)',
-                      backgroundColor: active ? 'var(--primary-light)' : 'transparent',
-                      fontWeight: active ? 600 : 500,
-                      fontSize: '13.5px',
-                      transition: 'all 0.15s ease',
-                      textDecoration: 'none',
-                    };
-                  }}
-                >
-                  <FileText size={18} strokeWidth={2} />
-                  <span>📄 Documents</span>
-                </NavLink>
-
-                <NavLink
-                  to="/portal?tab=report"
-                  onClick={handleNavClick}
-                  style={() => {
-                    const active = location.pathname.startsWith('/portal') && (!location.search.includes('tab=universities') && !location.search.includes('tab=documents'));
-                    return {
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '9px 12px',
-                      borderRadius: 'var(--radius-md)',
-                      color: active ? 'var(--primary)' : 'var(--text-secondary)',
-                      backgroundColor: active ? 'var(--primary-light)' : 'transparent',
-                      fontWeight: active ? 600 : 500,
-                      fontSize: '13.5px',
-                      transition: 'all 0.15s ease',
-                      textDecoration: 'none',
-                    };
-                  }}
-                >
-                  <BarChart3 size={18} strokeWidth={2} />
-                  <span>📊 Report</span>
-                </NavLink>
+              <div style={{ marginTop: '4px', paddingTop: '8px', borderTop: '1px solid var(--border-color)' }}>
+                <VerticalStageStepper currentStage={studentStage} sidebarCollapsed={false} />
               </div>
-
-              <VerticalStageStepper currentStage={studentStage} sidebarCollapsed={false} />
             </div>
           ) : (
             allowedSections.map((section, sIdx) => (
@@ -1005,10 +1022,38 @@ export const AppLayout: React.FC = () => {
         </header>
 
         {/* Page Content Body */}
-        <main style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+        <main className="app-main-content-area" style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
           <Outlet />
         </main>
       </div>
+
+      {/* Mobile App Bottom Navigation Bar for Student Portal */}
+      {(isStudent || location.pathname.startsWith('/portal')) && (
+        <nav className="app-student-mobile-bottom-nav" aria-label="Mobile Bottom Navigation">
+          {MOBILE_STUDENT_NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
+            const isActive =
+              location.pathname.startsWith('/portal') &&
+              (item.tab === currentTab || (item.tab === 'overview' && !new URLSearchParams(location.search).get('tab')));
+
+            return (
+              <button
+                key={item.tab}
+                type="button"
+                className={`app-mobile-nav-btn ${isActive ? 'is-active' : ''}`}
+                onClick={() => {
+                  navigate(`/portal?tab=${item.tab}`);
+                  if (sidebarCollapsed === false) setSidebarCollapsed(true);
+                }}
+              >
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
 
       {/* Interactive User Guide Modal */}
       <UserGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
