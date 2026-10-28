@@ -699,6 +699,34 @@ export const StudentPortalPage: React.FC = () => {
   // Mobile responsive refs for smooth touch auto-scrolling
   const stepperRef = useRef<HTMLDivElement>(null);
   const navBarRef = useRef<HTMLElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
+  const [shouldHighlightChat, setShouldHighlightChat] = useState(false);
+
+  // Smooth animated transition to Advisor Chat Section
+  const handleContactAdvisor = useCallback(() => {
+    handleTabChange('messages');
+    setShouldHighlightChat(true);
+
+    const performScrollAndFocus = () => {
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (messageInputRef.current) {
+        messageInputRef.current.focus();
+      }
+    };
+
+    if (activeTab === 'messages') {
+      performScrollAndFocus();
+    } else {
+      setTimeout(performScrollAndFocus, 140);
+    }
+
+    setTimeout(() => {
+      setShouldHighlightChat(false);
+    }, 1600);
+  }, [activeTab]);
 
   // Auto-center active stage on mobile
   useEffect(() => {
@@ -889,7 +917,7 @@ export const StudentPortalPage: React.FC = () => {
               variant="primary"
               size="sm"
               icon={<MessageSquare size={14} />}
-              onClick={() => handleTabChange('messages')}
+              onClick={handleContactAdvisor}
             >
               Contact Advisor
             </Button>
@@ -1317,7 +1345,7 @@ export const StudentPortalPage: React.FC = () => {
           <div className="student-dual-column">
             <CounsellorCard
               counsellor={lead?.counsellorId}
-              onOpenChat={() => handleTabChange('messages')}
+              onOpenChat={handleContactAdvisor}
               onScheduleCall={() => setIsScheduleCallOpen(true)}
               nextSession={nextSession}
             />
@@ -2381,7 +2409,7 @@ export const StudentPortalPage: React.FC = () => {
          TAB 8: COUNSELLOR & DIRECT MESSAGES
          ========================================================================= */}
       {activeTab === 'messages' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="student-tab-animated-pane" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Scheduled Preliminary Counselling Meetings */}
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
@@ -2451,7 +2479,10 @@ export const StudentPortalPage: React.FC = () => {
           </div>
 
           {/* Real-Time Chat Thread */}
-          <div className="student-chat-container">
+          <div
+            ref={chatContainerRef}
+            className={`student-chat-container ${shouldHighlightChat ? 'highlight-pulse' : ''}`}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2497,6 +2528,7 @@ export const StudentPortalPage: React.FC = () => {
 
             <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px' }}>
               <input
+                ref={messageInputRef}
                 type="text"
                 className="form-input"
                 value={newMessage}
