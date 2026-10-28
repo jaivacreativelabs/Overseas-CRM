@@ -917,12 +917,21 @@
   background: #FFFFFF;
   border: 1px solid var(--border-color, #E5E7EB);
   border-radius: var(--radius-lg, 12px);
-  padding: 20px;
+  padding: 20px 24px;
   box-shadow: var(--shadow-xs);
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  flex-direction: row;
   justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.student-counsellor-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .student-counsellor-card.empty-state {
@@ -2059,6 +2068,26 @@
   .student-counsellor-cards-grid {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
+  }
+
+  .student-counsellor-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 16px !important;
+    gap: 14px !important;
+  }
+
+  .student-counsellor-action-row {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .student-counsellor-action-row .btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
   }
 
   .student-uni-card-actions {

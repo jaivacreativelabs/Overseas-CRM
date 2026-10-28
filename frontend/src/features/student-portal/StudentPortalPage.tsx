@@ -66,9 +66,7 @@ import {
   University,
   Course,
 } from '../../types';
-import { PendingTasksCard } from './components/PendingTasksCard';
 import { CounsellorCard } from './components/CounsellorCard';
-import { ProfileReadinessCard } from './components/ProfileReadinessCard';
 import { StageStepper, STAGES_CONFIG } from '../../components/StageStepper';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
@@ -1338,19 +1336,13 @@ export const StudentPortalPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Admissions Readiness Score Card */}
-          <ProfileReadinessCard score={88} onBoostScore={() => handleTabChange('documents')} />
-
-          {/* 2-Column: Assigned Counsellor & Pending Tasks */}
-          <div className="student-dual-column">
-            <CounsellorCard
-              counsellor={lead?.counsellorId}
-              onOpenChat={handleContactAdvisor}
-              onScheduleCall={() => setIsScheduleCallOpen(true)}
-              nextSession={nextSession}
-            />
-            <PendingTasksCard tasks={tasks} loading={loading} />
-          </div>
+          {/* Dedicated Education Advisor Card */}
+          <CounsellorCard
+            counsellor={lead?.counsellorId}
+            onOpenChat={handleContactAdvisor}
+            onScheduleCall={() => setIsScheduleCallOpen(true)}
+            nextSession={nextSession}
+          />
         </div>
       )}
 
