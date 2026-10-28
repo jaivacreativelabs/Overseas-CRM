@@ -355,6 +355,7 @@ export const StudentPortalPage: React.FC = () => {
   const currentMilestoneIndex = journeyMilestones.findIndex((m) =>
     lead?.stage ? m.stages.includes(lead.stage) : false
   );
+  const activeMilestoneIndex = currentMilestoneIndex >= 0 ? currentMilestoneIndex : 0;
 
   // Dynamic Next Best Action Spotlight Data
   const spotlightAction = useMemo(() => {
@@ -550,28 +551,48 @@ export const StudentPortalPage: React.FC = () => {
           <span className="student-lifecycle-percentage">{progressPercentage}% Completed</span>
         </div>
 
-        <div className="student-progress-track">
-          <div className="student-progress-fill" style={{ width: `${progressPercentage}%` }} />
-        </div>
+        {/* Stepper with progress line right through checkpoints */}
+        <div className="student-stepper-wrapper">
+          <div className="student-stepper-track">
+            {journeyMilestones.map((m, idx) => {
+              const isCompleted = idx < activeMilestoneIndex;
+              const isCurrent = idx === activeMilestoneIndex;
+              const isLast = idx === journeyMilestones.length - 1;
 
-        <div className="student-milestones-row">
-          {journeyMilestones.map((m, idx) => {
-            const isCompleted = idx < currentMilestoneIndex;
-            const isCurrent = idx === currentMilestoneIndex;
-            return (
-              <div
-                key={m.id}
-                className={`student-milestone-step ${isCompleted ? 'is-completed' : ''} ${isCurrent ? 'is-current' : ''}`}
-              >
-                <div className="student-milestone-dot">
-                  {isCompleted ? <Check size={12} /> : m.id}
+              return (
+                <div
+                  key={m.id}
+                  className={`student-stepper-step ${isCompleted ? 'is-completed' : ''} ${isCurrent ? 'is-current' : ''}`}
+                >
+                  <div className="student-stepper-node-row">
+                    {/* Left connecting segment */}
+                    <div
+                      className={`student-stepper-line ${
+                        idx > 0 && idx <= activeMilestoneIndex ? 'is-active' : ''
+                      } ${idx === 0 ? 'is-hidden' : ''}`}
+                    />
+
+                    {/* Checkpoint Circle */}
+                    <div className="student-stepper-circle">
+                      {isCompleted ? <Check size={14} strokeWidth={2.5} /> : m.id}
+                    </div>
+
+                    {/* Right connecting segment */}
+                    <div
+                      className={`student-stepper-line ${
+                        idx < activeMilestoneIndex ? 'is-active' : ''
+                      } ${isLast ? 'is-hidden' : ''}`}
+                    />
+                  </div>
+
+                  {/* Milestone Label */}
+                  <span className="student-stepper-label" title={m.name}>
+                    {m.name}
+                  </span>
                 </div>
-                <span className="student-milestone-name" title={m.name}>
-                  {m.name}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         <button
