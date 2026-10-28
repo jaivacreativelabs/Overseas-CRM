@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import './student-portal.css';
 import {
@@ -25,11 +25,18 @@ import {
   X,
   Calendar,
   Compass,
-  BarChart3,
   Building2,
-  File,
   FolderOpen,
   FileCheck,
+  AlertCircle,
+  LayoutDashboard,
+  ArrowRight,
+  Sparkles,
+  Clock,
+  ShieldCheck,
+  Globe,
+  DollarSign,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -58,24 +65,25 @@ import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
 import { Table } from '../../components/Table';
 import { Modal } from '../../components/Modal';
-import { Input, Textarea } from '../../components/Form';
+import { Input } from '../../components/Form';
 
 export const StudentPortalPage: React.FC = () => {
   const { user } = useAuth();
   const { success, error } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Primary active tab derived from URL query param: 'universities' | 'documents' | 'report'
-  const activeTabParam = searchParams.get('tab') || 'report';
+  // Primary active tab derived from URL query param: 'overview' | 'universities' | 'documents' | 'applications' | 'payments' | 'visa' | 'travel' | 'messages'
+  const rawTabParam = searchParams.get('tab') || 'overview';
+  // Backward compatibility: map legacy 'report' to 'overview'
+  const activeTab = rawTabParam === 'report' ? 'overview' : rawTabParam;
+
+  const handleTabChange = (tabKey: string) => {
+    setSearchParams({ tab: tabKey });
+  };
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isJourneyExpanded, setIsJourneyExpanded] = useState(false);
-
-  // Sub-tab state inside the Report page
-  const [reportSection, setReportSection] = useState<
-    'overview' | 'counselling' | 'applications' | 'others' | 'payments' | 'visa' | 'travel' | 'orientation'
-  >('overview');
 
   const [shortlists, setShortlists] = useState<Shortlist[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -88,6 +96,9 @@ export const StudentPortalPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [orientations, setOrientations] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+
+  // Document filter in Document Locker
+  const [docFilter, setDocFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('ALL');
 
   // Rich University Detail Modal
   const [isUnivDetailsOpen, setIsUnivDetailsOpen] = useState(false);
@@ -127,6 +138,7 @@ export const StudentPortalPage: React.FC = () => {
         const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
         currentLead = res.data?.[0] || null;
       }
+
       if (currentLead) {
         setLead(currentLead);
         const [shortRes, docRes, appRes, offRes, payRes, visRes, travRes, msgRes, taskRes, orientRes] =
@@ -165,7 +177,7 @@ export const StudentPortalPage: React.FC = () => {
     fetchStudentData();
   }, [fetchStudentData]);
 
-  // Student selects 1 university
+  // Student selects 1 preferred university
   const handleSelectUniversity = async (shortlistId: string) => {
     if (!lead) return;
     try {
@@ -286,162 +298,751 @@ export const StudentPortalPage: React.FC = () => {
       setNewMessage('');
       const res = await apiClient.get<Message[]>(`/messages/lead/${lead._id}`);
       setMessages(res.data || []);
-      success('Message sent to your counsellor.');
+      success('Message sent to your advisor.');
     } catch (err: any) {
       error(err.message || 'Failed to send message');
     }
   };
 
-  if (loading) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading your student application portal...</div>;
-  }
+  // Dynamic greeting based on time of day
+  const greetingTime = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
 
+  // Compute stage indexes and progress
   const currentStageIndex = STAGES_CONFIG.findIndex((s) => s.stage === lead?.stage);
   const activeStageNum = currentStageIndex >= 0 ? currentStageIndex + 1 : 1;
   const progressPercentage = Math.round((activeStageNum / STAGES_CONFIG.length) * 100);
   const counsellingSessions = lead?.counsellingSessions || [];
+  const nextSession = counsellingSessions.find((s) => s.status === 'SCHEDULED') || null;
+
+  // Filtered documents
+  const filteredDocuments = useMemo(() => {
+    if (docFilter === 'VERIFIED') {
+      return documents.filter((d) => d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL);
+    }
+    if (docFilter === 'REJECTED') {
+      return documents.filter((d) => d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED);
+    }
+    if (docFilter === 'PENDING') {
+      return documents.filter((d) => d.status === DocumentStatus.REQUESTED);
+    }
+    return documents;
+  }, [documents, docFilter]);
+
+  const verifiedDocsCount = documents.filter(
+    (d) => d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL
+  ).length;
+  const rejectedDocsCount = documents.filter(
+    (d) => d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED
+  ).length;
+  const pendingDocsCount = documents.filter((d) => d.status === DocumentStatus.REQUESTED).length;
+
+  // Milestone list (7 High-Level Journey Phases)
+  const journeyMilestones = [
+    { id: 1, name: 'Profile Evaluation', stages: [StudentStage.LEAD_CAPTURED, StudentStage.PRELIMINARY_COUNSELLING, StudentStage.PROFILE_EVALUATION] },
+    { id: 2, name: 'Shortlists', stages: [StudentStage.UNIVERSITY_SHORTLISTING] },
+    { id: 3, name: 'Documents', stages: [StudentStage.DOCUMENT_COLLECTION] },
+    { id: 4, name: 'Applications & Offers', stages: [StudentStage.APPLICATION_SUBMISSION, StudentStage.OFFER_MANAGEMENT] },
+    { id: 5, name: 'Fee Deposit', stages: [StudentStage.FEE_PAYMENT] },
+    { id: 6, name: 'Visa Processing', stages: [StudentStage.VISA_PROCESSING] },
+    { id: 7, name: 'Departure & Arrival', stages: [StudentStage.PRE_DEPARTURE, StudentStage.DEPARTURE, StudentStage.ARRIVAL_CONFIRMED] },
+  ];
+
+  const currentMilestoneIndex = journeyMilestones.findIndex((m) =>
+    lead?.stage ? m.stages.includes(lead.stage) : false
+  );
+
+  // Dynamic Next Best Action Spotlight Data
+  const spotlightAction = useMemo(() => {
+    const stage = lead?.stage;
+    if (stage === StudentStage.UNIVERSITY_SHORTLISTING) {
+      return {
+        label: 'Action Required',
+        title: 'Select Your Preferred University Choice',
+        desc: 'Your counsellor has prepared university recommendations. Choose your top program to unlock your document checklist.',
+        btnText: 'Choose University',
+        tab: 'universities',
+        icon: <Building2 size={20} />,
+      };
+    }
+    if (stage === StudentStage.DOCUMENT_COLLECTION || pendingDocsCount > 0) {
+      return {
+        label: 'Action Required',
+        title: `${pendingDocsCount} Mandatory Document${pendingDocsCount === 1 ? '' : 's'} Pending`,
+        desc: 'Upload your academic transcripts, English proficiency test scores, and passport for counsellor verification.',
+        btnText: 'Open Document Locker',
+        tab: 'documents',
+        icon: <FileText size={20} />,
+      };
+    }
+    if (stage === StudentStage.OFFER_MANAGEMENT || offers.some((o) => !o.signedOfferUrl)) {
+      return {
+        label: 'Exciting Milestone',
+        title: 'Review & Sign University Offer Letter',
+        desc: 'Your official acceptance package is ready! Download the offer, sign the acceptance declaration, and upload your signed copy.',
+        btnText: 'Review Offers',
+        tab: 'applications',
+        icon: <Award size={20} />,
+      };
+    }
+    if (stage === StudentStage.FEE_PAYMENT || payments.some((p) => p.status === PaymentStatus.REQUESTED)) {
+      return {
+        label: 'Action Required',
+        title: 'Submit Tuition Deposit Wire Receipt',
+        desc: 'Secure your university admission seat by completing your tuition wire deposit and submitting bank reference proof.',
+        btnText: 'Submit Fee Proof',
+        tab: 'payments',
+        icon: <CreditCard size={20} />,
+      };
+    }
+    if (stage === StudentStage.VISA_PROCESSING) {
+      return {
+        label: 'In Progress',
+        title: 'Embassy Visa Filing in Progress',
+        desc: visa?.appointmentDate
+          ? `Biometrics & Interview scheduled for ${new Date(visa.appointmentDate).toLocaleDateString()} at ${visa.vfsCenterLocation || 'VFS Embassy Center'}.`
+          : 'Your counsellor is preparing your visa documentation dossier for embassy submission.',
+        btnText: 'Track Visa Status',
+        tab: 'visa',
+        icon: <Stamp size={20} />,
+      };
+    }
+    if (stage === StudentStage.PRE_DEPARTURE || stage === StudentStage.DEPARTURE) {
+      return {
+        label: 'Pre-Departure Guidance',
+        title: 'Prepare for Travel & Orientation',
+        desc: 'Join scheduled pre-departure workshops, confirm your student accommodation, and check health insurance coverage.',
+        btnText: 'View Travel Details',
+        tab: 'travel',
+        icon: <Plane size={20} />,
+      };
+    }
+
+    return {
+      label: 'Current Status',
+      title: 'Profile Evaluation Underway',
+      desc: 'Our admissions counsellors are reviewing your academic background to find your best university options.',
+      btnText: 'Message Advisor',
+      tab: 'messages',
+      icon: <Sparkles size={20} />,
+    };
+  }, [lead?.stage, pendingDocsCount, offers, payments, visa]);
+
+  if (loading) {
+    return (
+      <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--primary-light)', borderTopColor: 'var(--primary)', borderRadius: '50%', margin: '0 auto 16px auto', animation: 'spin 1s linear infinite' }} />
+        <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>Loading your student portal...</h3>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Retrieving your academic journey and live application statuses.</p>
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  const studentDisplayName = lead?.name || user?.name || 'Student';
+  const studentInitial = studentDisplayName.charAt(0).toUpperCase();
 
   return (
     <div className="student-portal-container">
-      {/* Student Welcome & Profile Summary Header */}
-      <div className="card student-welcome-card">
-        <div className="student-header-top">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <h1 className="student-welcome-title">Welcome, {lead?.name || user?.name}!</h1>
-            <Badge variant="primary">{lead?.stage?.replace(/_/g, ' ') || 'PROFILE EVALUATION'}</Badge>
-            {user?.role !== UserRole.STUDENT && (
-              <Badge variant="warning">Staff Preview Mode</Badge>
-            )}
-          </div>
-          <p className="student-welcome-subtext">
-            Target Country: <strong>{lead?.targetCountry || 'International'}</strong> • Program:{' '}
-            <strong>{lead?.targetCourse || 'Undecided'}</strong>
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<FileText size={14} />}
-            onClick={() => lead && window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
-          >
-            Download Summary Dossier
-          </Button>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '8px 14px',
-              backgroundColor: 'var(--bg-subtle)',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
-            <User size={18} color="var(--primary)" />
-            <div style={{ fontSize: '12px' }}>
-              <div style={{ fontWeight: 600 }}>Assigned Counsellor</div>
-              <div style={{ color: 'var(--text-muted)' }}>{lead?.counsellorId?.name || 'Sarah Jenkins'}</div>
+      {/* =========================================================================
+         1. HERO WELCOME & PROFILE BANNER
+         ========================================================================= */}
+      <section className="student-hero-banner" aria-label="Student Welcome">
+        <div className="student-hero-content">
+          <div className="student-hero-profile-group">
+            <div className="student-hero-avatar-box">
+              {studentInitial}
+            </div>
+            <div className="student-hero-text-block">
+              <div className="student-hero-title-row">
+                <h1 className="student-hero-greeting">
+                  {greetingTime}, {studentDisplayName}!
+                </h1>
+                <Badge variant="primary">
+                  {lead?.stage?.replace(/_/g, ' ') || 'PROFILE EVALUATION'}
+                </Badge>
+                {user?.role !== UserRole.STUDENT && (
+                  <Badge variant="warning">Staff Preview Mode</Badge>
+                )}
+              </div>
+              <div className="student-hero-meta-pills">
+                <span className="student-hero-meta-pill">
+                  <Globe size={13} color="var(--primary)" />
+                  Target Country: <strong>{lead?.targetCountry || 'International'}</strong>
+                </span>
+                <span className="student-hero-meta-pill">
+                  <GraduationCap size={13} color="var(--primary)" />
+                  Program: <strong>{lead?.targetCourse || 'Undecided'}</strong>
+                </span>
+                {lead?.targetIntake && (
+                  <span className="student-hero-meta-pill">
+                    <Calendar size={13} color="var(--primary)" />
+                    Intake: <strong>{lead.targetIntake}</strong>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+
+          <div className="student-hero-actions">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Download size={14} />}
+              onClick={() => lead && window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
+            >
+              Download Application Dossier
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<MessageSquare size={14} />}
+              onClick={() => handleTabChange('messages')}
+            >
+              Contact Advisor
+            </Button>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* =========================================================================
-         PAGE 1: UNIVERSITIES
+         2. NEXT BEST ACTION SPOTLIGHT CARD
          ========================================================================= */}
-      {activeTabParam === 'universities' && (
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">📍 Shortlisted Universities</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Review recommended programs and click "Confirm Selection" on your top preferred choice to unlock your document checklist.
-              </p>
+      <section className="student-spotlight-card" aria-label="Current Action Required">
+        <div className="student-spotlight-body">
+          <div className="student-spotlight-icon-circle">
+            {spotlightAction.icon}
+          </div>
+          <div className="student-spotlight-text">
+            <span className="student-spotlight-label">{spotlightAction.label}</span>
+            <h2 className="student-spotlight-title">{spotlightAction.title}</h2>
+            <p className="student-spotlight-desc">{spotlightAction.desc}</p>
+          </div>
+        </div>
+        <div className="student-spotlight-cta">
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<ArrowRight size={14} />}
+            onClick={() => handleTabChange(spotlightAction.tab)}
+          >
+            {spotlightAction.btnText}
+          </Button>
+        </div>
+      </section>
+
+      {/* =========================================================================
+         3. JOURNEY LIFECYCLE PROGRESS & ACCORDION
+         ========================================================================= */}
+      <section className="student-lifecycle-card" aria-label="Journey Progress Roadmap">
+        <div className="student-lifecycle-header">
+          <div className="student-lifecycle-title-group">
+            <Compass size={16} color="var(--primary)" />
+            <h3 className="student-lifecycle-title">Admissions Journey Roadmap</h3>
+            <span className="student-lifecycle-stage-pill">
+              Stage {activeStageNum} of {STAGES_CONFIG.length}: {lead?.stage?.replace(/_/g, ' ')}
+            </span>
+          </div>
+          <span className="student-lifecycle-percentage">{progressPercentage}% Completed</span>
+        </div>
+
+        <div className="student-progress-track">
+          <div className="student-progress-fill" style={{ width: `${progressPercentage}%` }} />
+        </div>
+
+        <div className="student-milestones-row">
+          {journeyMilestones.map((m, idx) => {
+            const isCompleted = idx < currentMilestoneIndex;
+            const isCurrent = idx === currentMilestoneIndex;
+            return (
+              <div
+                key={m.id}
+                className={`student-milestone-step ${isCompleted ? 'is-completed' : ''} ${isCurrent ? 'is-current' : ''}`}
+              >
+                <div className="student-milestone-dot">
+                  {isCompleted ? <Check size={12} /> : m.id}
+                </div>
+                <span className="student-milestone-name" title={m.name}>
+                  {m.name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          className="student-accordion-btn"
+          onClick={() => setIsJourneyExpanded(!isJourneyExpanded)}
+          aria-expanded={isJourneyExpanded}
+        >
+          <span>{isJourneyExpanded ? 'Hide Detailed 12-Stage Stepper' : 'View Full 12-Stage Stepper Timeline'}</span>
+          {isJourneyExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {isJourneyExpanded && (
+          <div style={{ marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+            <StageStepper currentStage={lead?.stage || StudentStage.PROFILE_EVALUATION} />
+          </div>
+        )}
+      </section>
+
+      {/* =========================================================================
+         4. PRIMARY NAVIGATION TAB BAR
+         ========================================================================= */}
+      <nav className="student-nav-bar" aria-label="Student Portal Sections">
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'overview' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('overview')}
+        >
+          <LayoutDashboard size={15} />
+          <span>Overview</span>
+        </button>
+
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'universities' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('universities')}
+        >
+          <Building2 size={15} />
+          <span>Universities</span>
+          {shortlists.length > 0 && <span className="student-nav-badge">{shortlists.length}</span>}
+        </button>
+
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'documents' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('documents')}
+        >
+          <FileText size={15} />
+          <span>Document Locker</span>
+          {documents.length > 0 && (
+            <span className="student-nav-badge">
+              {verifiedDocsCount}/{documents.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'applications' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('applications')}
+        >
+          <Award size={15} />
+          <span>Applications & Offers</span>
+          {offers.length > 0 && <span className="student-nav-badge">{offers.length} Offer{offers.length === 1 ? '' : 's'}</span>}
+        </button>
+
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'payments' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('payments')}
+        >
+          <CreditCard size={15} />
+          <span>Tuition & Fees</span>
+          {payments.length > 0 && <span className="student-nav-badge">{payments.length}</span>}
+        </button>
+
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'visa' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('visa')}
+        >
+          <Stamp size={15} />
+          <span>Visa Tracking</span>
+          {visa?.status && <span className="student-nav-badge">{visa.status.replace(/_/g, ' ')}</span>}
+        </button>
+
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'travel' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('travel')}
+        >
+          <Plane size={15} />
+          <span>Travel & Orientation</span>
+          {orientations.length > 0 && <span className="student-nav-badge">{orientations.length}</span>}
+        </button>
+
+        <button
+          type="button"
+          className={`student-nav-item ${activeTab === 'messages' ? 'is-active' : ''}`}
+          onClick={() => handleTabChange('messages')}
+        >
+          <MessageSquare size={15} />
+          <span>Advisor & Chat</span>
+          {messages.length > 0 && <span className="student-nav-badge">{messages.length}</span>}
+        </button>
+      </nav>
+
+      {/* =========================================================================
+         TAB 1: OVERVIEW (BENTO GRID DASHBOARD COMMAND CENTER)
+         ========================================================================= */}
+      {activeTab === 'overview' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* 6 Bento Grid Summary Cards */}
+          <div className="student-bento-grid">
+            {/* Bento Card 1: Universities */}
+            <div className="student-bento-card" onClick={() => handleTabChange('universities')}>
+              <div className="student-bento-card-top">
+                <div className="student-bento-icon-box blue">
+                  <Building2 size={20} />
+                </div>
+                <Badge variant={shortlists.some((s) => s.status === 'SELECTED_BY_STUDENT') ? 'success' : 'primary'}>
+                  {shortlists.some((s) => s.status === 'SELECTED_BY_STUDENT') ? 'Choice Selected' : `${shortlists.length} Shortlisted`}
+                </Badge>
+              </div>
+              <div className="student-bento-card-middle">
+                <span className="student-bento-metric">{shortlists.length}</span>
+                <span className="student-bento-label">Recommended Programs</span>
+                <p className="student-bento-subtext">
+                  {shortlists.some((s) => s.status === 'SELECTED_BY_STUDENT')
+                    ? `Selected: ${shortlists.find((s) => s.status === 'SELECTED_BY_STUDENT')?.universityName}`
+                    : 'Review curated options and lock your preferred choice.'}
+                </p>
+              </div>
+              <div className="student-bento-card-footer">
+                <span>View Shortlists <ArrowRight size={13} /></span>
+              </div>
+            </div>
+
+            {/* Bento Card 2: Document Locker */}
+            <div className="student-bento-card" onClick={() => handleTabChange('documents')}>
+              <div className="student-bento-card-top">
+                <div className="student-bento-icon-box green">
+                  <FileText size={20} />
+                </div>
+                <Badge variant={rejectedDocsCount > 0 ? 'danger' : pendingDocsCount > 0 ? 'warning' : 'success'}>
+                  {rejectedDocsCount > 0 ? `${rejectedDocsCount} Resubmit` : `${verifiedDocsCount}/${documents.length} Verified`}
+                </Badge>
+              </div>
+              <div className="student-bento-card-middle">
+                <span className="student-bento-metric">{verifiedDocsCount} / {documents.length || 0}</span>
+                <span className="student-bento-label">Documents Verified</span>
+                <p className="student-bento-subtext">
+                  {pendingDocsCount > 0
+                    ? `${pendingDocsCount} mandatory document(s) awaiting your upload.`
+                    : 'All submitted documents verified by admissions.'}
+                </p>
+              </div>
+              <div className="student-bento-card-footer">
+                <span>Manage Locker <ArrowRight size={13} /></span>
+              </div>
+            </div>
+
+            {/* Bento Card 3: Applications & Offers */}
+            <div className="student-bento-card" onClick={() => handleTabChange('applications')}>
+              <div className="student-bento-card-top">
+                <div className="student-bento-icon-box purple">
+                  <Award size={20} />
+                </div>
+                <Badge variant={offers.length > 0 ? 'success' : 'neutral'}>
+                  {offers.length > 0 ? `${offers.length} Offer Letter(s)` : `${applications.length} Applied`}
+                </Badge>
+              </div>
+              <div className="student-bento-card-middle">
+                <span className="student-bento-metric">{applications.length}</span>
+                <span className="student-bento-label">Submitted Applications</span>
+                <p className="student-bento-subtext">
+                  {offers.length > 0
+                    ? `Official offer received from ${offers[0]?.universityName || 'University'}.`
+                    : 'Applications filed and tracking university review.'}
+                </p>
+              </div>
+              <div className="student-bento-card-footer">
+                <span>Check Offers <ArrowRight size={13} /></span>
+              </div>
+            </div>
+
+            {/* Bento Card 4: Tuition & Payments */}
+            <div className="student-bento-card" onClick={() => handleTabChange('payments')}>
+              <div className="student-bento-card-top">
+                <div className="student-bento-icon-box amber">
+                  <CreditCard size={20} />
+                </div>
+                <Badge variant={payments.some((p) => p.status === PaymentStatus.REQUESTED) ? 'warning' : 'neutral'}>
+                  {payments.filter((p) => p.status === PaymentStatus.VERIFIED).length}/{payments.length} Verified
+                </Badge>
+              </div>
+              <div className="student-bento-card-middle">
+                <span className="student-bento-metric">{payments.length}</span>
+                <span className="student-bento-label">Tuition Deposit Invoices</span>
+                <p className="student-bento-subtext">
+                  {payments.some((p) => p.status === PaymentStatus.REQUESTED)
+                    ? 'Tuition deposit wire transfer pending submission.'
+                    : 'Fee invoices and bank receipts recorded.'}
+                </p>
+              </div>
+              <div className="student-bento-card-footer">
+                <span>Payment Details <ArrowRight size={13} /></span>
+              </div>
+            </div>
+
+            {/* Bento Card 5: Visa Tracking */}
+            <div className="student-bento-card" onClick={() => handleTabChange('visa')}>
+              <div className="student-bento-card-top">
+                <div className="student-bento-icon-box sky">
+                  <Stamp size={20} />
+                </div>
+                <Badge variant={visa?.status === 'APPROVED' ? 'success' : visa?.appointmentDate ? 'info' : 'neutral'}>
+                  {visa?.status ? visa.status.replace(/_/g, ' ') : 'Pending'}
+                </Badge>
+              </div>
+              <div className="student-bento-card-middle">
+                <span className="student-bento-metric" style={{ fontSize: '18px' }}>
+                  {visa?.visaNumber || (visa?.status ? visa.status.replace(/_/g, ' ') : 'Under Preparation')}
+                </span>
+                <span className="student-bento-label">Visa & Embassy Record</span>
+                <p className="student-bento-subtext">
+                  {visa?.appointmentDate
+                    ? `Appointment: ${new Date(visa.appointmentDate).toLocaleDateString()}`
+                    : `Destination: ${visa?.country || lead?.targetCountry || 'International'}`}
+                </p>
+              </div>
+              <div className="student-bento-card-footer">
+                <span>Embassy Timeline <ArrowRight size={13} /></span>
+              </div>
+            </div>
+
+            {/* Bento Card 6: Travel & Orientation */}
+            <div className="student-bento-card" onClick={() => handleTabChange('travel')}>
+              <div className="student-bento-card-top">
+                <div className="student-bento-icon-box indigo">
+                  <Plane size={20} />
+                </div>
+                <Badge variant="neutral">
+                  {orientations.length} Session{orientations.length === 1 ? '' : 's'}
+                </Badge>
+              </div>
+              <div className="student-bento-card-middle">
+                <span className="student-bento-metric">
+                  {travel?.flightStatus ? travel.flightStatus.replace(/_/g, ' ') : 'Planning'}
+                </span>
+                <span className="student-bento-label">Departure Readiness</span>
+                <p className="student-bento-subtext">
+                  Housing: {travel?.accommodationStatus || 'Pending'} • Health Insurance: {travel?.insuranceStatus || 'Pending'}
+                </p>
+              </div>
+              <div className="student-bento-card-footer">
+                <span>View Briefings <ArrowRight size={13} /></span>
+              </div>
             </div>
           </div>
 
-          <Table
-            columns={[
-              { header: 'UNIVERSITY', accessor: 'universityName' },
-              { header: 'COURSE', accessor: 'courseTitle' },
-              { header: 'COUNTRY', accessor: 'country' },
-              { header: 'INTAKE', accessor: 'intake' },
-              {
-                header: 'ANNUAL FEE',
-                render: (s) => (s.annualFee ? `${s.currency || '$'} ${s.annualFee.toLocaleString()}` : '—'),
-              },
-              {
-                header: 'STATUS',
-                render: (s) => <StatusBadge status={s.status} />,
-              },
-              {
-                header: 'ACTION',
-                align: 'right',
-                render: (s) => (
-                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedUnivItem(s);
-                        setIsUnivDetailsOpen(true);
-                      }}
-                    >
-                      View Details
-                    </Button>
-                    {s.status !== 'SELECTED_BY_STUDENT' ? (
-                      <Button variant="primary" size="sm" onClick={() => handleSelectUniversity(s._id)}>
-                        Select Choice
-                      </Button>
-                    ) : (
-                      <Badge variant="success">✓ Selected</Badge>
-                    )}
-                  </div>
-                ),
-              },
-            ]}
-            data={shortlists}
-            emptyMessage="Your counsellor is curating your personalized university shortlist."
-          />
+          {/* 2-Column: Assigned Counsellor & Pending Tasks */}
+          <div className="student-dual-column">
+            <CounsellorCard
+              counsellor={lead?.counsellorId}
+              onOpenChat={() => handleTabChange('messages')}
+              nextSession={nextSession}
+            />
+            <PendingTasksCard tasks={tasks} loading={loading} />
+          </div>
         </div>
       )}
 
       {/* =========================================================================
-         PAGE 2: DOCUMENTS
+         TAB 2: UNIVERSITIES SHORTLIST
          ========================================================================= */}
-      {activeTabParam === 'documents' && (
+      {activeTab === 'universities' && (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
             <div>
-              <h3 className="card-title">📄 Document Checklist</h3>
-              <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Please review and upload all required documents requested by your assigned counselor.
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Building2 size={18} color="var(--primary)" /> Shortlisted Universities & Degree Programs
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Review recommended courses curated by your advisor. Confirm your 1 top choice to unlock the document checklist.
+              </p>
+            </div>
+            <Badge variant="primary">{shortlists.length} Programs Shortlisted</Badge>
+          </div>
+
+          {shortlists.length === 0 ? (
+            <div className="student-tasks-empty-state">
+              <div className="student-tasks-empty-icon" style={{ background: '#EFF6FF', color: 'var(--primary)' }}>
+                <Building2 size={32} />
+              </div>
+              <h4 className="student-tasks-empty-title">Curating Your University Shortlist</h4>
+              <p className="student-tasks-empty-subtext">
+                Your education counsellor is analyzing your academic background and test scores to curate top-tier university recommendations.
+              </p>
+            </div>
+          ) : (
+            <div className="student-univ-grid">
+              {shortlists.map((s) => {
+                const isSelected = s.status === 'SELECTED_BY_STUDENT';
+                return (
+                  <div key={s._id} className={`student-univ-card ${isSelected ? 'is-selected' : ''}`}>
+                    <div>
+                      <div className="student-univ-card-header">
+                        <div className="student-univ-logo-box">
+                          {s.universityName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="student-univ-badge-group">
+                          <Badge variant="primary">{s.country}</Badge>
+                          {isSelected && <Badge variant="success">✓ Choice Confirmed</Badge>}
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '12px' }}>
+                        <h4 className="student-univ-name">{s.universityName}</h4>
+                        <p className="student-univ-course">{s.courseTitle}</p>
+                      </div>
+                    </div>
+
+                    <div className="student-univ-details-list">
+                      <div>
+                        <div className="student-univ-detail-label">Intake Season</div>
+                        <div className="student-univ-detail-val">{s.intake}</div>
+                      </div>
+                      <div>
+                        <div className="student-univ-detail-label">Est. Tuition Fee</div>
+                        <div className="student-univ-detail-val">
+                          {s.annualFee ? `${s.currency || '$'} ${s.annualFee.toLocaleString()}` : '—'} / yr
+                        </div>
+                      </div>
+                      <div>
+                        <div className="student-univ-detail-label">Status</div>
+                        <div className="student-univ-detail-val">
+                          <StatusBadge status={s.status} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="student-univ-detail-label">Ranking</div>
+                        <div className="student-univ-detail-val">
+                          {(s.universityId as any)?.ranking ? `#${(s.universityId as any).ranking}` : 'Top 100 Global'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="student-univ-actions">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        style={{ flex: 1 }}
+                        onClick={() => {
+                          setSelectedUnivItem(s);
+                          setIsUnivDetailsOpen(true);
+                        }}
+                      >
+                        View Details
+                      </Button>
+                      {!isSelected ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          style={{ flex: 1 }}
+                          onClick={() => handleSelectUniversity(s._id)}
+                        >
+                          Select Choice
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" disabled style={{ flex: 1, color: '#059669', fontWeight: 600 }}>
+                          Selected ✓
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =========================================================================
+         TAB 3: DOCUMENT LOCKER
+         ========================================================================= */}
+      {activeTab === 'documents' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FolderOpen size={18} color="var(--primary)" /> Document Locker & Credential Checklist
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                Upload verified PDFs or scans of your academic transcripts, test certificates, and identification.
               </p>
             </div>
             <Badge variant="primary">
-              {documents.filter((d) => d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL).length} / {documents.length} Verified
+              {verifiedDocsCount} / {documents.length} Verified
             </Badge>
           </div>
+
+          {/* Document Summary Strip */}
+          <div className="student-docs-summary-strip">
+            <div className="student-doc-summary-pill" onClick={() => setDocFilter('ALL')} style={{ cursor: 'pointer', borderColor: docFilter === 'ALL' ? 'var(--primary)' : undefined }}>
+              <div className="student-doc-summary-icon" style={{ background: '#EFF6FF', color: 'var(--primary)' }}>
+                <FileText size={16} />
+              </div>
+              <div>
+                <div className="student-doc-summary-count">{documents.length}</div>
+                <div className="student-doc-summary-label">All Documents</div>
+              </div>
+            </div>
+
+            <div className="student-doc-summary-pill" onClick={() => setDocFilter('PENDING')} style={{ cursor: 'pointer', borderColor: docFilter === 'PENDING' ? 'var(--warning)' : undefined }}>
+              <div className="student-doc-summary-icon" style={{ background: '#FFFBEB', color: '#D97706' }}>
+                <Clock size={16} />
+              </div>
+              <div>
+                <div className="student-doc-summary-count">{pendingDocsCount}</div>
+                <div className="student-doc-summary-label">Awaiting Upload</div>
+              </div>
+            </div>
+
+            <div className="student-doc-summary-pill" onClick={() => setDocFilter('VERIFIED')} style={{ cursor: 'pointer', borderColor: docFilter === 'VERIFIED' ? 'var(--success)' : undefined }}>
+              <div className="student-doc-summary-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
+                <CheckCircle2 size={16} />
+              </div>
+              <div>
+                <div className="student-doc-summary-count">{verifiedDocsCount}</div>
+                <div className="student-doc-summary-label">Verified & Approved</div>
+              </div>
+            </div>
+
+            <div className="student-doc-summary-pill" onClick={() => setDocFilter('REJECTED')} style={{ cursor: 'pointer', borderColor: docFilter === 'REJECTED' ? 'var(--danger)' : undefined }}>
+              <div className="student-doc-summary-icon" style={{ background: '#FEF2F2', color: '#DC2626' }}>
+                <AlertCircle size={16} />
+              </div>
+              <div>
+                <div className="student-doc-summary-count">{rejectedDocsCount}</div>
+                <div className="student-doc-summary-label">Needs Re-upload</div>
+              </div>
+            </div>
+          </div>
+
           <div className="student-table-responsive">
             <Table
               columns={[
                 {
-                  header: 'DOCUMENT',
+                  header: 'DOCUMENT TITLE',
                   render: (d) => (
                     <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <strong>{d.title}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <strong style={{ color: 'var(--text-primary)' }}>{d.title}</strong>
                         {d.isMandatory ? (
-                          <span style={{ color: 'var(--danger)', fontSize: '11px', fontWeight: 600 }}>[Required]</span>
+                          <span style={{ color: 'var(--danger)', fontSize: '11px', fontWeight: 700, background: '#FEF2F2', padding: '1px 6px', borderRadius: '4px' }}>
+                            Mandatory
+                          </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>[Optional]</span>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Optional</span>
                         )}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '3px' }}>
                         Category: {d.category}
                         {d.description ? ` • Instructions: ${d.description}` : ''}
                       </div>
+                      {(d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED) && (
+                        <div className="student-doc-rejection-callout">
+                          <strong>Counsellor Feedback:</strong> {d.rejectionReason || 'Document unreadable or invalid format. Please re-upload.'}
+                        </div>
+                      )}
                     </div>
                   ),
                 },
@@ -450,7 +1051,7 @@ export const StudentPortalPage: React.FC = () => {
                   render: (d) => <StatusBadge status={d.status} />,
                 },
                 {
-                  header: 'ATTACHMENT',
+                  header: 'FILE ATTACHMENT',
                   render: (d) =>
                     d.fileUrl ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -458,32 +1059,26 @@ export const StudentPortalPage: React.FC = () => {
                           href={d.fileUrl}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          style={{
+                            color: 'var(--primary)',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            fontSize: '12.5px',
+                          }}
                         >
                           <FileText size={14} />
-                          {d.originalFileName || 'View Uploaded Document'}
+                          {d.originalFileName || 'View Uploaded File'}
                         </a>
                         {d.fileSize && (
-                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             {(d.fileSize / 1024).toFixed(0)} KB
                           </span>
                         )}
                       </div>
                     ) : (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Awaiting Submission</span>
-                    ),
-                },
-                {
-                  header: 'COUNSELOR FEEDBACK',
-                  render: (d) =>
-                    d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED ? (
-                      <div style={{ padding: '4px 8px', backgroundColor: '#FEF2F2', borderRadius: '4px', border: '1px solid #FECACA' }}>
-                        <span style={{ color: 'var(--danger)', fontSize: '12px', fontWeight: 500 }}>
-                          {d.rejectionReason || 'Document requires re-submission'}
-                        </span>
-                      </div>
-                    ) : (
-                      '—'
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Pending Submission</span>
                     ),
                 },
                 {
@@ -510,850 +1105,627 @@ export const StudentPortalPage: React.FC = () => {
                   },
                 },
               ]}
-              data={documents}
-              emptyMessage="No documents have been requested yet. Your counselor will notify you if any credentials are required."
+              data={filteredDocuments}
+              emptyMessage={
+                docFilter === 'ALL'
+                  ? 'No documents have been requested yet. Your counsellor will notify you when checklists are generated.'
+                  : `No documents found matching the filter "${docFilter}".`
+              }
             />
           </div>
         </div>
       )}
 
       {/* =========================================================================
-         PAGE 3: STUDENT JOURNEY REPORT (FULL-SCREEN WITH HORIZONTAL INTERACTIVE NAV)
+         TAB 4: APPLICATIONS & OFFERS
          ========================================================================= */}
-      {activeTabParam === 'report' && (
+      {activeTab === 'applications' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Top Report Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                📊 Student Journey Report
-              </h1>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                Full-spectrum journey progress summary & interactive management for all lifecycle stages
-              </p>
-            </div>
-          </div>
-
-          {/* Top Summary Section Cards (Real Data, Clean Empty States) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-            {/* Summary Card 1: Journey Progress */}
-            <div style={{ padding: '14px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Overall Progress
+          {/* Official University Offer Letters */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Award size={18} color="var(--primary)" /> Official University Offer Letters
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Download official admission letters and submit signed acceptance declarations to confirm your enrollment.
+                </p>
               </div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>
-                {progressPercentage}%
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: 500 }}>
-                Stage {activeStageNum}/12: {lead?.stage?.replace(/_/g, ' ') || 'PROFILE EVALUATION'}
-              </div>
+              <Badge variant="primary">{offers.length} Offer{offers.length === 1 ? '' : 's'}</Badge>
             </div>
 
-            {/* Summary Card 2: Counselling Status */}
-            <div style={{ padding: '14px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Counselling Status
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {counsellingSessions.length > 0 ? `${counsellingSessions.length} Session(s)` : lead?.counsellorId?.name ? 'Counsellor Assigned' : 'No information available yet'}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                {lead?.counsellorId?.name ? `Counsellor: ${lead.counsellorId.name}` : 'No information available yet'}
-              </div>
-            </div>
-
-            {/* Summary Card 3: Applications Status */}
-            <div style={{ padding: '14px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Applications & Offers
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {applications.length > 0 ? `${applications.length} Applied` : 'No information available yet'}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                {offers.length > 0 ? `${offers.length} Offer Letter(s) Received` : 'No offer letters yet'}
-              </div>
-            </div>
-
-            {/* Summary Card 4: Payments Status */}
-            <div style={{ padding: '14px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Payments Status
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {payments.length > 0 ? `${payments.filter((p) => p.status === PaymentStatus.VERIFIED).length}/${payments.length} Verified` : 'No information available yet'}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                {payments.some((p) => p.status === PaymentStatus.REQUESTED || p.status === PaymentStatus.PROOF_SUBMITTED) ? 'Fee deposit pending' : 'All clear'}
-              </div>
-            </div>
-
-            {/* Summary Card 5: Visa Status */}
-            <div style={{ padding: '14px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Visa Status
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {visa?.status ? visa.status.replace(/_/g, ' ') : 'No information available yet'}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                {visa?.visaNumber ? `Grant #: ${visa.visaNumber}` : 'Under review'}
-              </div>
-            </div>
-
-            {/* Summary Card 6: Travel Status */}
-            <div style={{ padding: '14px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Travel Status
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {travel?.flightStatus ? travel.flightStatus.replace(/_/g, ' ') : 'No information available yet'}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Housing: {travel?.accommodationStatus || 'Pending'}
-              </div>
-            </div>
-
-            {/* Summary Card 7: Orientation Status */}
-            <div style={{ padding: '14px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Orientation Status
-              </div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                {orientations.length > 0 ? `${orientations.length} Session(s) Available` : 'No information available yet'}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Pre-departure guidance
-              </div>
-            </div>
-          </div>
-
-          {/* Horizontal Interactive Navigation Bar inside Report Page */}
-          <div className="student-tabs-header" style={{ marginBottom: '16px' }}>
-            <button
-              className={`student-tab-btn ${reportSection === 'overview' ? 'active' : ''}`}
-              onClick={() => setReportSection('overview')}
-            >
-              📊 Overview
-            </button>
-            <button
-              className={`student-tab-btn ${reportSection === 'counselling' ? 'active' : ''}`}
-              onClick={() => setReportSection('counselling')}
-            >
-              🗣️ Counselling ({counsellingSessions.length})
-            </button>
-            <button
-              className={`student-tab-btn ${reportSection === 'applications' ? 'active' : ''}`}
-              onClick={() => setReportSection('applications')}
-            >
-              📝 Applications & Offers ({applications.length + offers.length})
-            </button>
-            <button
-              className={`student-tab-btn ${reportSection === 'others' ? 'active' : ''}`}
-              onClick={() => setReportSection('others')}
-            >
-              📁 Others (Tasks & Messages)
-            </button>
-            <button
-              className={`student-tab-btn ${reportSection === 'payments' ? 'active' : ''}`}
-              onClick={() => setReportSection('payments')}
-            >
-              💳 Payments ({payments.length})
-            </button>
-            <button
-              className={`student-tab-btn ${reportSection === 'visa' ? 'active' : ''}`}
-              onClick={() => setReportSection('visa')}
-            >
-              🛂 Visa Tracking
-            </button>
-            <button
-              className={`student-tab-btn ${reportSection === 'travel' ? 'active' : ''}`}
-              onClick={() => setReportSection('travel')}
-            >
-              ✈️ Travel & Departure
-            </button>
-            <button
-              className={`student-tab-btn ${reportSection === 'orientation' ? 'active' : ''}`}
-              onClick={() => setReportSection('orientation')}
-            >
-              🧭 Orientation ({orientations.length})
-            </button>
-          </div>
-
-          {/* =========================================================================
-             REPORT SECTION 1: OVERVIEW
-             ========================================================================= */}
-          {reportSection === 'overview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Stepper Summary Card */}
-              <div className="student-progress-summary-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Application Lifecycle Stage
-                    </span>
-                    <div style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
-                      Current: {lead?.stage?.replace(/_/g, ' ')}{' '}
-                      <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--primary)' }}>
-                        (Stage {activeStageNum} of {STAGES_CONFIG.length})
-                      </span>
+            <Table
+              columns={[
+                {
+                  header: 'UNIVERSITY & COURSE',
+                  render: (o) => (
+                    <div>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{o.universityName}</strong>
+                      <div style={{ fontSize: '12px', color: 'var(--primary)', marginTop: '2px' }}>{o.courseTitle}</div>
                     </div>
-                  </div>
-                  <Badge variant="primary">{progressPercentage}%</Badge>
-                </div>
-
-                <div className="student-progress-bar-bg">
-                  <div className="student-progress-bar-fill" style={{ width: `${progressPercentage}%` }} />
-                </div>
-
-                <button
-                  type="button"
-                  className="student-accordion-toggle"
-                  onClick={() => setIsJourneyExpanded(!isJourneyExpanded)}
-                >
-                  <span>{isJourneyExpanded ? 'Hide Full Stepper Timeline' : 'View Full Journey Stepper Timeline'}</span>
-                  {isJourneyExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-
-                {isJourneyExpanded && (
-                  <div style={{ marginTop: '10px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
-                    <StageStepper currentStage={lead?.stage || StudentStage.PROFILE_EVALUATION} />
-                  </div>
-                )}
-              </div>
-
-              {/* 2-Column Grid */}
-              <div className="student-grid-2col">
-                <div className="card">
-                  <h3 className="card-title" style={{ marginBottom: '12px' }}>Current Stage Action Required</h3>
-                  <div
-                    style={{
-                      padding: '16px',
-                      backgroundColor: 'var(--primary-light)',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid rgba(0, 87, 248, 0.2)',
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px', marginBottom: '6px' }}>
-                      Stage: {lead?.stage?.replace(/_/g, ' ')}
+                  ),
+                },
+                {
+                  header: 'OFFER TYPE',
+                  render: (o) => <Badge variant={o.offerType === 'UNCONDITIONAL' ? 'success' : 'warning'}>{o.offerType || 'OFFICIAL'}</Badge>,
+                },
+                {
+                  header: 'ORIGINAL OFFER PDF',
+                  render: (o) => (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <a
+                        href={o.originalOfferUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12.5px' }}
+                      >
+                        <Eye size={14} /> View
+                      </a>
+                      <a
+                        href={`/api/v1/offers/${o._id}/download/original`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', fontSize: '12px' }}
+                      >
+                        <Download size={13} /> Download PDF
+                      </a>
                     </div>
-                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.5 }}>
-                      {lead?.stage === StudentStage.PROFILE_EVALUATION
-                        ? 'Your counsellor is reviewing your academic transcripts to build your university recommendations.'
-                        : lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING
-                        ? 'Your university options are ready! Please review the shortlist and confirm your 1 preferred university.'
-                        : lead?.stage === StudentStage.DOCUMENT_COLLECTION
-                        ? 'Please upload your mandatory documents (Passport, Transcripts, English Test Score) for verification.'
-                        : lead?.stage === StudentStage.OFFER_MANAGEMENT
-                        ? 'Congratulations! Your university offer letter is ready. Download it, sign the acceptance page, and upload your signed copy.'
-                        : lead?.stage === StudentStage.FEE_PAYMENT
-                        ? 'Your offer is accepted! Please check the fee deposit details and upload your wire transfer receipt.'
-                        : lead?.stage === StudentStage.VISA_PROCESSING
-                        ? 'Your student visa filing is currently in progress with the embassy. We will notify you upon decision.'
-                        : 'Get ready for your pre-departure orientation and flight booking!'}
-                    </p>
-
-                    {lead?.stage === StudentStage.UNIVERSITY_SHORTLISTING && (
-                      <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setSearchParams({ tab: 'universities' })}>
-                        👉 Choose Preferred University
-                      </Button>
-                    )}
-                    {lead?.stage === StudentStage.DOCUMENT_COLLECTION && (
-                      <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setSearchParams({ tab: 'documents' })}>
-                        👉 Upload Required Documents
-                      </Button>
-                    )}
-                    {lead?.stage === StudentStage.OFFER_MANAGEMENT && (
-                      <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setReportSection('applications')}>
-                        👉 Review & Sign Offer Letter
-                      </Button>
-                    )}
-                    {lead?.stage === StudentStage.FEE_PAYMENT && (
-                      <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setReportSection('payments')}>
-                        👉 Submit Fee Receipt Proof
-                      </Button>
-                    )}
-                    {lead?.stage === StudentStage.VISA_PROCESSING && (
-                      <Button variant="primary" size="sm" className="student-card-btn-full" onClick={() => setReportSection('visa')}>
-                        👉 View Visa & Travel Status
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="card">
-                  <h3 className="card-title" style={{ marginBottom: '12px' }}>Pending Checklist Items</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {documents.filter((d) => d.status === DocumentStatus.REQUESTED).length === 0 ? (
-                      <div style={{ color: 'var(--success)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <CheckCircle2 size={16} /> All requested documents are uploaded!
+                  ),
+                },
+                {
+                  header: 'SIGNED ACCEPTANCE COPY',
+                  render: (o) =>
+                    o.signedOfferUrl ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--success)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <CheckCircle2 size={14} /> Signed Copy Uploaded
+                        </div>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Download size={12} />}
+                          onClick={() => window.open(`/api/v1/offers/${o._id}/download/signed`, '_blank')}
+                        >
+                          Download Acceptance
+                        </Button>
                       </div>
                     ) : (
-                      documents
-                        .filter((d) => d.status === DocumentStatus.REQUESTED)
-                        .map((d) => (
-                          <div key={d._id} className="student-action-item">
-                            <div>
-                              <strong>{d.title}</strong>
-                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.category}</div>
-                            </div>
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              className="student-card-btn-full"
-                              onClick={() => {
-                                setSelectedDoc(d);
-                                setIsUploadDocOpen(true);
-                              }}
-                            >
-                              Upload
-                            </Button>
-                          </div>
-                        ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Pending Tasks Section */}
-              <PendingTasksCard tasks={tasks} loading={loading} />
-            </div>
-          )}
-
-          {/* =========================================================================
-             REPORT SECTION 2: COUNSELLING
-             ========================================================================= */}
-          {reportSection === 'counselling' && (
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '14px' }}>🗣️ Preliminary Counselling Sessions & Notes</h3>
-              <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                View your scheduled 1-on-1 preliminary counselling meetings, join live Google Meet calls, and review counsellor notes.
-              </p>
-
-              <Table
-                columns={[
-                  {
-                    header: 'COUNSELLOR',
-                    render: (s: any) => (
-                      <div>
-                        <strong>{s.counsellorName || lead?.counsellorId?.name || 'Sarah Jenkins'}</strong>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Education Counsellor</div>
-                      </div>
-                    ),
-                  },
-                  {
-                    header: 'DATE & TIME',
-                    render: (s: any) => (s.scheduledDate ? `${s.scheduledDate} at ${s.scheduledTime || 'TBD'}` : 'Scheduled'),
-                  },
-                  {
-                    header: 'GOOGLE MEET LINK',
-                    render: (s: any) =>
-                      s.googleMeetLink ? (
-                        <a
-                          href={s.googleMeetLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          <Video size={14} /> Join Call <ExternalLink size={12} />
-                        </a>
-                      ) : (
-                        '—'
-                      ),
-                  },
-                  {
-                    header: 'STATUS',
-                    render: (s: any) => (
-                      <Badge variant={s.status === 'COMPLETED' ? 'success' : s.status === 'SCHEDULED' ? 'primary' : 'neutral'}>
-                        {s.status || 'SCHEDULED'}
-                      </Badge>
-                    ),
-                  },
-                  {
-                    header: 'ATTENDANCE',
-                    render: (s: any) => (
-                      <Badge variant={s.attendance === 'ATTENDED' ? 'success' : s.attendance === 'ABSENT' ? 'danger' : 'neutral'}>
-                        {s.attendance || 'PENDING'}
-                      </Badge>
-                    ),
-                  },
-                ]}
-                data={counsellingSessions}
-                emptyMessage="No preliminary counselling sessions recorded yet."
-              />
-            </div>
-          )}
-
-          {/* =========================================================================
-             REPORT SECTION 3: APPLICATIONS & OFFERS
-             ========================================================================= */}
-          {reportSection === 'applications' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Submitted Applications Table */}
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '14px' }}>📝 Submitted Applications</h3>
-                <Table
-                  columns={[
-                    { header: 'UNIVERSITY', accessor: 'universityName' },
-                    { header: 'COURSE', accessor: 'courseTitle' },
-                    { header: 'COUNTRY', accessor: 'country' },
-                    { header: 'INTAKE', accessor: 'intake' },
-                    {
-                      header: 'STATUS',
-                      render: (a) => <StatusBadge status={a.status} />,
-                    },
-                    {
-                      header: 'APPLIED DATE',
-                      render: (a) => (a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'),
-                    },
-                  ]}
-                  data={applications}
-                  emptyMessage="No university applications submitted yet."
-                />
-              </div>
-
-              {/* University Offer Letters Table */}
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '14px' }}>🏆 Official Offer Letters & Acceptance Declarations</h3>
-                <Table
-                  columns={[
-                    { header: 'UNIVERSITY', accessor: 'universityName' },
-                    { header: 'COURSE', accessor: 'courseTitle' },
-                    { header: 'OFFER TYPE', accessor: 'offerType' },
-                    {
-                      header: '1. ORIGINAL OFFER PDF',
-                      render: (o) => (
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <a
-                            href={o.originalOfferUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-                          >
-                            <Eye size={14} /> View
-                          </a>
-                          <a
-                            href={`/api/v1/offers/${o._id}/download/original`}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              color: 'var(--primary)',
-                              fontWeight: 600,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '12px',
-                              padding: '4px 8px',
-                              backgroundColor: 'var(--bg-subtle)',
-                              borderRadius: '4px',
-                              border: '1px solid var(--border-color)',
-                              textDecoration: 'none',
-                            }}
-                          >
-                            <Download size={13} /> Download
-                          </a>
-                        </div>
-                      ),
-                    },
-                    {
-                      header: '2. SIGNED ACCEPTANCE COPY',
-                      render: (o) =>
-                        o.signedOfferUrl ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <CheckCircle2 size={14} /> Signed Offer Uploaded
-                            </div>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              icon={<Download size={12} />}
-                              onClick={() => window.open(`/api/v1/offers/${o._id}/download/signed`, '_blank')}
-                            >
-                              Download Signed Copy
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            icon={<Upload size={12} />}
-                            onClick={() => {
-                              setSelectedOffer(o);
-                              setIsSignOfferOpen(true);
-                            }}
-                          >
-                            Upload Signed Acceptance
-                          </Button>
-                        ),
-                    },
-                    {
-                      header: 'STATUS',
-                      render: (o) => <StatusBadge status={o.status} />,
-                    },
-                  ]}
-                  data={offers}
-                  emptyMessage="No university offer letters available yet."
-                />
-              </div>
-            </div>
-          )}
-
-          {/* =========================================================================
-             REPORT SECTION 4: OTHERS (TASKS & MESSAGES)
-             ========================================================================= */}
-          {reportSection === 'others' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Chat with Counsellor */}
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '14px' }}>💬 Chat with Your Education Counsellor</h3>
-                <div
-                  style={{
-                    maxHeight: '340px',
-                    overflowY: 'auto',
-                    padding: '12px',
-                    backgroundColor: 'var(--bg-app)',
-                    borderRadius: 'var(--radius-md)',
-                    marginBottom: '14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                  }}
-                >
-                  {messages.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', margin: 'auto' }}>No messages exchanged yet.</div>
-                  ) : (
-                    messages.map((m) => (
-                      <div
-                        key={m._id}
-                        style={{
-                          alignSelf: m.senderRole === 'STUDENT' ? 'flex-end' : 'flex-start',
-                          maxWidth: '75%',
-                          padding: '10px 14px',
-                          borderRadius: 'var(--radius-md)',
-                          backgroundColor: m.senderRole === 'STUDENT' ? 'var(--primary-light)' : '#FFFFFF',
-                          border: '1px solid var(--border-color)',
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={<Upload size={12} />}
+                        onClick={() => {
+                          setSelectedOffer(o);
+                          setIsSignOfferOpen(true);
                         }}
                       >
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '2px' }}>
-                          {m.senderName} • {new Date(m.createdAt).toLocaleTimeString()}
-                        </div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{m.content}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                        Upload Signed Acceptance
+                      </Button>
+                    ),
+                },
+                {
+                  header: 'STATUS',
+                  render: (o) => <StatusBadge status={o.status} />,
+                },
+              ]}
+              data={offers}
+              emptyMessage="No university offer letters available yet. Track your submitted applications below."
+            />
+          </div>
 
-                <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type your question or update for your counsellor..."
-                  />
-                  <Button type="submit" variant="primary" icon={<Send size={14} />}>
-                    Send
-                  </Button>
-                </form>
+          {/* Submitted Applications */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileSpreadsheet size={18} color="var(--primary)" /> Submitted University Applications
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Track institutional review, application reference numbers, and intake timelines.
+                </p>
               </div>
+              <Badge variant="neutral">{applications.length} Submitted</Badge>
+            </div>
 
-              {/* Tasks & Action Dossier */}
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '12px' }}>📁 Additional Files & Action Tasks</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <strong>Full Application Dossier (PDF)</strong>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Complete consolidated profile, transcripts, applications, and offers</div>
-                    </div>
+            <Table
+              columns={[
+                { header: 'UNIVERSITY', accessor: 'universityName' },
+                { header: 'COURSE', accessor: 'courseTitle' },
+                { header: 'COUNTRY', accessor: 'country' },
+                { header: 'INTAKE', accessor: 'intake' },
+                {
+                  header: 'STATUS',
+                  render: (a) => <StatusBadge status={a.status} />,
+                },
+                {
+                  header: 'SUBMISSION DATE',
+                  render: (a) => (a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '—'),
+                },
+              ]}
+              data={applications}
+              emptyMessage="No applications submitted to universities yet."
+            />
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+         TAB 5: TUITION & PAYMENTS
+         ========================================================================= */}
+      {activeTab === 'payments' && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CreditCard size={18} color="var(--primary)" /> Tuition Deposit & Institutional Fee Payments
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                View requested enrollment fees, bank wire transfer instructions, and upload proof of payment.
+              </p>
+            </div>
+            <Badge variant="primary">{payments.length} Payments</Badge>
+          </div>
+
+          <div className="student-table-responsive">
+            <Table
+              columns={[
+                { header: 'PAYMENT DESCRIPTION', accessor: 'title' },
+                {
+                  header: 'AMOUNT DUE',
+                  render: (p) => (
+                    <strong style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
+                      {p.currency} {p.amount.toLocaleString()}
+                    </strong>
+                  ),
+                },
+                {
+                  header: 'PAYMENT STATUS',
+                  render: (p) => <StatusBadge status={p.status} />,
+                },
+                {
+                  header: 'RECEIPT & PROOF',
+                  render: (p) =>
+                    p.proofUrl ? (
+                      <a
+                        href={p.proofUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                      >
+                        <FileCheck size={14} /> Receipt Attached
+                      </a>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Awaiting Wire Receipt</span>
+                    ),
+                },
+                {
+                  header: 'ACTION',
+                  align: 'right',
+                  render: (p) => (
                     <Button
-                      variant="secondary"
+                      variant={p.status === PaymentStatus.VERIFIED ? 'ghost' : 'primary'}
                       size="sm"
-                      icon={<Download size={14} />}
-                      onClick={() => lead && window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
+                      disabled={p.status === PaymentStatus.VERIFIED}
+                      onClick={() => {
+                        setSelectedPayment(p);
+                        setIsSubmitPaymentOpen(true);
+                      }}
                     >
-                      Download PDF
+                      {p.status === PaymentStatus.VERIFIED ? 'Verified ✓' : p.proofUrl ? 'Re-upload Proof' : 'Submit Bank Proof'}
                     </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+                  ),
+                },
+              ]}
+              data={payments}
+              emptyMessage="No tuition fee deposits requested yet."
+            />
+          </div>
+        </div>
+      )}
 
-          {/* =========================================================================
-             REPORT SECTION 5: PAYMENTS
-             ========================================================================= */}
-          {reportSection === 'payments' && (
+      {/* =========================================================================
+         TAB 6: VISA TRACKING
+         ========================================================================= */}
+      {activeTab === 'visa' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="student-dual-column">
+            {/* Visa Record Details */}
             <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '14px' }}>💳 Tuition Fee Deposits & Payment Receipts</h3>
-              <div className="student-table-responsive">
-                <Table
-                  columns={[
-                    { header: 'PAYMENT TITLE', accessor: 'title' },
-                    {
-                      header: 'AMOUNT DUE',
-                      render: (p) => (
-                        <strong>
-                          {p.currency} {p.amount.toLocaleString()}
-                        </strong>
-                      ),
-                    },
-                    {
-                      header: 'STATUS',
-                      render: (p) => <StatusBadge status={p.status} />,
-                    },
-                    {
-                      header: 'ACTION',
-                      align: 'right',
-                      render: (p) => (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={p.status === PaymentStatus.VERIFIED}
-                          onClick={() => {
-                            setSelectedPayment(p);
-                            setIsSubmitPaymentOpen(true);
-                          }}
-                        >
-                          {p.status === PaymentStatus.VERIFIED ? 'Verified ✓' : 'Submit Payment Proof'}
-                        </Button>
-                      ),
-                    },
-                  ]}
-                  data={payments}
-                  emptyMessage="No payment requests generated yet."
-                />
-              </div>
-            </div>
-          )}
+              <h3 className="card-title" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Stamp size={18} color="var(--primary)" /> Visa Filing & Embassy Application
+              </h3>
 
-          {/* =========================================================================
-             REPORT SECTION 6: VISA TRACKING
-             ========================================================================= */}
-          {reportSection === 'visa' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="student-grid-2col">
-                <div className="card">
-                  <h3 className="card-title" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Stamp size={18} color="var(--primary)" /> Visa Filing & Embassy Record
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Destination Country:</span>{' '}
-                      <strong>{visa?.country || lead?.targetCountry || 'International'}</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Destination Country:</span>
+                  <strong>{visa?.country || lead?.targetCountry || 'International'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Target University:</span>
+                  <strong>{visa?.universityName || 'University Destination'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Embassy Filing Status:</span>
+                  <StatusBadge status={visa?.status || 'PENDING'} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Visa Grant / Application #:</span>
+                  <strong style={{ fontFamily: 'monospace', color: 'var(--primary)' }}>
+                    {visa?.visaNumber || visa?.applicationId || 'Under Processing'}
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Filing Submission Date:</span>
+                  <strong>{visa?.submissionDate ? new Date(visa.submissionDate).toLocaleDateString() : 'In Progress'}</strong>
+                </div>
+
+                {visa?.appointmentDate && (
+                  <div style={{ backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', padding: '12px', borderRadius: '8px' }}>
+                    <div style={{ color: '#0369A1', fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={15} /> Embassy Biometrics & Interview
                     </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Target University:</span>{' '}
-                      <strong>{visa?.universityName || 'University of Oxford'}</strong>
+                    <div style={{ color: '#0C4A6E', fontSize: '13.5px', fontWeight: 600, marginTop: '4px' }}>
+                      {new Date(visa.appointmentDate).toLocaleString()}
                     </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Visa Filing Status:</span>{' '}
-                      <StatusBadge status={visa?.status || 'PENDING'} />
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Visa Application / Grant #:</span>{' '}
-                      <strong>{visa?.visaNumber || visa?.applicationId || 'Under Review'}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Submission Date:</span>{' '}
-                      <strong>{visa?.submissionDate ? new Date(visa.submissionDate).toLocaleDateString() : 'In Progress'}</strong>
-                    </div>
-                    {visa?.appointmentDate && (
-                      <div style={{ backgroundColor: 'rgba(2, 132, 199, 0.08)', padding: '8px 10px', borderRadius: '4px' }}>
-                        <span style={{ color: '#0284C7', fontWeight: 600 }}>Embassy Appointment / Interview:</span>{' '}
-                        <strong style={{ color: '#0284C7' }}>{new Date(visa.appointmentDate).toLocaleString()}</strong>
-                        {visa.vfsCenterLocation && (
-                          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                            Location: {visa.vfsCenterLocation}
-                          </div>
-                        )}
+                    {visa.vfsCenterLocation && (
+                      <div style={{ fontSize: '12px', color: '#0369A1', marginTop: '2px' }}>
+                        Center: {visa.vfsCenterLocation}
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* Decision Information Card if recorded */}
-                {visa?.decision ? (
-                  <div
-                    className="card"
-                    style={{
-                      border: visa.decision === 'APPROVED' ? '1px solid rgba(22, 163, 74, 0.3)' : '1px solid rgba(220, 38, 38, 0.3)',
-                      backgroundColor: visa.decision === 'APPROVED' ? 'rgba(22, 163, 74, 0.02)' : 'rgba(220, 38, 38, 0.02)',
-                    }}
-                  >
-                    <h3 className="card-title" style={{ marginBottom: '14px', color: visa.decision === 'APPROVED' ? '#16A34A' : '#DC2626' }}>
-                      {visa.decision === 'APPROVED' ? '🎉 Embassy Decision: Visa Approved' : 'Embassy Decision: Visa Refused'}
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                      <div>
-                        <span style={{ color: 'var(--text-muted)' }}>Decision Date:</span>{' '}
-                        <strong>{visa.decisionDate ? new Date(visa.decisionDate).toLocaleDateString() : 'Confirmed'}</strong>
-                      </div>
-                      {visa.studentInstructions && (
-                        <div style={{ backgroundColor: '#FFFFFF', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '11.5px', fontWeight: 600 }}>Counsellor Instructions for You:</span>
-                          <div style={{ marginTop: '4px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
-                            {visa.studentInstructions}
-                          </div>
-                        </div>
-                      )}
-                      {visa.decisionDocumentUrl && (
-                        <div>
-                          <a
-                            href={visa.decisionDocumentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-secondary btn-sm"
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
-                          >
-                            <Download size={14} /> Download Official Decision Document
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="card">
-                    <h3 className="card-title" style={{ marginBottom: '12px' }}>📋 Visa Requirements & Checklist</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CheckCircle2 size={16} color="var(--success)" /> Valid Passport (Minimum 6 Months Validity)
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CheckCircle2 size={16} color="var(--success)" /> Official CAS / I-20 / Offer Letter
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CheckCircle2 size={16} color="var(--success)" /> Financial Proof & Bank Wire Receipts
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CheckCircle2 size={16} color="var(--success)" /> Biometric Enrollment Appointment
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Status Update History Timeline */}
-              {visa?.statusHistory && visa.statusHistory.length > 0 && (
-                <div className="card">
-                  <h3 className="card-title" style={{ marginBottom: '12px', fontSize: '14px' }}>
-                    ⏱️ Visa Status Updates & Timeline
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {visa.statusHistory.slice().reverse().map((hist: any, index: number) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '12px',
-                          fontSize: '12.5px',
-                          paddingBottom: '8px',
-                          borderBottom: index !== visa.statusHistory!.length - 1 ? '1px dashed var(--border-color)' : 'none',
-                        }}
-                      >
-                        <StatusBadge status={hist.status} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ color: 'var(--text-secondary)' }}>
-                            {hist.studentInstructions || hist.remarks || `Status transitioned to ${hist.status.replace(/_/g, ' ')}`}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            {new Date(hist.changedAt).toLocaleString()}
-                          </div>
-                        </div>
+            {/* Official Embassy Decision or Checklist */}
+            {visa?.decision ? (
+              <div
+                className="card"
+                style={{
+                  border: visa.decision === 'APPROVED' ? '1px solid rgba(22, 163, 74, 0.4)' : '1px solid rgba(220, 38, 38, 0.4)',
+                  backgroundColor: visa.decision === 'APPROVED' ? '#F0FDF4' : '#FEF2F2',
+                }}
+              >
+                <h3 className="card-title" style={{ color: visa.decision === 'APPROVED' ? '#15803D' : '#B91C1C', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {visa.decision === 'APPROVED' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                  {visa.decision === 'APPROVED' ? 'Embassy Decision: Visa Granted' : 'Embassy Decision: Visa Refused'}
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', marginTop: '10px' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Decision Recorded:</span>{' '}
+                    <strong>{visa.decisionDate ? new Date(visa.decisionDate).toLocaleDateString() : 'Confirmed'}</strong>
+                  </div>
+                  {visa.studentInstructions && (
+                    <div style={{ backgroundColor: '#FFFFFF', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '11.5px', fontWeight: 700, textTransform: 'uppercase' }}>
+                        Counsellor Briefing Notes:
+                      </span>
+                      <div style={{ marginTop: '4px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                        {visa.studentInstructions}
                       </div>
-                    ))}
+                    </div>
+                  )}
+                  {visa.decisionDocumentUrl && (
+                    <div style={{ marginTop: '6px' }}>
+                      <a
+                        href={visa.decisionDocumentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <Download size={14} /> Download Official Decision Document
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="card">
+                <h3 className="card-title" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle2 size={18} color="var(--primary)" /> Visa Interview & Biometrics Checklist
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={16} color="var(--success)" /> Original Passport with 6+ Months Validity
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={16} color="var(--success)" /> Official Confirmation of Acceptance for Studies (CAS / I-20)
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={16} color="var(--success)" /> Tuition Fee Deposit Wire Receipt
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={16} color="var(--success)" /> Bank Financial Statements & Solvency Certificate
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle2 size={16} color="var(--success)" /> Biometric Enrollment Appointment Letter
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Timeline History */}
+          {visa?.statusHistory && visa.statusHistory.length > 0 && (
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '14px', fontSize: '14px' }}>
+                Visa Status Updates & Timeline
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {visa.statusHistory.slice().reverse().map((hist: any, index: number) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      fontSize: '13px',
+                      paddingBottom: '10px',
+                      borderBottom: index !== visa.statusHistory!.length - 1 ? '1px dashed var(--border-color)' : 'none',
+                    }}
+                  >
+                    <StatusBadge status={hist.status} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {hist.studentInstructions || hist.remarks || `Status transitioned to ${hist.status.replace(/_/g, ' ')}`}
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {new Date(hist.changedAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =========================================================================
+         TAB 7: TRAVEL & PRE-DEPARTURE ORIENTATION
+         ========================================================================= */}
+      {activeTab === 'travel' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="student-dual-column">
+            {/* Flight Ticket Card */}
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Plane size={18} color="var(--primary)" /> Flight & Departure Details
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Flight Ticket Status:</span>
+                  <Badge variant="neutral">{travel?.flightStatus || 'PENDING'}</Badge>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Departure Airport:</span>
+                  <strong>{travel?.departureAirport || 'Home Airport'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Arrival Destination Date:</span>
+                  <strong>{travel?.arrivalDate ? new Date(travel.arrivalDate).toLocaleDateString() : 'TBD'}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Accommodation & Insurance Card */}
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Compass size={18} color="var(--primary)" /> Accommodation & Health Insurance
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Housing / Student Dormitory:</span>
+                  <Badge variant={travel?.accommodationStatus === 'COMPLETED' ? 'success' : 'neutral'}>
+                    {travel?.accommodationStatus || 'PENDING'}
+                  </Badge>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Overseas Student Health Cover:</span>
+                  <Badge variant={travel?.insuranceStatus === 'COMPLETED' ? 'success' : 'neutral'}>
+                    {travel?.insuranceStatus || 'PENDING'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Orientation Sessions */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={18} color="var(--primary)" /> Pre-Departure Orientation Workshops
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Join destination workshops on foreign exchange, airport pickup, campus registration, and local student life.
+                </p>
+              </div>
+              <Badge variant="primary">{orientations.length} Workshops</Badge>
+            </div>
+
+            <Table
+              columns={[
+                {
+                  header: 'SESSION TITLE & FOCUS',
+                  render: (o) => (
+                    <div>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: '13.5px' }}>{o.title}</strong>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {o.country} • {o.intake}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  header: 'DATE & TIME',
+                  render: (o) => `${new Date(o.sessionDate).toLocaleDateString()} at ${o.sessionTime}`,
+                },
+                {
+                  header: 'MEET LINK',
+                  render: (o) =>
+                    o.googleMeetLink ? (
+                      <a
+                        href={o.googleMeetLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Video size={13} /> Join Live Meet <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      'In-Person Session'
+                    ),
+                },
+                {
+                  header: 'TOPICS & AGENDA',
+                  render: (o) => o.description || 'Pre-departure guidance',
+                },
+              ]}
+              data={orientations}
+              emptyMessage="No pre-departure orientation sessions scheduled at this moment."
+            />
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+         TAB 8: COUNSELLOR & DIRECT MESSAGES
+         ========================================================================= */}
+      {activeTab === 'messages' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Scheduled Preliminary Counselling Meetings */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={18} color="var(--primary)" /> 1-on-1 Counselling Consultations
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Join scheduled video meetings with your advisor and review preliminary consultation notes.
+                </p>
+              </div>
+              <Badge variant="primary">{counsellingSessions.length} Consultations</Badge>
+            </div>
+
+            <Table
+              columns={[
+                {
+                  header: 'ADVISOR',
+                  render: (s: any) => (
+                    <div>
+                      <strong>{s.counsellorName || lead?.counsellorId?.name || 'Sarah Jenkins'}</strong>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Education Advisor</div>
+                    </div>
+                  ),
+                },
+                {
+                  header: 'DATE & TIME',
+                  render: (s: any) => (s.scheduledDate ? `${s.scheduledDate} at ${s.scheduledTime || 'TBD'}` : 'Scheduled'),
+                },
+                {
+                  header: 'VIDEO CALL LINK',
+                  render: (s: any) =>
+                    s.googleMeetLink ? (
+                      <a
+                        href={s.googleMeetLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-secondary btn-sm"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      >
+                        <Video size={13} /> Join Call <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>In-Person / Phone</span>
+                    ),
+                },
+                {
+                  header: 'SESSION STATUS',
+                  render: (s: any) => (
+                    <Badge variant={s.status === 'COMPLETED' ? 'success' : s.status === 'SCHEDULED' ? 'primary' : 'neutral'}>
+                      {s.status || 'SCHEDULED'}
+                    </Badge>
+                  ),
+                },
+                {
+                  header: 'ATTENDANCE',
+                  render: (s: any) => (
+                    <Badge variant={s.attendance === 'ATTENDED' ? 'success' : s.attendance === 'ABSENT' ? 'danger' : 'neutral'}>
+                      {s.attendance || 'PENDING'}
+                    </Badge>
+                  ),
+                },
+              ]}
+              data={counsellingSessions}
+              emptyMessage="No 1-on-1 preliminary counselling meetings recorded yet."
+            />
+          </div>
+
+          {/* Real-Time Chat Thread */}
+          <div className="student-chat-container">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <MessageSquare size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Conversation with {lead?.counsellorId?.name || 'Your Education Advisor'}
+                  </h4>
+                  <span style={{ fontSize: '11.5px', color: 'var(--success)', fontWeight: 600 }}>Active Direct Channel</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="student-chat-messages-box">
+              {messages.length === 0 ? (
+                <div className="student-tasks-empty-state">
+                  <div className="student-tasks-empty-icon" style={{ background: '#EFF6FF', color: 'var(--primary)' }}>
+                    <MessageSquare size={28} />
+                  </div>
+                  <h5 className="student-tasks-empty-title">Start a Conversation</h5>
+                  <p className="student-tasks-empty-subtext">
+                    Have questions about university shortlists, SOP requirements, or visa deadlines? Type a message below to reach your advisor directly.
+                  </p>
+                </div>
+              ) : (
+                messages.map((m) => {
+                  const isStudent = m.senderRole === 'STUDENT';
+                  return (
+                    <div
+                      key={m._id}
+                      className={`student-chat-bubble ${isStudent ? 'student' : 'counsellor'}`}
+                    >
+                      <div className="student-chat-meta">
+                        {m.senderName} • {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div>{m.content}</div>
+                    </div>
+                  );
+                })
               )}
             </div>
-          )}
 
-          {/* =========================================================================
-             REPORT SECTION 7: TRAVEL & DEPARTURE
-             ========================================================================= */}
-          {reportSection === 'travel' && (
-            <div className="student-grid-2col">
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '12px' }}>✈️ Flight & Departure Details</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Flight Ticket Status:</span>{' '}
-                    <Badge variant="neutral">{travel?.flightStatus || 'PENDING'}</Badge>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Departure Airport:</span>{' '}
-                    <strong>{travel?.departureAirport || 'Kathmandu (KTM)'}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Arrival Date:</span>{' '}
-                    <strong>{travel?.arrivalDate ? new Date(travel.arrivalDate).toLocaleDateString() : 'TBD'}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <h3 className="card-title" style={{ marginBottom: '12px' }}>🏡 Accommodation & Insurance</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Accommodation Status:</span> <Badge variant="neutral">{travel?.accommodationStatus || 'PENDING'}</Badge>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Health Insurance:</span> <Badge variant="neutral">{travel?.insuranceStatus || 'PENDING'}</Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* =========================================================================
-             REPORT SECTION 8: ORIENTATION
-             ========================================================================= */}
-          {reportSection === 'orientation' && (
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '14px' }}>🧭 Pre-Departure Orientation Sessions</h3>
-              <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                Join destination-specific orientation workshops to learn about currency exchange, student housing, airport pickup, and campus life.
-              </p>
-
-              <Table
-                columns={[
-                  {
-                    header: 'SESSION TITLE',
-                    render: (o) => (
-                      <div>
-                        <strong>{o.title}</strong>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {o.country} • {o.intake}
-                        </div>
-                      </div>
-                    ),
-                  },
-                  {
-                    header: 'DATE & TIME',
-                    render: (o) => `${new Date(o.sessionDate).toLocaleDateString()} at ${o.sessionTime}`,
-                  },
-                  {
-                    header: 'MEET LINK',
-                    render: (o) =>
-                      o.googleMeetLink ? (
-                        <a href={o.googleMeetLink} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                          Join Meet
-                        </a>
-                      ) : (
-                        'In-Person'
-                      ),
-                  },
-                  {
-                    header: 'AGENDA / TOPICS',
-                    render: (o) => o.description || 'Pre-departure guidance',
-                  },
-                ]}
-                data={orientations}
-                emptyMessage="No orientation sessions scheduled."
+            <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '10px' }}>
+              <input
+                type="text"
+                className="form-input"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type your message or enquiry for your advisor..."
+                style={{ flex: 1 }}
               />
-            </div>
-          )}
+              <Button type="submit" variant="primary" icon={<Send size={14} />}>
+                Send
+              </Button>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1371,7 +1743,7 @@ export const StudentPortalPage: React.FC = () => {
             setDocFileUrl('');
           }
         }}
-        title={`Upload Document: ${selectedDoc?.title}`}
+        title={`Upload Document: ${selectedDoc?.title || ''}`}
         footer={
           <>
             <Button
@@ -1390,7 +1762,7 @@ export const StudentPortalPage: React.FC = () => {
               disabled={isUploadingDoc || (!docFile && !docFileUrl.trim())}
               onClick={handleUploadDoc}
             >
-              {isUploadingDoc ? 'Uploading...' : 'Submit File'}
+              {isUploadingDoc ? 'Uploading...' : 'Submit Document'}
             </Button>
           </>
         }
@@ -1403,11 +1775,11 @@ export const StudentPortalPage: React.FC = () => {
                 backgroundColor: 'var(--bg-subtle)',
                 borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border-color)',
-                fontSize: '12px',
+                fontSize: '12.5px',
                 color: 'var(--text-secondary)',
               }}
             >
-              <strong>Counselor Instructions:</strong> {selectedDoc.description}
+              <strong>Advisor Instructions:</strong> {selectedDoc.description}
             </div>
           )}
 
@@ -1512,7 +1884,7 @@ export const StudentPortalPage: React.FC = () => {
       <Modal
         isOpen={isUnivDetailsOpen}
         onClose={() => setIsUnivDetailsOpen(false)}
-        title={`University Specifications: ${selectedUnivItem?.universityName}`}
+        title={`University Specifications: ${selectedUnivItem?.universityName || ''}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsUnivDetailsOpen(false)}>
@@ -1552,7 +1924,7 @@ export const StudentPortalPage: React.FC = () => {
                   <strong>{(selectedUnivItem.universityId as any)?.city || selectedUnivItem.country}</strong>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Ranking:</span>{' '}
+                  <span style={{ color: 'var(--text-muted)' }}>Global Ranking:</span>{' '}
                   <strong>#{(selectedUnivItem.universityId as any)?.ranking || 'Top 100'}</strong>
                 </div>
               </div>
@@ -1565,6 +1937,7 @@ export const StudentPortalPage: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '13px' }}>
                 <div><span style={{ color: 'var(--text-muted)' }}>Intake:</span> <strong>{selectedUnivItem.intake}</strong></div>
                 <div><span style={{ color: 'var(--text-muted)' }}>Tuition Fee:</span> <strong>{selectedUnivItem.currency || '$'} {selectedUnivItem.annualFee?.toLocaleString() || 'N/A'} / Year</strong></div>
+                <div><span style={{ color: 'var(--text-muted)' }}>Status:</span> <strong>{selectedUnivItem.status.replace(/_/g, ' ')}</strong></div>
               </div>
             </div>
           </div>
@@ -1618,7 +1991,7 @@ export const StudentPortalPage: React.FC = () => {
       <Modal
         isOpen={isSubmitPaymentOpen}
         onClose={() => setIsSubmitPaymentOpen(false)}
-        title={`Submit Payment Proof: ${selectedPayment?.title}`}
+        title={`Submit Payment Proof: ${selectedPayment?.title || ''}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsSubmitPaymentOpen(false)}>

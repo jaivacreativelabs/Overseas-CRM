@@ -1,139 +1,121 @@
 import React from 'react';
-import { MessageSquare, UserX } from 'lucide-react';
+import { MessageSquare, UserX, Mail, Phone, Calendar, ShieldCheck } from 'lucide-react';
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 
 interface CounsellorCardProps {
   counsellor?: { name?: string; email?: string; phone?: string; avatar?: string } | null;
   onOpenChat?: () => void;
+  nextSession?: {
+    scheduledDate?: string;
+    scheduledTime?: string;
+    googleMeetLink?: string;
+  } | null;
 }
 
 export const CounsellorCard: React.FC<CounsellorCardProps> = ({
   counsellor,
   onOpenChat,
+  nextSession,
 }) => {
   if (!counsellor || !counsellor.name) {
     return (
-      <div
-        className="student-counsellor-banner"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          padding: '10px 14px',
-          backgroundColor: '#FFFFFF',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-md)',
-          boxShadow: 'var(--shadow-xs)',
-          width: '100%',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--bg-hover)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-muted)',
-            flexShrink: 0,
-          }}
-        >
-          <UserX size={18} />
+      <div className="student-counsellor-card empty-state">
+        <div className="student-counsellor-avatar-placeholder">
+          <UserX size={20} />
         </div>
-        <div style={{ fontSize: '12px', flex: 1 }}>
-          <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>No Counsellor Assigned</span>
-            <Badge variant="warning">Pending</Badge>
+        <div className="student-counsellor-info">
+          <div className="student-counsellor-title-row">
+            <span className="student-counsellor-name">Counsellor Matching in Progress</span>
+            <Badge variant="warning">Matching</Badge>
           </div>
-          <div style={{ color: 'var(--text-muted)', marginTop: '2px', fontSize: '11px' }}>
-            Our team will pair you with a counsellor soon.
-          </div>
+          <p className="student-counsellor-subtext">
+            Our admissions team is assigning a dedicated education advisor to guide your university applications.
+          </p>
         </div>
       </div>
     );
   }
 
+  const initials = counsellor.name
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
   return (
-    <div
-      className="student-counsellor-banner"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '10px',
-        padding: '10px 14px',
-        backgroundColor: '#FFFFFF',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-md)',
-        boxShadow: 'var(--shadow-xs)',
-        width: '100%',
-        boxSizing: 'border-box',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-        {/* Avatar with Online Dot */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <div
-            style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--primary-light)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--primary)',
-              fontWeight: 700,
-              fontSize: '13px',
-            }}
-          >
-            {counsellor.name.charAt(0).toUpperCase()}
-          </div>
-          <span
-            style={{
-              position: 'absolute',
-              bottom: '0',
-              right: '0',
-              width: '9px',
-              height: '9px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--success)',
-              border: '2px solid #FFFFFF',
-            }}
-            title="Available"
-          />
+    <div className="student-counsellor-card">
+      <div className="student-counsellor-header">
+        <div className="student-counsellor-avatar-wrapper">
+          {counsellor.avatar ? (
+            <img src={counsellor.avatar} alt={counsellor.name} className="student-counsellor-avatar-img" />
+          ) : (
+            <div className="student-counsellor-avatar-initials">{initials}</div>
+          )}
+          <span className="student-counsellor-status-dot" title="Active Advisor" />
         </div>
 
-        {/* Info */}
-        <div style={{ fontSize: '12px', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Counsellor:</span>
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {counsellor.name}
+        <div className="student-counsellor-meta">
+          <div className="student-counsellor-badge-row">
+            <span className="student-counsellor-role">
+              <ShieldCheck size={13} color="var(--primary)" />
+              Dedicated Education Advisor
             </span>
+            <span className="student-counsellor-online-badge">Online</span>
           </div>
-          <div style={{ color: 'var(--success)', fontSize: '11px', fontWeight: 500, marginTop: '1px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--success)', display: 'inline-block' }} />
-            <span>Online • Available</span>
+          <h4 className="student-counsellor-name">{counsellor.name}</h4>
+
+          <div className="student-counsellor-contact-list">
+            {counsellor.email && (
+              <a href={`mailto:${counsellor.email}`} className="student-counsellor-contact-item" title="Send Email">
+                <Mail size={13} />
+                <span>{counsellor.email}</span>
+              </a>
+            )}
+            {counsellor.phone && (
+              <a href={`tel:${counsellor.phone}`} className="student-counsellor-contact-item" title="Call Advisor">
+                <Phone size={13} />
+                <span>{counsellor.phone}</span>
+              </a>
+            )}
           </div>
         </div>
       </div>
 
+      {nextSession && nextSession.scheduledDate && (
+        <div className="student-counsellor-upcoming-session">
+          <div className="student-counsellor-session-info">
+            <Calendar size={14} color="var(--primary)" />
+            <span>
+              Next Consultation: <strong>{nextSession.scheduledDate}</strong> at {nextSession.scheduledTime || 'TBD'}
+            </span>
+          </div>
+          {nextSession.googleMeetLink && (
+            <a
+              href={nextSession.googleMeetLink}
+              target="_blank"
+              rel="noreferrer"
+              className="student-counsellor-meet-link"
+            >
+              Join Call
+            </a>
+          )}
+        </div>
+      )}
+
       {onOpenChat && (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={onOpenChat}
-          className="student-card-btn-full"
-          icon={<MessageSquare size={13} />}
-        >
-          Message Counsellor
-        </Button>
+        <div className="student-counsellor-action-row">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onOpenChat}
+            className="student-card-btn-full"
+            icon={<MessageSquare size={14} />}
+          >
+            Message Advisor
+          </Button>
+        </div>
       )}
     </div>
   );
