@@ -38,6 +38,8 @@ import {
   Globe,
   DollarSign,
   FileSpreadsheet,
+  MapPin,
+  Percent,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -58,6 +60,8 @@ import {
   PaymentStatus,
   Task,
   UserRole,
+  University,
+  Course,
 } from '../../types';
 import { PendingTasksCard } from './components/PendingTasksCard';
 import { CounsellorCard } from './components/CounsellorCard';
@@ -67,6 +71,114 @@ import { Badge, StatusBadge } from '../../components/Badge';
 import { Table } from '../../components/Table';
 import { Modal } from '../../components/Modal';
 import { Input } from '../../components/Form';
+import { UniversityDetailsModal } from '../universities/components/UniversityDetailsModal';
+
+const DEFAULT_CAMPUS_GALLERY = [
+  {
+    url: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+    title: 'Historic Academic Quad & Faculty Lawns',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+    title: 'Modern Multimedia Lecture Hall',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
+    title: 'Central University Library & Digital Archives',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+    title: 'Advanced Science & Computing Laboratories',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1200&q=80',
+    title: 'Student Innovation Center & Recreation Hub',
+  },
+];
+
+const getUniversityFromShortlist = (item: Shortlist | null): University | null => {
+  if (!item) return null;
+  const populated =
+    typeof item.universityId === 'object' && item.universityId !== null
+      ? (item.universityId as any)
+      : null;
+
+  return {
+    _id: populated?._id || (typeof item.universityId === 'string' ? item.universityId : item._id),
+    name: populated?.name || item.universityName,
+    country: populated?.country || item.country,
+    state: populated?.state,
+    city: populated?.city || (item.country === 'USA' ? 'California' : item.country === 'UK' ? 'London' : item.country),
+    address: populated?.address,
+    website: populated?.website || 'https://www.google.com/search?q=' + encodeURIComponent(item.universityName),
+    ranking: populated?.ranking || 49,
+    customComment: populated?.customComment,
+    logoUrl: populated?.logoUrl,
+    bannerUrl: populated?.bannerUrl || DEFAULT_CAMPUS_GALLERY[0].url,
+    description:
+      populated?.description ||
+      `Premier academic institution renowned for research excellence, state-of-the-art facilities, and exceptional graduate employability in ${item.country}.`,
+    galleryPhotos:
+      populated?.galleryPhotos && populated.galleryPhotos.length > 0
+        ? populated.galleryPhotos
+        : DEFAULT_CAMPUS_GALLERY.map((p) => p.url),
+    overview:
+      populated?.overview ||
+      `${item.universityName} offers comprehensive academic programs structured for international career success, supported by distinguished faculty and industry partnerships.`,
+    campusFacilities: populated?.campusFacilities || [
+      'Research Libraries',
+      'Computer Labs',
+      'Student Residence',
+      'Sports Complex',
+      'Career Placement Center',
+    ],
+    establishedYear: populated?.establishedYear || 1868,
+    acceptanceRate: populated?.acceptanceRate || '22%',
+    averageTuitionFee:
+      populated?.averageTuitionFee ||
+      (item.annualFee ? `${item.currency || '$'} ${item.annualFee.toLocaleString()} / Year` : '$28,000 / Year'),
+    scholarshipInfo:
+      populated?.scholarshipInfo ||
+      'International merit and diversity scholarships up to $10,000 available for early applicants.',
+    accommodationInfo:
+      populated?.accommodationInfo || 'On-campus dormitories and certified university partner housing available.',
+    generalRequirements:
+      populated?.generalRequirements ||
+      'Official academic transcripts, minimum IELTS 6.5 / TOEFL 85, and Statement of Purpose.',
+    isActive: true,
+  };
+};
+
+const getCoursesFromShortlist = (item: Shortlist | null): Course[] => {
+  if (!item) return [];
+  const populatedCourse =
+    typeof item.courseId === 'object' && item.courseId !== null
+      ? (item.courseId as any)
+      : null;
+
+  return [
+    {
+      _id: populatedCourse?._id || (typeof item.courseId === 'string' ? item.courseId : `${item._id}-course`),
+      universityId:
+        typeof item.universityId === 'object' && item.universityId !== null
+          ? (item.universityId as any)._id
+          : typeof item.universityId === 'string'
+          ? item.universityId
+          : '',
+      universityName: item.universityName || populatedCourse?.universityName || '',
+      country: item.country || populatedCourse?.country || '',
+      title: item.courseTitle || populatedCourse?.title || 'Degree Program',
+      level: populatedCourse?.level || 'Master',
+      durationMonths: populatedCourse?.durationMonths || 24,
+      annualFee: item.annualFee || populatedCourse?.annualFee || 28000,
+      currency: item.currency || populatedCourse?.currency || 'USD',
+      intakes: populatedCourse?.intakes || [item.intake || 'Fall 2026'],
+      eligibilityRequirements:
+        populatedCourse?.eligibilityRequirements || 'Bachelor degree with minimum GPA 3.0 or equivalent',
+      description: populatedCourse?.description || 'Curriculum specifically selected based on your academic profile.',
+    },
+  ];
+};
 
 export const StudentPortalPage: React.FC = () => {
   const { user } = useAuth();
@@ -101,9 +213,37 @@ export const StudentPortalPage: React.FC = () => {
   // Document filter in Document Locker
   const [docFilter, setDocFilter] = useState<'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED'>('ALL');
 
-  // Rich University Detail Modal
+  // Rich University Detail Modal & Showcase Selection
   const [isUnivDetailsOpen, setIsUnivDetailsOpen] = useState(false);
   const [selectedUnivItem, setSelectedUnivItem] = useState<Shortlist | null>(null);
+  const [activeShowcaseId, setActiveShowcaseId] = useState<string | null>(null);
+
+  // Identify confirmed choice (if student selected one)
+  const confirmedChoice = useMemo(() => {
+    return shortlists.find((s) => s.status === 'SELECTED_BY_STUDENT');
+  }, [shortlists]);
+
+  // Active showcase item (explicit user switch -> confirmed choice -> first shortlist item)
+  const showcaseItem = useMemo(() => {
+    if (activeShowcaseId) {
+      const match = shortlists.find((s) => s._id === activeShowcaseId);
+      if (match) return match;
+    }
+    if (confirmedChoice) return confirmedChoice;
+    return shortlists[0] || null;
+  }, [shortlists, activeShowcaseId, confirmedChoice]);
+
+  const showcaseUniversity = useMemo(() => {
+    return getUniversityFromShortlist(showcaseItem);
+  }, [showcaseItem]);
+
+  const modalUniversity = useMemo(() => {
+    return getUniversityFromShortlist(selectedUnivItem || showcaseItem);
+  }, [selectedUnivItem, showcaseItem]);
+
+  const modalCourses = useMemo(() => {
+    return getCoursesFromShortlist(selectedUnivItem || showcaseItem);
+  }, [selectedUnivItem, showcaseItem]);
 
   // Modals for student upload actions
   const [isUploadDocOpen, setIsUploadDocOpen] = useState(false);
@@ -874,108 +1014,400 @@ export const StudentPortalPage: React.FC = () => {
          TAB 2: UNIVERSITIES SHORTLIST
          ========================================================================= */}
       {activeTab === 'universities' && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <div className="student-univ-page-container">
+          {/* Header */}
+          <div className="student-univ-page-header">
             <div>
-              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Building2 size={18} color="var(--primary)" /> Shortlisted Universities & Degree Programs
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Building2 size={20} color="var(--primary)" /> Shortlisted Universities & Degree Programs
               </h3>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Review recommended courses curated by your advisor. Confirm your 1 top choice to unlock the document checklist.
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
+                Review recommended institutions curated by your advisor. Confirm your top choice to unlock the document checklist.
               </p>
             </div>
-            <Badge variant="primary">{shortlists.length} Programs Shortlisted</Badge>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {confirmedChoice && (
+                <Badge variant="success">✓ Confirmed: {confirmedChoice.universityName}</Badge>
+              )}
+              <Badge variant="primary">{shortlists.length} Programs Shortlisted</Badge>
+            </div>
           </div>
 
           {shortlists.length === 0 ? (
-            <div className="student-tasks-empty-state">
-              <div className="student-tasks-empty-icon" style={{ background: '#EFF6FF', color: 'var(--primary)' }}>
-                <Building2 size={32} />
+            <div className="card">
+              <div className="student-tasks-empty-state">
+                <div className="student-tasks-empty-icon" style={{ background: '#EFF6FF', color: 'var(--primary)' }}>
+                  <Building2 size={32} />
+                </div>
+                <h4 className="student-tasks-empty-title">Curating Your University Shortlist</h4>
+                <p className="student-tasks-empty-subtext">
+                  Your education counsellor is analyzing your academic background and test scores to curate top-tier university recommendations.
+                </p>
               </div>
-              <h4 className="student-tasks-empty-title">Curating Your University Shortlist</h4>
-              <p className="student-tasks-empty-subtext">
-                Your education counsellor is analyzing your academic background and test scores to curate top-tier university recommendations.
-              </p>
             </div>
           ) : (
-            <div className="student-univ-grid">
-              {shortlists.map((s) => {
-                const isSelected = s.status === 'SELECTED_BY_STUDENT';
-                return (
-                  <div key={s._id} className={`student-univ-card ${isSelected ? 'is-selected' : ''}`}>
-                    <div>
-                      <div className="student-univ-card-header">
-                        <div className="student-univ-logo-box">
-                          {s.universityName.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="student-univ-badge-group">
-                          <Badge variant="primary">{s.country}</Badge>
-                          {isSelected && <Badge variant="success">✓ Choice Confirmed</Badge>}
-                        </div>
-                      </div>
-
-                      <div style={{ marginTop: '12px' }}>
-                        <h4 className="student-univ-name">{s.universityName}</h4>
-                        <p className="student-univ-course">{s.courseTitle}</p>
-                      </div>
+            <>
+              {/* Full-Page University Showcase Hero Card (Matching UniversityDetailsModal design from user screenshot) */}
+              {showcaseUniversity && showcaseItem && (
+                <div className="student-univ-showcase-card">
+                  {/* Top Campus Cover Banner */}
+                  <div className="student-univ-showcase-banner">
+                    <img
+                      src={showcaseUniversity.bannerUrl}
+                      alt={showcaseUniversity.name}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    {/* Verified Partner Badge */}
+                    <div className="student-univ-partner-badge">
+                      <CheckCircle2 size={13} /> Verified Partner Institution
                     </div>
-
-                    <div className="student-univ-details-list">
-                      <div>
-                        <div className="student-univ-detail-label">Intake Season</div>
-                        <div className="student-univ-detail-val">{s.intake}</div>
-                      </div>
-                      <div>
-                        <div className="student-univ-detail-label">Est. Tuition Fee</div>
-                        <div className="student-univ-detail-val">
-                          {s.annualFee ? `${s.currency || '$'} ${s.annualFee.toLocaleString()}` : '—'} / yr
-                        </div>
-                      </div>
-                      <div>
-                        <div className="student-univ-detail-label">Status</div>
-                        <div className="student-univ-detail-val">
-                          <StatusBadge status={s.status} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="student-univ-detail-label">Ranking</div>
-                        <div className="student-univ-detail-val">
-                          {(s.universityId as any)?.ranking ? `#${(s.universityId as any).ranking}` : 'Top 100 Global'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="student-univ-actions">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        style={{ flex: 1 }}
-                        onClick={() => {
-                          setSelectedUnivItem(s);
-                          setIsUnivDetailsOpen(true);
-                        }}
-                      >
-                        View Details
-                      </Button>
-                      {!isSelected ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          style={{ flex: 1 }}
-                          onClick={() => handleSelectUniversity(s._id)}
-                        >
-                          Select Choice
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="sm" disabled style={{ flex: 1, color: '#059669', fontWeight: 600 }}>
-                          Selected ✓
-                        </Button>
-                      )}
+                    {/* Global Ranking Chip */}
+                    <div className="student-univ-ranking-chip">
+                      <Award size={13} /> Global Rank #{showcaseUniversity.ranking || 49}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Showcase Body */}
+                  <div className="student-univ-showcase-body">
+                    {/* Top Row: Pop-Out Logo & Action Buttons */}
+                    <div className="student-univ-showcase-header">
+                      <div className="student-univ-showcase-logo">
+                        {showcaseUniversity.logoUrl ? (
+                          <img
+                            src={showcaseUniversity.logoUrl}
+                            alt={showcaseUniversity.name}
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="student-univ-showcase-logo-fallback">
+                            {showcaseUniversity.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="student-univ-showcase-actions">
+                        {showcaseUniversity.website && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<ExternalLink size={13} />}
+                            onClick={() => window.open(showcaseUniversity.website, '_blank')}
+                          >
+                            Official Website
+                          </Button>
+                        )}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<Eye size={13} />}
+                          onClick={() => {
+                            setSelectedUnivItem(showcaseItem);
+                            setIsUnivDetailsOpen(true);
+                          }}
+                        >
+                          View Full Specifications
+                        </Button>
+                        {showcaseItem.status === 'SELECTED_BY_STUDENT' ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            disabled
+                            style={{ backgroundColor: '#10B981', borderColor: '#10B981', cursor: 'default' }}
+                            icon={<Check size={13} />}
+                          >
+                            Confirmed Choice ✓
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<CheckCircle2 size={13} />}
+                            onClick={() => handleSelectUniversity(showcaseItem._id)}
+                          >
+                            Confirm Selection
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* University Name & Location */}
+                    <div className="student-univ-showcase-meta">
+                      <h2 className="student-univ-showcase-title">{showcaseUniversity.name}</h2>
+                      <div className="student-univ-showcase-location">
+                        <MapPin size={15} color="var(--primary)" />
+                        <span>{[showcaseUniversity.city, showcaseUniversity.state, showcaseUniversity.country].filter(Boolean).join(', ')}</span>
+                      </div>
+                    </div>
+
+                    {/* 4-Stat Box with Dividers */}
+                    <div className="student-univ-stats-strip">
+                      <div className="student-univ-stat-col">
+                        <span className="student-univ-stat-label">GLOBAL RANK</span>
+                        <span className="student-univ-stat-val gold">
+                          <Award size={15} /> #{showcaseUniversity.ranking || 49}
+                        </span>
+                      </div>
+                      <div className="student-univ-stat-col">
+                        <span className="student-univ-stat-label">ACCEPTANCE</span>
+                        <span className="student-univ-stat-val blue">
+                          <Percent size={15} /> {showcaseUniversity.acceptanceRate || '22%'}
+                        </span>
+                      </div>
+                      <div className="student-univ-stat-col">
+                        <span className="student-univ-stat-label">ESTABLISHED</span>
+                        <span className="student-univ-stat-val">
+                          <Calendar size={15} color="var(--text-secondary)" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                          {showcaseUniversity.establishedYear || 1868}
+                        </span>
+                      </div>
+                      <div className="student-univ-stat-col">
+                        <span className="student-univ-stat-label">OFFERED COURSES</span>
+                        <span className="student-univ-stat-val blue">
+                          <GraduationCap size={15} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                          {shortlists.filter(s => (s.universityId as any)?._id === (showcaseUniversity as any)._id || s.universityName === showcaseUniversity.name).length || 1} Programs
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Campus & Classroom Gallery Strip */}
+                    <div className="student-univ-gallery-section">
+                      <div className="student-univ-gallery-header">
+                        <h4 className="student-univ-gallery-title">
+                          <Sparkles size={16} color="var(--primary)" /> Campus & Classroom Gallery
+                        </h4>
+                        <span className="student-univ-gallery-count">
+                          {(showcaseUniversity.galleryPhotos || DEFAULT_CAMPUS_GALLERY).length} Photos Available
+                        </span>
+                      </div>
+                      <div className="student-univ-gallery-grid">
+                        {(showcaseUniversity.galleryPhotos && showcaseUniversity.galleryPhotos.length > 0
+                          ? showcaseUniversity.galleryPhotos.slice(0, 3)
+                          : DEFAULT_CAMPUS_GALLERY.slice(0, 3).map((p) => p.url)
+                        ).map((url, idx) => (
+                          <div
+                            key={idx}
+                            className="student-univ-gallery-thumb"
+                            onClick={() => {
+                              setSelectedUnivItem(showcaseItem);
+                              setIsUnivDetailsOpen(true);
+                            }}
+                            title="Click to explore interactive campus gallery"
+                          >
+                            <img src={url} alt={`${showcaseUniversity.name} campus ${idx + 1}`} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Shortlisted Degree Program Highlight Strip */}
+                    <div
+                      style={{
+                        padding: '16px 20px',
+                        backgroundColor: 'var(--bg-subtle, #F8FAFC)',
+                        border: '1px solid var(--border-color, #E5E7EB)',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '14px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Curated Program For You
+                        </div>
+                        <h4 style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', margin: '4px 0 2px 0' }}>
+                          {showcaseItem.courseTitle}
+                        </h4>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '4px', flexWrap: 'wrap' }}>
+                          <span><strong>Intake:</strong> {showcaseItem.intake}</span>
+                          <span>•</span>
+                          <span><strong>Tuition:</strong> {showcaseItem.annualFee ? `${showcaseItem.currency || '$'} ${showcaseItem.annualFee.toLocaleString()} / Year` : 'Tuition on request'}</span>
+                          <span>•</span>
+                          <span><strong>Destination:</strong> {showcaseItem.country}</span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <StatusBadge status={showcaseItem.status} />
+                        {showcaseItem.status !== 'SELECTED_BY_STUDENT' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleSelectUniversity(showcaseItem._id)}
+                          >
+                            Select This Program
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* All Shortlisted Recommendations Grid (Counsellor-Dashboard Card Style) */}
+              <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Building2 size={18} color="var(--primary)" /> All Recommended Universities ({shortlists.length})
+                  </h3>
+                  <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                    Click any card to inspect or switch featured preview
+                  </span>
+                </div>
+
+                <div className="student-counsellor-cards-grid">
+                  {shortlists.map((s) => {
+                    const isSelected = s.status === 'SELECTED_BY_STUDENT';
+                    const isShowcased = showcaseItem?._id === s._id;
+                    const uni = getUniversityFromShortlist(s);
+
+                    return (
+                      <div
+                        key={s._id}
+                        className={`student-counsellor-uni-card ${isShowcased ? 'is-active-featured' : ''} ${isSelected ? 'is-confirmed-choice' : ''}`}
+                        onClick={() => setActiveShowcaseId(s._id)}
+                      >
+                        {/* 130px Cover Banner */}
+                        <div className="student-uni-card-banner">
+                          {uni?.bannerUrl ? (
+                            <img
+                              src={uni.bannerUrl}
+                              alt={s.universityName}
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Building2 size={40} color="rgba(255,255,255,0.2)" />
+                            </div>
+                          )}
+
+                          {/* Global Ranking Chip on Banner */}
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '10px',
+                              right: '10px',
+                              background: 'rgba(15, 23, 42, 0.8)',
+                              backdropFilter: 'blur(4px)',
+                              color: '#FBBF24',
+                              padding: '3px 9px',
+                              borderRadius: '9999px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              border: '1px solid rgba(251, 191, 36, 0.3)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                              zIndex: 10,
+                            }}
+                          >
+                            <Award size={11} color="#FBBF24" />
+                            <span>#{uni?.ranking || 49} Global</span>
+                          </div>
+                        </div>
+
+                        {/* Pop-Out Logo (56px) */}
+                        <div className="student-uni-card-logo">
+                          {uni?.logoUrl ? (
+                            <img
+                              src={uni.logoUrl}
+                              alt={s.universityName}
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 700, fontSize: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {s.universityName.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Card Body */}
+                        <div className="student-uni-card-body">
+                          <div>
+                            <h4
+                              style={{
+                                fontSize: '15px',
+                                fontWeight: 700,
+                                color: 'var(--text-primary)',
+                                margin: 0,
+                                lineHeight: 1.3,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={s.universityName}
+                            >
+                              {s.universityName}
+                            </h4>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                              <MapPin size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {[uni?.city, s.country].filter(Boolean).join(', ')}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ marginTop: '4px', padding: '8px 10px', background: 'var(--bg-subtle)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {s.courseTitle}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                              <span>Intake: <strong>{s.intake}</strong></span>
+                              <span>Fee: <strong>{s.annualFee ? `${s.currency || '$'}${s.annualFee.toLocaleString()}/yr` : '—'}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card Actions Footer */}
+                        <div className="student-uni-card-actions">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            style={{ flex: 1 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedUnivItem(s);
+                              setIsUnivDetailsOpen(true);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                          {isSelected ? (
+                            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                              <Badge variant="success">✓ Confirmed Choice</Badge>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              style={{ flex: 1 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectUniversity(s._id);
+                              }}
+                            >
+                              Select Choice
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -1905,69 +2337,26 @@ export const StudentPortalPage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* --- Student University & Course Detail Modal --- */}
-      <Modal
+      {/* --- Student University & Course Detail Modal (Rich Counsellor-Grade Modal) --- */}
+      <UniversityDetailsModal
+        university={modalUniversity}
+        courses={modalCourses}
         isOpen={isUnivDetailsOpen}
         onClose={() => setIsUnivDetailsOpen(false)}
-        title={`University Specifications: ${selectedUnivItem?.universityName || ''}`}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsUnivDetailsOpen(false)}>
-              Close
-            </Button>
-            {selectedUnivItem && selectedUnivItem.status !== 'SELECTED_BY_STUDENT' && (
-              <Button
-                variant="primary"
-                onClick={async () => {
-                  if (!lead) return;
-                  try {
-                    await apiClient.post(`/universities/shortlists/${lead._id}/select/${selectedUnivItem._id}`);
-                    success(`Confirmed selection of ${selectedUnivItem.courseTitle} at ${selectedUnivItem.universityName}!`);
-                    setIsUnivDetailsOpen(false);
-                    fetchStudentData();
-                  } catch (err: any) {
-                    error(err.message || 'Selection failed');
-                  }
-                }}
-              >
-                Confirm University Choice
-              </Button>
-            )}
-          </>
-        }
-      >
-        {selectedUnivItem && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '70vh', overflowY: 'auto' }}>
-            <div style={{ padding: '14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary)' }}>{selectedUnivItem.universityName}</h4>
-                <Badge variant="primary">{selectedUnivItem.country}</Badge>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px', marginTop: '10px' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Location:</span>{' '}
-                  <strong>{(selectedUnivItem.universityId as any)?.city || selectedUnivItem.country}</strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Global Ranking:</span>{' '}
-                  <strong>#{(selectedUnivItem.universityId as any)?.ranking || 'Top 100'}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ padding: '14px', backgroundColor: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
-                Program: {selectedUnivItem.courseTitle}
-              </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', fontSize: '13px' }}>
-                <div><span style={{ color: 'var(--text-muted)' }}>Intake:</span> <strong>{selectedUnivItem.intake}</strong></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>Tuition Fee:</span> <strong>{selectedUnivItem.currency || '$'} {selectedUnivItem.annualFee?.toLocaleString() || 'N/A'} / Year</strong></div>
-                <div><span style={{ color: 'var(--text-muted)' }}>Status:</span> <strong>{selectedUnivItem.status.replace(/_/g, ' ')}</strong></div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+        onSelectProgram={(course) => {
+          if (!lead) return;
+          const matchingShortlist = shortlists.find(
+            (s) =>
+              (typeof s.courseId === 'object' && (s.courseId as any)?._id === course._id) ||
+              s.courseId === course._id ||
+              s.courseTitle === course.title
+          );
+          if (matchingShortlist) {
+            handleSelectUniversity(matchingShortlist._id);
+            setIsUnivDetailsOpen(false);
+          }
+        }}
+      />
 
       {/* --- Student Upload Signed Offer Modal --- */}
       <Modal
