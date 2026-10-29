@@ -1621,19 +1621,14 @@ export const StudentPortalPage: React.FC = () => {
                       >
                         {/* 130px Cover Banner */}
                         <div className="student-uni-card-banner">
-                          {uni?.bannerUrl ? (
-                            <img
-                              src={uni.bannerUrl}
-                              alt={s.universityName}
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <div style={{ width: '100%', height: '100%', background: '#0F172A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Building2 size={40} color="rgba(255,255,255,0.2)" />
-                            </div>
-                          )}
+                          <img
+                            src={uni?.bannerUrl && uni.bannerUrl.trim() ? uni.bannerUrl : 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80'}
+                            alt={s.universityName}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80';
+                            }}
+                          />
 
                           {/* Global Ranking Chip on Banner */}
                           <div

@@ -110,6 +110,12 @@ export const seedDatabase = async () => {
       city: 'Oxford',
       website: 'https://ox.ac.uk',
       ranking: 1,
+      bannerUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const uofToronto = await UniversityModel.create({
@@ -118,6 +124,12 @@ export const seedDatabase = async () => {
       city: 'Toronto',
       website: 'https://utoronto.ca',
       ranking: 18,
+      bannerUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const uofMelbourne = await UniversityModel.create({
@@ -126,6 +138,12 @@ export const seedDatabase = async () => {
       city: 'Melbourne',
       website: 'https://unimelb.edu.au',
       ranking: 33,
+      bannerUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const tumGermany = await UniversityModel.create({
@@ -134,6 +152,12 @@ export const seedDatabase = async () => {
       city: 'Munich',
       website: 'https://tum.de',
       ranking: 49,
+      bannerUrl: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const courseOxfordCS = await CourseModel.create({
