@@ -30,6 +30,10 @@ import {
   FileCheck,
   AlertCircle,
   X,
+  MoreVertical,
+  Globe,
+  GraduationCap,
+  DollarSign,
 } from 'lucide-react';
 import { applicationService } from '../applications/services/applicationService';
 import { offerService } from '../offers/services/offerService';
@@ -225,6 +229,22 @@ export const LeadDetailPage: React.FC = () => {
   const [closedLostReason, setClosedLostReason] = useState('Budget Constraints / Financial Limitations');
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    if (isMoreMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMoreMenuOpen]);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -790,20 +810,25 @@ export const LeadDetailPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Back button & Student Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', background: 'var(--bg-surface)', padding: '16px 20px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      {/* Redesigned Student & Lead Record Header (Swiss Minimalism & Action Hierarchy) */}
+      <div className="lead-record-header">
+        <div className="lead-identity-group">
           <Button
             variant="secondary"
             size="sm"
             icon={<ArrowLeft size={16} />}
             onClick={() => navigate(isStudentRoute ? '/students' : '/leads')}
           >
-            Back to {isStudentRoute ? 'Students' : 'Leads'}
+            Back
           </Button>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{lead.name}</h1>
+
+          <div className="lead-avatar-badge">
+            {lead.name ? lead.name.charAt(0).toUpperCase() : 'S'}
+          </div>
+
+          <div className="lead-identity-meta">
+            <div className="lead-title-row">
+              <h1 className="lead-name-text">{lead.name}</h1>
               <PinButton
                 item={{
                   id: lead._id,
@@ -817,17 +842,29 @@ export const LeadDetailPage: React.FC = () => {
               <StatusBadge status={lead.status} />
               <Badge variant="primary">{lead.stage.replace(/_/g, ' ')}</Badge>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', flexWrap: 'wrap' }}>
-              <span><Mail size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{lead.email}</span>
-              <span><Phone size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{lead.phone}</span>
-              <span><MapPin size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />{lead.city || 'India'}</span>
-              <span><strong>Source:</strong> <Badge variant="neutral">{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}</Badge></span>
+            <div className="lead-contact-strip">
+              <span className="lead-contact-item">
+                <Mail size={13} style={{ flexShrink: 0 }} />
+                {lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : 'No email'}
+              </span>
+              <span className="lead-contact-item">
+                <Phone size={13} style={{ flexShrink: 0 }} />
+                {lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : 'No phone'}
+              </span>
+              <span className="lead-contact-item">
+                <MapPin size={13} style={{ flexShrink: 0 }} />
+                {[lead.city, lead.country].filter(Boolean).join(', ') || 'India'}
+              </span>
+              <span className="lead-contact-item">
+                <strong>Source:</strong>{' '}
+                <Badge variant="neutral">{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}</Badge>
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Organized Lead Actions Toolbar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        {/* Clean Action Hierarchy: 1 Primary CTA + 2 Fast Contact Triggers + 1 "..." Menu */}
+        <div className="lead-header-actions-bar" ref={moreMenuRef}>
           <Button
             variant="secondary"
             size="sm"
@@ -855,30 +892,6 @@ export const LeadDetailPage: React.FC = () => {
             Schedule Counselling
           </Button>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Edit3 size={14} />}
-            onClick={() => {
-              setEditForm({
-                name: lead.name || '',
-                email: lead.email || '',
-                phone: lead.phone || '',
-                city: lead.city || '',
-                targetCountry: lead.targetCountry || '',
-                targetCourse: lead.targetCourse || '',
-                targetIntake: lead.targetIntake || 'Fall 2026',
-                budget: lead.budget || '',
-                source: (lead.source as any) || LeadSource.WEBSITE,
-                counsellorId: lead.counsellorId?._id || '',
-                notes: lead.notes || '',
-              });
-              setIsEditModalOpen(true);
-            }}
-          >
-            Edit Lead
-          </Button>
-
           {lead.status !== LeadStatus.INTERESTED && lead.status !== LeadStatus.CLOSED_LOST && (
             <Button
               variant="primary"
@@ -891,16 +904,7 @@ export const LeadDetailPage: React.FC = () => {
             </Button>
           )}
 
-          {lead.status !== LeadStatus.CLOSED_LOST ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<XCircle size={14} color="var(--danger)" />}
-              onClick={() => setIsClosedLostModalOpen(true)}
-            >
-              Mark Closed Lost
-            </Button>
-          ) : (
+          {lead.status === LeadStatus.CLOSED_LOST && (
             <Button
               variant="secondary"
               size="sm"
@@ -912,16 +916,75 @@ export const LeadDetailPage: React.FC = () => {
             </Button>
           )}
 
-          {isAdmin && (
-            <Button
-              variant="danger"
-              size="sm"
-              icon={<Trash2 size={14} />}
-              onClick={() => setIsDeleteConfirmOpen(true)}
+          {/* More Actions Popover */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className="lead-more-btn"
+              title="More Actions"
+              aria-label="More options"
+              onClick={() => setIsMoreMenuOpen(prev => !prev)}
             >
-              Delete Lead
-            </Button>
-          )}
+              <MoreVertical size={16} />
+            </button>
+
+            {isMoreMenuOpen && (
+              <div className="lead-more-dropdown">
+                <button
+                  type="button"
+                  className="lead-more-dropdown-item"
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setEditForm({
+                      name: lead.name || '',
+                      email: lead.email || '',
+                      phone: lead.phone || '',
+                      city: lead.city || '',
+                      targetCountry: lead.targetCountry || '',
+                      targetCourse: lead.targetCourse || '',
+                      targetIntake: lead.targetIntake || 'Fall 2026',
+                      budget: lead.budget || '',
+                      source: (lead.source as any) || LeadSource.WEBSITE,
+                      counsellorId: lead.counsellorId?._id || '',
+                      notes: lead.notes || '',
+                    });
+                    setIsEditModalOpen(true);
+                  }}
+                >
+                  <Edit3 size={14} />
+                  <span>Edit Lead Info</span>
+                </button>
+
+                {lead.status !== LeadStatus.CLOSED_LOST && (
+                  <button
+                    type="button"
+                    className="lead-more-dropdown-item"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      setIsClosedLostModalOpen(true);
+                    }}
+                  >
+                    <XCircle size={14} color="var(--danger)" />
+                    <span>Mark Closed Lost</span>
+                  </button>
+                )}
+
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="lead-more-dropdown-item danger"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete Record</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -967,376 +1030,370 @@ export const LeadDetailPage: React.FC = () => {
 
       {/* --- NAVIGATION CONTENT --- */}
 
-      {/* 1. Overview Section */}
+      {/* 1. Overview Section: 2-Column Responsive Workspace */}
       {isOverview && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          <div className="card">
-            <div className="card-header" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="card-title">Lead Details & Preferences</h3>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                ID: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-secondary)' }}>{lead._id}</span>
-              </span>
-            </div>
-
-            <div className="lead-details-grid">
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Student Name
+        <div className="lead-overview-workspace">
+          {/* LEFT COLUMN: Profile & Preferences */}
+          <div className="lead-overview-sidebar">
+            {/* Card 1: Study Preferences (2x2 Matrix) */}
+            <div className="card">
+              <div className="card-header" style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 className="card-title">Study Preferences</h3>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  ID: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-secondary)' }}>{lead._id?.slice(-8)}</span>
                 </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.name || 'Not provided'}
-                </strong>
               </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Target study destination, degree level, intake, and budget
+              </p>
 
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Email ID
-                </span>
-                <div style={{ marginTop: '3px' }}>
-                  {lead.email ? (
-                    <a href={`mailto:${lead.email}`} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      {lead.email}
-                    </a>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Not provided</span>
-                  )}
+              <div className="lead-pref-matrix">
+                <div className="lead-pref-tile">
+                  <div className="lead-pref-tile-label">
+                    <Globe size={13} color="var(--primary)" />
+                    <span>Target Country</span>
+                  </div>
+                  <div className="lead-pref-tile-value">
+                    {lead.targetCountry || 'Not provided'}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Phone Number
-                </span>
-                <div style={{ marginTop: '3px' }}>
-                  {lead.phone ? (
-                    <a href={`tel:${lead.phone}`} style={{ color: 'var(--text-primary)', textDecoration: 'none', fontWeight: 500 }}>
-                      {lead.phone}
-                    </a>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Not provided</span>
-                  )}
+                <div className="lead-pref-tile">
+                  <div className="lead-pref-tile-label">
+                    <GraduationCap size={13} color="var(--primary)" />
+                    <span>Course / Program</span>
+                  </div>
+                  <div className="lead-pref-tile-value">
+                    {lead.targetCourse || 'Not provided'}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Target Country
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.targetCountry || 'Not provided'}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Target Course / Program
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.targetCourse || 'Not provided'}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Status
-                </span>
-                <div style={{ marginTop: '3px' }}>
-                  <StatusBadge status={lead.status} />
+                <div className="lead-pref-tile">
+                  <div className="lead-pref-tile-label">
+                    <Calendar size={13} color="var(--primary)" />
+                    <span>Target Intake</span>
+                  </div>
+                  <div className="lead-pref-tile-value">
+                    {lead.targetIntake || 'Not provided'}
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Current Stage / Process
-                </span>
-                <div style={{ marginTop: '3px' }}>
-                  <Badge variant="primary">{lead.stage ? lead.stage.replace(/_/g, ' ') : 'Not provided'}</Badge>
+                <div className="lead-pref-tile">
+                  <div className="lead-pref-tile-label">
+                    <DollarSign size={13} color="var(--primary)" />
+                    <span>Budget Range</span>
+                  </div>
+                  <div className="lead-pref-tile-value">
+                    {lead.budget || 'Not provided'}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Intake
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.targetIntake || 'Not provided'}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Budget
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.budget || 'Not provided'}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Acquisition Source
-                </span>
-                <div style={{ marginTop: '3px' }}>
-                  <Badge variant="neutral">{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Not provided'}</Badge>
-                </div>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Assigned Counsellor
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.counsellorId?.name ? (
-                    lead.counsellorId.name
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>Unassigned</span>
-                  )}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Lead ID
-                </span>
-                <div style={{ fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px', wordBreak: 'break-all' }}>
-                  {lead._id}
-                </div>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  City / Location
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {[lead.city, lead.state, lead.country].filter(Boolean).join(', ') || 'Not provided'}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Passport Number
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.passportNumber || 'Not provided'}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Lead Captured Date
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Not provided'}
-                </strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Last Contacted
-                </span>
-                <strong style={{ color: 'var(--text-primary)', marginTop: '3px', display: 'block' }}>
-                  {lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleString() : 'Not contacted yet'}
-                </strong>
               </div>
 
               {lead.status === LeadStatus.CLOSED_LOST && lead.closedLostReason && (
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <span style={{ color: 'var(--danger)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>
-                    Closed Lost Reason
-                  </span>
-                  <div style={{ marginTop: '3px' }}>
-                    <Badge variant="danger">{lead.closedLostReason}</Badge>
-                  </div>
+                <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius-md)' }}>
+                  <span style={{ color: 'var(--danger)', fontSize: '11px', fontWeight: 700, display: 'block', textTransform: 'uppercase' }}>Closed Lost Reason</span>
+                  <div style={{ fontSize: '12px', color: '#991B1B', marginTop: '3px' }}>{lead.closedLostReason}</div>
                 </div>
               )}
             </div>
 
-            {lead.notes && (
-              <div style={{ marginTop: '18px', padding: '12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>INITIAL INQUIRY NOTES:</span>
-                <p style={{ fontSize: '13px', marginTop: '4px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{lead.notes}</p>
+            {/* Card 2: Academic Readiness & Eligibility */}
+            <div className="card">
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3 className="card-title">Academic Profile</h3>
+                {profile?.isComplete ? (
+                  <Badge variant="success">✓ Evaluated</Badge>
+                ) : (
+                  <Badge variant="warning">
+                    Evaluation Pending {profile?.missingFields && profile.missingFields.length > 0 ? `(${profile.missingFields.length} missing)` : ''}
+                  </Badge>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: '14px' }}>Contact Attempts (Immutable History)</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
-              {((lead as any).contactAttempts || []).length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>No contact attempts logged yet.</div>
-              ) : (
-                ((lead as any).contactAttempts || []).map((ca: any) => (
-                  <div key={ca._id} style={{ padding: '8px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
-                      <span>{ca.method} — {ca.outcome}</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{new Date(ca.attemptDate).toLocaleString()}</span>
-                    </div>
-                    {ca.notes && <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{ca.notes}</div>}
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>Logged by: {ca.recordedByName}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Student Profile Summary Card */}
-          <div className="card" style={{ gridColumn: '1 / -1' }}>
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 className="card-title">Student Profile Summary</h3>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Academic background, eligibility criteria, and assessment summary
-                </p>
-              </div>
-              {profile?.isComplete ? (
-                <Badge variant="success">✓ Profile Evaluation Completed</Badge>
-              ) : (
-                <Badge variant="warning">
-                  Evaluation Pending {profile?.missingFields && profile.missingFields.length > 0 ? `(${profile.missingFields.length} missing)` : ''}
-                </Badge>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', fontSize: '13px', marginTop: '12px' }}>
-              <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, display: 'block', textTransform: 'uppercase' }}>Highest Qualification</span>
-                <strong style={{ marginTop: '2px', display: 'block' }}>{profile?.highestQualification || 'Not evaluated yet'}</strong>
-              </div>
-              <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, display: 'block', textTransform: 'uppercase' }}>Institution / University</span>
-                <strong style={{ marginTop: '2px', display: 'block' }}>{profile?.institution || 'Not specified'}</strong>
-              </div>
-              <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, display: 'block', textTransform: 'uppercase' }}>Percentage / GPA</span>
-                <strong style={{ marginTop: '2px', display: 'block' }}>{profile?.percentageGpa || 'N/A'}</strong>
-              </div>
-              <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, display: 'block', textTransform: 'uppercase' }}>English Test Score</span>
-                <strong style={{ marginTop: '2px', display: 'block' }}>
-                  {profile?.testScore?.testType && profile.testScore.testType !== 'NONE'
-                    ? `${profile.testScore.testType}: ${profile.testScore.overall || 'Pending'}`
-                    : 'Waiver / None'}
-                </strong>
-              </div>
-              <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, display: 'block', textTransform: 'uppercase' }}>GRE / GMAT</span>
-                <strong style={{ marginTop: '2px', display: 'block' }}>{profile?.greGmatScore || 'N/A'}</strong>
-              </div>
-              <div style={{ padding: '10px 14px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, display: 'block', textTransform: 'uppercase' }}>Active Documents</span>
-                <strong style={{ marginTop: '2px', display: 'block' }}>{documents.length} document{documents.length === 1 ? '' : 's'} ({documents.filter(d => d.status === DocumentStatus.APPROVED).length} approved)</strong>
-              </div>
-            </div>
-
-            {profile?.counsellorRemarks && (
-              <div style={{ marginTop: '12px', padding: '10px 14px', backgroundColor: '#F0FDF4', borderRadius: 'var(--radius-sm)', border: '1px solid #BBF7D0', fontSize: '12px' }}>
-                <strong style={{ color: '#166534' }}>Counsellor Remarks: </strong>
-                <span style={{ color: '#14532D' }}>{profile.counsellorRemarks}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Card 4: Student Communications & Private Notes */}
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: '16px' }}>Student Communications & Private Notes</h3>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                maxHeight: '280px',
-                overflowY: 'auto',
-                padding: '12px',
-                backgroundColor: 'var(--bg-app)',
-                borderRadius: 'var(--radius-md)',
-                marginBottom: '16px',
-              }}
-            >
-              {messages.length === 0 ? (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '20px' }}>
-                  No messages exchanged yet.
+              <div className="lead-attr-list">
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Highest Qualification</span>
+                  <span className="lead-attr-row-value">{profile?.highestQualification || 'Not evaluated yet'}</span>
                 </div>
-              ) : (
-                messages.map((m) => (
-                  <div
-                    key={m._id}
-                    style={{
-                      alignSelf: m.senderRole === UserRole.STUDENT ? 'flex-start' : 'flex-end',
-                      maxWidth: '80%',
-                      padding: '10px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: m.isInternalNote ? '#FFFBEB' : m.senderRole === UserRole.STUDENT ? '#FFFFFF' : 'var(--primary-light)',
-                      border: `1px solid ${m.isInternalNote ? 'var(--warning-border)' : 'var(--border-color)'}`,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 600, fontSize: '11px', color: m.isInternalNote ? 'var(--warning-text)' : 'var(--text-primary)' }}>
-                        {m.senderName} ({m.senderRole}) {m.isInternalNote && '🔒 [INTERNAL NOTE]'}
-                      </span>
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(m.createdAt).toLocaleTimeString()}</span>
-                    </div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                  </div>
-                ))
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Institution / University</span>
+                  <span className="lead-attr-row-value">{profile?.institution || 'Not specified'}</span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">GPA / Percentage</span>
+                  <span className="lead-attr-row-value">{profile?.percentageGpa || 'N/A'}</span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">English Test Score</span>
+                  <span className="lead-attr-row-value">
+                    {profile?.testScore?.testType && profile.testScore.testType !== 'NONE'
+                      ? `${profile.testScore.testType}: ${profile.testScore.overall || 'Pending'}`
+                      : 'Waiver / None'}
+                  </span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">GRE / GMAT</span>
+                  <span className="lead-attr-row-value">{profile?.greGmatScore || 'N/A'}</span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Passport</span>
+                  <span className="lead-attr-row-value">{lead.passportNumber || 'Not provided'}</span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Active Documents</span>
+                  <span className="lead-attr-row-value">
+                    {documents.length} uploaded ({documents.filter(d => d.status === DocumentStatus.APPROVED).length} approved)
+                  </span>
+                </div>
+              </div>
+
+              {profile?.counsellorRemarks && (
+                <div style={{ marginTop: '12px', padding: '10px 12px', backgroundColor: '#F0FDF4', borderRadius: 'var(--radius-sm)', border: '1px solid #BBF7D0', fontSize: '12px' }}>
+                  <strong style={{ color: '#166534' }}>Counsellor Remarks: </strong>
+                  <span style={{ color: '#14532D' }}>{profile.counsellorRemarks}</span>
+                </div>
               )}
             </div>
 
-            <form onSubmit={handleSendMessage} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <Textarea
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message to the student or enter internal notes..."
-                rows={2}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={isInternalNote}
-                    onChange={(e) => setIsInternalNote(e.target.checked)}
-                  />
-                  <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>
-                    Mark as Internal Note (Visible to Staff only)
+            {/* Card 3: Assigned Advisor & Tracking */}
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '12px' }}>Advisor & Tracking</h3>
+              <div className="lead-attr-list">
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Assigned Advisor</span>
+                  <span className="lead-attr-row-value" style={{ color: 'var(--primary)' }}>
+                    {lead.counsellorId?.name || 'Unassigned'}
                   </span>
-                </label>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Acquisition Source</span>
+                  <span className="lead-attr-row-value">
+                    {lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}
+                  </span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Lead Captured</span>
+                  <span className="lead-attr-row-value">
+                    {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
+                  </span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Last Contacted</span>
+                  <span className="lead-attr-row-value">
+                    {lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleString() : 'Not contacted yet'}
+                  </span>
+                </div>
+                <div className="lead-attr-row">
+                  <span className="lead-attr-row-label">Location</span>
+                  <span className="lead-attr-row-value">
+                    {[lead.city, lead.state, lead.country].filter(Boolean).join(', ') || 'Not provided'}
+                  </span>
+                </div>
+              </div>
 
-                <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />}>
-                  Send
+              {lead.notes && (
+                <div style={{ marginTop: '14px', padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Inquiry Notes:</span>
+                  <p style={{ fontSize: '12px', marginTop: '4px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{lead.notes}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Engagement Hub & Timelines */}
+          <div className="lead-overview-main">
+            {/* Card 4: Activity & Touchpoints Timeline with Direct Quick Action */}
+            <div className="card">
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div>
+                  <h3 className="card-title">Contact Attempts & Touchpoints</h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Record of phone calls, WhatsApp check-ins, and scheduled interactions
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<PhoneCall size={13} />}
+                  onClick={() => setIsContactModalOpen(true)}
+                >
+                  Log Touchpoint
                 </Button>
               </div>
-            </form>
-          </div>
 
-          {/* Card 5: Student Journey Activity Timeline */}
-          <div className="card">
-            <h3 className="card-title" style={{ marginBottom: '16px' }}>Student Journey Activity Timeline</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '380px', overflowY: 'auto' }}>
-              {activities.length === 0 ? (
-                <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No recorded activities yet.</div>
+              {((lead as any).contactAttempts || []).length === 0 ? (
+                <div className="lead-timeline-empty-card">
+                  <div className="lead-timeline-empty-icon">
+                    <PhoneCall size={18} />
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                    No contact touchpoints logged yet
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '320px', margin: 0 }}>
+                    Keep your engagement record complete by logging calls, WhatsApp outreach, or email consultations.
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<PhoneCall size={13} />}
+                    onClick={() => setIsContactModalOpen(true)}
+                    style={{ marginTop: '8px' }}
+                  >
+                    Log First Contact
+                  </Button>
+                </div>
               ) : (
-                activities.map((act) => (
-                  <div key={act._id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                    <div
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--primary)',
-                        marginTop: '6px',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{act.title}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{act.description}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {new Date(act.createdAt).toLocaleString()} • {act.actorName || 'System'}
+                <div className="lead-timeline-container">
+                  {((lead as any).contactAttempts || []).map((ca: any) => (
+                    <div key={ca._id} className="lead-timeline-entry">
+                      <div className="lead-timeline-entry-dot">
+                        {ca.method === 'WHATSAPP' ? (
+                          <MessageSquare size={14} />
+                        ) : ca.method === 'EMAIL' ? (
+                          <Mail size={14} />
+                        ) : (
+                          <PhoneCall size={14} />
+                        )}
+                      </div>
+                      <div className="lead-timeline-entry-body">
+                        <div className="lead-timeline-entry-header">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <strong style={{ color: 'var(--text-primary)' }}>{ca.method}</strong>
+                            <Badge
+                              variant={
+                                ca.outcome === 'CONNECTED'
+                                  ? 'success'
+                                  : ca.outcome === 'CALLBACK_REQUESTED'
+                                  ? 'primary'
+                                  : ca.outcome === 'NO_ANSWER' || ca.outcome === 'BUSY'
+                                  ? 'warning'
+                                  : 'danger'
+                              }
+                            >
+                              {ca.outcome ? ca.outcome.replace(/_/g, ' ') : 'COMPLETED'}
+                            </Badge>
+                          </div>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                            {new Date(ca.attemptDate).toLocaleString()}
+                          </span>
+                        </div>
+                        {ca.notes && (
+                          <div style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '12px' }}>
+                            {ca.notes}
+                          </div>
+                        )}
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Recorded by: {ca.recordedByName || 'Advisor'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
+            </div>
+
+            {/* Card 5: Student Communications & Private Notes */}
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '16px' }}>Student Communications & Private Notes</h3>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  maxHeight: '280px',
+                  overflowY: 'auto',
+                  padding: '12px',
+                  backgroundColor: 'var(--bg-app)',
+                  borderRadius: 'var(--radius-md)',
+                  marginBottom: '16px',
+                }}
+              >
+                {messages.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '20px' }}>
+                    No messages exchanged yet.
+                  </div>
+                ) : (
+                  messages.map((m) => (
+                    <div
+                      key={m._id}
+                      style={{
+                        alignSelf: m.senderRole === UserRole.STUDENT ? 'flex-start' : 'flex-end',
+                        maxWidth: '80%',
+                        padding: '10px 14px',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: m.isInternalNote ? '#FFFBEB' : m.senderRole === UserRole.STUDENT ? '#FFFFFF' : 'var(--primary-light)',
+                        border: `1px solid ${m.isInternalNote ? 'var(--warning-border)' : 'var(--border-color)'}`,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 600, fontSize: '11px', color: m.isInternalNote ? 'var(--warning-text)' : 'var(--text-primary)' }}>
+                          {m.senderName} ({m.senderRole}) {m.isInternalNote && '🔒 [INTERNAL NOTE]'}
+                        </span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(m.createdAt).toLocaleTimeString()}</span>
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={handleSendMessage} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <Textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message to the student or enter internal notes..."
+                  rows={2}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={isInternalNote}
+                      onChange={(e) => setIsInternalNote(e.target.checked)}
+                    />
+                    <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>
+                      Mark as Internal Note (Visible to Staff only)
+                    </span>
+                  </label>
+
+                  <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />}>
+                    Send
+                  </Button>
+                </div>
+              </form>
+            </div>
+
+            {/* Card 6: Student Journey Activity Timeline */}
+            <div className="card">
+              <h3 className="card-title" style={{ marginBottom: '16px' }}>Student Journey Activity Timeline</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '380px', overflowY: 'auto' }}>
+                {activities.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No recorded activities yet.</div>
+                ) : (
+                  activities.map((act) => (
+                    <div key={act._id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--primary)',
+                          marginTop: '6px',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{act.title}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{act.description}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {new Date(act.createdAt).toLocaleString()} • {act.actorName || 'System'}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
