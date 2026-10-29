@@ -778,32 +778,6 @@ export const VisaPage: React.FC = () => {
               ),
             },
             {
-              header: 'ASSIGNED COUNSELLOR',
-              render: (v: VisaRecord) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(0, 87, 248, 0.1)',
-                      color: 'var(--primary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {(v.counsellorName || 'U').charAt(0).toUpperCase()}
-                  </div>
-                  <span style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {v.counsellorName || v.assignedCounsellor || 'Unassigned'}
-                  </span>
-                </div>
-              ),
-            },
-            {
               header: 'ACTIONS',
               align: 'right',
               render: (v: VisaRecord) => (
