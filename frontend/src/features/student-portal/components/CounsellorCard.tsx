@@ -22,18 +22,46 @@ export const CounsellorCard: React.FC<CounsellorCardProps> = ({
 }) => {
   if (!counsellor || !counsellor.name) {
     return (
-      <div className="student-counsellor-card empty-state">
-        <div className="student-counsellor-avatar-placeholder">
-          <UserX size={20} />
-        </div>
-        <div className="student-counsellor-info">
-          <div className="student-counsellor-title-row">
-            <span className="student-counsellor-name">Counsellor Matching in Progress</span>
-            <Badge variant="warning">Matching</Badge>
+      <div className="student-counsellor-card">
+        <div className="student-counsellor-header">
+          <div className="student-counsellor-avatar-wrapper">
+            <div className="student-counsellor-avatar-initials" style={{ backgroundColor: '#0057F8', color: '#FFFFFF' }}>IIEC</div>
+            <span className="student-counsellor-status-dot" title="Active Admissions Advisory Team" />
           </div>
-          <p className="student-counsellor-subtext">
-            Our admissions team is assigning a dedicated education advisor to guide your university applications.
-          </p>
+          <div className="student-counsellor-info">
+            <div className="student-counsellor-title-row">
+              <span className="student-counsellor-name">Admissions Advisory Team</span>
+              <Badge variant="success">Available</Badge>
+            </div>
+            <p className="student-counsellor-subtext">
+              Certified education advisors ready to assist with your university shortlisting and applications.
+            </p>
+          </div>
+        </div>
+
+        <div className="student-counsellor-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          {onOpenChat && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<MessageSquare size={13} />}
+              onClick={onOpenChat}
+              style={{ flex: 1 }}
+            >
+              Message Advisors
+            </Button>
+          )}
+          {onScheduleCall && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Calendar size={13} />}
+              onClick={onScheduleCall}
+              style={{ flex: 1 }}
+            >
+              Book Consultation
+            </Button>
+          )}
         </div>
       </div>
     );

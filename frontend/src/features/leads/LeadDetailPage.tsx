@@ -1160,9 +1160,9 @@ export const LeadDetailPage: React.FC = () => {
               <h3 className="card-title" style={{ marginBottom: '12px' }}>Advisor & Tracking</h3>
               <div className="lead-attr-list">
                 <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Assigned Advisor</span>
-                  <span className="lead-attr-row-value" style={{ color: 'var(--primary)' }}>
-                    {lead.counsellorId?.name || 'Unassigned'}
+                  <span className="lead-attr-row-label">Advisory Access</span>
+                  <span className="lead-attr-row-value" style={{ color: 'var(--success)', fontWeight: 600 }}>
+                    ✓ Open to All Counsellors
                   </span>
                 </div>
                 <div className="lead-attr-row">
@@ -1408,7 +1408,7 @@ export const LeadDetailPage: React.FC = () => {
               <div>
                 <h3 className="card-title">Preliminary Counselling Details</h3>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                  Initial consultation, student preferences, and assigned counsellor
+                  Initial consultation, student preferences, and scheduled sessions
                 </p>
               </div>
               <Button
@@ -1421,7 +1421,7 @@ export const LeadDetailPage: React.FC = () => {
                     scheduledTime: '11:00',
                     googleMeetLink: '',
                     notes: '',
-                    counsellorId: lead.counsellorId?._id || user?._id || '',
+                    counsellorId: user?._id || '',
                   });
                   setIsCounsellingModalOpen(true);
                 }}
@@ -1442,14 +1442,11 @@ export const LeadDetailPage: React.FC = () => {
                 <div style={{ marginTop: '4px' }}><StatusBadge status={lead.status} /></div>
               </div>
               <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Assigned Counsellor</span>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Advisory Coverage</span>
                 <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <User size={14} color="var(--primary)" />
-                  <strong>{lead.counsellorId?.name || 'Unassigned'}</strong>
+                  <span style={{ color: 'var(--success)', fontWeight: 600 }}>Open to All Counsellors</span>
                 </div>
-                {lead.counsellorId?.email && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{lead.counsellorId.email}</div>
-                )}
               </div>
               <div>
                 <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' }}>Acquisition Source</span>
@@ -3083,13 +3080,6 @@ export const LeadDetailPage: React.FC = () => {
             placeholder="https://meet.google.com/..."
           />
 
-          <Select
-            label="Assigned Counsellor"
-            value={counsellingForm.counsellorId}
-            onChange={(e) => setCounsellingForm({ ...counsellingForm, counsellorId: e.target.value })}
-            options={counsellors.map((c) => ({ value: c._id, label: c.name }))}
-          />
-
           <Textarea
             label="Agenda / Notes"
             value={counsellingForm.notes}
@@ -3176,21 +3166,12 @@ export const LeadDetailPage: React.FC = () => {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
             <Select
               label="Lead Source *"
               value={editForm.source}
               onChange={(e) => setEditForm({ ...editForm, source: e.target.value as LeadSource })}
               options={Object.values(LeadSource).map((s) => ({ value: s, label: s.replace(/_/g, ' ') }))}
-            />
-            <Select
-              label="Assign Counsellor"
-              value={editForm.counsellorId}
-              onChange={(e) => setEditForm({ ...editForm, counsellorId: e.target.value })}
-              options={[
-                { value: '', label: 'Unassigned' },
-                ...counsellors.map((c) => ({ value: c._id, label: c.name })),
-              ]}
             />
           </div>
 

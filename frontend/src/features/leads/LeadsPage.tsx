@@ -34,8 +34,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
-  const [counsellorFilter, setCounsellorFilter] = useState('');
-  const [counsellors, setCounsellors] = useState<UserType[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
   const [branches, setBranches] = useState<any[]>([]);
 
@@ -54,7 +52,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     targetIntake: '',
     budget: '',
     source: LeadSource.WEBSITE,
-    counsellorId: '',
     branchId: '',
     notes: '',
   });
@@ -73,7 +70,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         status: statusFilter,
         source: sourceFilter,
         stage: stageFilter,
-        counsellorId: counsellorFilter,
         branchId: branchFilter || undefined,
         isStudent: isStudentOnly ? true : isStudentOnly === false ? false : undefined,
       });
@@ -84,24 +80,20 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, sourceFilter, stageFilter, counsellorFilter, branchFilter, isStudentOnly, error]);
+  }, [page, search, statusFilter, sourceFilter, stageFilter, branchFilter, isStudentOnly, error]);
 
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
 
   useEffect(() => {
-    const fetchCounsellorsAndBranches = async () => {
+    const fetchBranches = async () => {
       try {
-        const [cRes, bRes] = await Promise.all([
-          apiClient.get<UserType[]>('/users/counsellors'),
-          apiClient.get<any>('/branches'),
-        ]);
-        setCounsellors(cRes.data || []);
+        const bRes = await apiClient.get<any>('/branches');
         setBranches(bRes.data?.branches || (Array.isArray(bRes.data) ? bRes.data : []));
       } catch (err) {}
     };
-    fetchCounsellorsAndBranches();
+    fetchBranches();
   }, []);
 
   const handleCreateLead = async (e: React.FormEvent) => {
@@ -121,7 +113,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         targetIntake: 'Fall 2026',
         budget: '',
         source: LeadSource.WEBSITE,
-        counsellorId: '',
         branchId: '',
         notes: '',
       });
@@ -317,7 +308,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                 setBranchFilter('');
                 setStatusFilter('');
                 setSourceFilter('');
-                setCounsellorFilter('');
                 setStageFilter('');
               }}
             >
@@ -495,9 +485,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                       )}
                       <div className="kanban-card-footer">
                         <span>
-                          {typeof l.counsellorId === 'object' && l.counsellorId
-                            ? (l.counsellorId as any).name
-                            : 'Unassigned'}
+                          {l.source ? String(l.source).replace(/_/g, ' ') : 'Inquiry'}
                         </span>
                         <span>
                           {l.createdAt ? new Date(l.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
