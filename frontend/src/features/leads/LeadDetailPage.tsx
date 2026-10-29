@@ -768,11 +768,11 @@ export const LeadDetailPage: React.FC = () => {
     setActionLoading(true);
     try {
       await apiClient.delete(`/leads/${lead._id}`);
-      success('Lead permanently deleted.');
+      success(isStudentRoute ? 'Student permanently deleted.' : 'Lead permanently deleted.');
       setIsDeleteConfirmOpen(false);
-      navigate('/leads');
+      navigate(isStudentRoute ? '/students' : '/leads');
     } catch (err: any) {
-      error(err.message || 'Failed to delete lead');
+      error(err.message || (isStudentRoute ? 'Failed to delete student' : 'Failed to delete lead'));
     } finally {
       setActionLoading(false);
     }
@@ -979,7 +979,7 @@ export const LeadDetailPage: React.FC = () => {
                     }}
                   >
                     <Trash2 size={14} />
-                    <span>Delete Record</span>
+                    <span>{isStudentRoute ? 'Delete Student' : 'Delete Lead'}</span>
                   </button>
                 )}
               </div>
@@ -3244,7 +3244,7 @@ export const LeadDetailPage: React.FC = () => {
         isOpen={isDeleteConfirmOpen}
         onClose={() => setIsDeleteConfirmOpen(false)}
         onConfirm={handleDeleteLead}
-        title="Permanently Delete Lead"
+        title={isStudentRoute ? "Permanently Delete Student" : "Permanently Delete Lead"}
         message={`Are you sure you want to permanently delete ${lead?.name}? This action is irreversible and recorded in the audit log.`}
         isDanger
         confirmText="Delete Permanently"
