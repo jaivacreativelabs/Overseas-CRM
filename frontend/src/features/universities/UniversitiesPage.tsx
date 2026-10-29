@@ -40,6 +40,14 @@ const BANNER_GRADIENTS = [
   { from: '#BE185D', to: '#831843' },
 ];
 
+const DEFAULT_UNIVERSITY_BANNERS = [
+  'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1200&q=80',
+];
+
 const PRESET_FACILITIES = [
   'Smart Classrooms',
   'Digital Library',
@@ -653,29 +661,17 @@ export const UniversitiesPage: React.FC = () => {
                         overflow: 'hidden',
                       }}
                     >
-                      {u.bannerUrl ? (
-                        <img
-                          src={u.bannerUrl}
-                          alt={u.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Building2 size={44} color="rgba(255, 255, 255, 0.22)" />
-                        </div>
-                      )}
+                      <img
+                        src={u.bannerUrl && u.bannerUrl.trim() ? u.bannerUrl : DEFAULT_UNIVERSITY_BANNERS[idx % DEFAULT_UNIVERSITY_BANNERS.length]}
+                        alt={u.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          const fallback = DEFAULT_UNIVERSITY_BANNERS[idx % DEFAULT_UNIVERSITY_BANNERS.length];
+                          if ((e.target as HTMLImageElement).src !== fallback) {
+                            (e.target as HTMLImageElement).src = fallback;
+                          }
+                        }}
+                      />
 
                       {/* Highlight Tag / Custom Comment / Global Ranking Badge Chip */}
                       {(u.customComment?.trim() || (u.ranking !== undefined && u.ranking !== null)) && (

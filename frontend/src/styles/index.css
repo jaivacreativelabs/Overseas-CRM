@@ -85,10 +85,15 @@ button, input, select, textarea {
   font-size: inherit;
 }
 
-/* Custom Scrollbars */
+/* Custom Scrollbars - Completely eliminate horizontal scrollbars globally */
 ::-webkit-scrollbar {
   width: 6px;
-  height: 6px;
+  height: 0px; /* Never render a horizontal scrollbar */
+}
+::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0px !important;
+  width: 0px !important;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -99,4 +104,39 @@ button, input, select, textarea {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #9CA3AF;
+}
+
+/* Global Zero Horizontal Overflow & Smooth Viewport Containment */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* Hide horizontal scrollbars across all scrollable carousels, tabs, and tables */
+.no-scrollbar,
+.table-container,
+.tabs-header,
+.stepper-container,
+.student-stepper-wrapper,
+.student-nav-bar,
+.crm-table-wrapper {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.table-container::-webkit-scrollbar,
+.tabs-header::-webkit-scrollbar,
+.stepper-container::-webkit-scrollbar,
+.student-stepper-wrapper::-webkit-scrollbar,
+.student-nav-bar::-webkit-scrollbar,
+.crm-table-wrapper::-webkit-scrollbar {
+  display: none !important;
+  height: 0px !important;
+  width: 0px !important;
 }

@@ -20,7 +20,7 @@ export class AutomationService {
         name: 'New Lead Welcome Workflow',
         description: 'Sends automated welcome email and WhatsApp message upon lead registration.',
         trigger: 'lead.created' as WorkflowTrigger,
-        isActive: true,
+        isActive: false, // Disabled: email only triggered when counsellor approves lead as student
         actions: [
           {
             actionType: 'SEND_EMAIL',
@@ -28,6 +28,22 @@ export class AutomationService {
             config: {
               subject: 'Welcome to IIEC Overseas Education',
               template: 'lead_welcome',
+            },
+          },
+        ],
+      },
+      {
+        name: 'Student Portal Access Provisioned',
+        description: 'Sends student portal login credentials when a lead is approved and converted to student by counsellor.',
+        trigger: 'student.created' as WorkflowTrigger,
+        isActive: true,
+        actions: [
+          {
+            actionType: 'SEND_EMAIL',
+            providerId: 'email_smtp',
+            config: {
+              subject: 'Congratulations! Your IIEC Student Portal Account is Ready',
+              template: 'student_created',
             },
           },
         ],
@@ -337,6 +353,12 @@ export class AutomationService {
         { upsert: true }
       );
     }
+
+    // Ensure lead.created workflow is disabled so manual lead creation never triggers emails
+    await AutomationWorkflowModel.updateMany(
+      { trigger: 'lead.created' },
+      { $set: { isActive: false } }
+    );
   }
 
   /**

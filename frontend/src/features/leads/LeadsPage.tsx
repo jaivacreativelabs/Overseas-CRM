@@ -1,13 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
   Eye,
+  LayoutGrid,
+  Table as TableIcon,
+  Globe,
+  Calendar,
+  Clock,
+  User,
+  ArrowRight,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
-import { Lead, LeadSource, LeadStatus, StudentStage, User } from '../../types';
+import { Lead, LeadSource, LeadStatus, StudentStage, User as UserType } from '../../types';
 import { Table, Pagination, SearchInput } from '../../components/Table';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
@@ -20,14 +27,13 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<any>({ total: 0, totalPages: 1, limit: 20 });
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
 
   // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('');
-  const [counsellorFilter, setCounsellorFilter] = useState('');
-  const [counsellors, setCounsellors] = useState<User[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
   const [branches, setBranches] = useState<any[]>([]);
 
@@ -46,7 +52,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     targetIntake: '',
     budget: '',
     source: LeadSource.WEBSITE,
-    counsellorId: '',
     branchId: '',
     notes: '',
   });
@@ -65,7 +70,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         status: statusFilter,
         source: sourceFilter,
         stage: stageFilter,
-        counsellorId: counsellorFilter,
         branchId: branchFilter || undefined,
         isStudent: isStudentOnly ? true : isStudentOnly === false ? false : undefined,
       });
@@ -76,24 +80,20 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, sourceFilter, stageFilter, counsellorFilter, branchFilter, isStudentOnly, error]);
+  }, [page, search, statusFilter, sourceFilter, stageFilter, branchFilter, isStudentOnly, error]);
 
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
 
   useEffect(() => {
-    const fetchCounsellorsAndBranches = async () => {
+    const fetchBranches = async () => {
       try {
-        const [cRes, bRes] = await Promise.all([
-          apiClient.get<User[]>('/users/counsellors'),
-          apiClient.get<any>('/branches'),
-        ]);
-        setCounsellors(cRes.data || []);
+        const bRes = await apiClient.get<any>('/branches');
         setBranches(bRes.data?.branches || (Array.isArray(bRes.data) ? bRes.data : []));
       } catch (err) {}
     };
-    fetchCounsellorsAndBranches();
+    fetchBranches();
   }, []);
 
   const handleCreateLead = async (e: React.FormEvent) => {
@@ -113,7 +113,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         targetIntake: 'Fall 2026',
         budget: '',
         source: LeadSource.WEBSITE,
-        counsellorId: '',
         branchId: '',
         notes: '',
       });
@@ -124,6 +123,88 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
       setActionLoading(false);
     }
   };
+
+  const kanbanColumns = useMemo(() => {
+    if (isStudentOnly) {
+      return [
+        {
+          id: 'eval',
+          title: 'Profile Evaluation',
+          leads: leads.filter(
+            (l) =>
+              l.stage === StudentStage.PROFILE_EVALUATION ||
+              l.stage === StudentStage.LEAD_CAPTURED ||
+              l.stage === StudentStage.PRELIMINARY_COUNSELLING
+          ),
+        },
+        {
+          id: 'shortlist',
+          title: 'Shortlisting',
+          leads: leads.filter((l) => l.stage === StudentStage.UNIVERSITY_SHORTLISTING),
+        },
+        {
+          id: 'docs',
+          title: 'Document Prep',
+          leads: leads.filter((l) => l.stage === StudentStage.DOCUMENT_COLLECTION),
+        },
+        {
+          id: 'apps',
+          title: 'Applications Lodged',
+          leads: leads.filter((l) => l.stage === StudentStage.APPLICATION_SUBMISSION),
+        },
+        {
+          id: 'offers_visa',
+          title: 'Offers & Visa',
+          leads: leads.filter(
+            (l) =>
+              l.stage === StudentStage.OFFER_MANAGEMENT ||
+              l.stage === StudentStage.FEE_PAYMENT ||
+              l.stage === StudentStage.VISA_PROCESSING ||
+              l.stage === StudentStage.PRE_DEPARTURE ||
+              l.stage === StudentStage.DEPARTURE ||
+              l.stage === StudentStage.ARRIVAL_CONFIRMED
+          ),
+        },
+      ];
+    }
+
+    return [
+      {
+        id: 'new',
+        title: 'New Inquiries',
+        leads: leads.filter((l) => l.status === LeadStatus.NEW && l.stage === StudentStage.LEAD_CAPTURED),
+      },
+      {
+        id: 'contacted',
+        title: 'In Contact & Follow-up',
+        leads: leads.filter(
+          (l) => l.status === LeadStatus.CONTACTED && l.stage === StudentStage.LEAD_CAPTURED
+        ),
+      },
+      {
+        id: 'counselling',
+        title: 'Counselling Scheduled',
+        leads: leads.filter(
+          (l) =>
+            l.stage === StudentStage.PRELIMINARY_COUNSELLING ||
+            l.status === LeadStatus.COUNSELLING_SCHEDULED ||
+            l.status === LeadStatus.COUNSELLING_COMPLETED
+        ),
+      },
+      {
+        id: 'qualified',
+        title: 'Qualified for Evaluation',
+        leads: leads.filter(
+          (l) => l.stage === StudentStage.PROFILE_EVALUATION || l.status === LeadStatus.INTERESTED
+        ),
+      },
+      {
+        id: 'lost',
+        title: 'Closed Lost',
+        leads: leads.filter((l) => l.status === LeadStatus.CLOSED_LOST),
+      },
+    ];
+  }, [leads, isStudentOnly]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -139,11 +220,36 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
               : 'Track inquiries, record contact attempts, schedule counselling, and qualify students.'}
           </p>
         </div>
-        {!isStudentOnly && (
-          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsCreateOpen(true)}>
-            Create Lead
-          </Button>
-        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Dual View Toggle */}
+          <div className="view-mode-toggle">
+            <button
+              type="button"
+              className={`view-mode-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
+              onClick={() => setViewMode('table')}
+              title="Table View"
+            >
+              <TableIcon size={14} />
+              <span>Table</span>
+            </button>
+            <button
+              type="button"
+              className={`view-mode-toggle-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+              onClick={() => setViewMode('kanban')}
+              title="Pipeline Kanban View"
+            >
+              <LayoutGrid size={14} />
+              <span>Pipeline</span>
+            </button>
+          </div>
+
+          {!isStudentOnly && (
+            <Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsCreateOpen(true)}>
+              Create Lead
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filter & Search Bar */}
@@ -202,7 +308,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                 setBranchFilter('');
                 setStatusFilter('');
                 setSourceFilter('');
-                setCounsellorFilter('');
                 setStageFilter('');
               }}
             >
@@ -212,121 +317,188 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         </div>
       </div>
 
-      {/* Leads Table */}
-      <Table
-        columns={[
-          {
-            header: 'STUDENT NAME',
-            render: (l) => (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div
-                  style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
-                  onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
-                >
-                  {l.name}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.email}</div>
-                {l.phone && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.phone}</div>}
-              </div>
-            ),
-          },
-          {
-            header: 'TARGET COUNTRY / COURSE',
-            render: (l) => (
-              <div>
-                <div style={{ fontWeight: 500 }}>{l.targetCountry || 'Any Country'}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{l.targetCourse || 'Undecided'}</div>
-              </div>
-            ),
-          },
-          {
-            header: 'ASSIGNED BRANCH',
-            render: (l) => {
-              const b =
-                typeof l.branchId === 'object' && l.branchId
-                  ? l.branchId
-                  : branches.find((br) => br._id === l.branchId);
+      {/* View Content: Table vs Kanban Board */}
+      {viewMode === 'table' ? (
+        <>
+          <Table
+            columns={[
+              {
+                header: 'STUDENT NAME',
+                render: (l) => (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div
+                      style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
+                      onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
+                    >
+                      {l.name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.email}</div>
+                    {l.phone && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.phone}</div>}
+                  </div>
+                ),
+              },
+              {
+                header: 'TARGET COUNTRY / COURSE',
+                render: (l) => (
+                  <div>
+                    <div style={{ fontWeight: 500 }}>{l.targetCountry || 'Any Country'}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{l.targetCourse || 'Undecided'}</div>
+                  </div>
+                ),
+              },
+              {
+                header: 'ASSIGNED BRANCH',
+                render: (l) => {
+                  const b =
+                    typeof l.branchId === 'object' && l.branchId
+                      ? l.branchId
+                      : branches.find((br) => br._id === l.branchId);
 
-              return (
-                <div>
-                  {b ? (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        color: '#1E40AF',
-                        backgroundColor: '#EFF6FF',
-                        border: '1px solid #BFDBFE',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
+                  return (
+                    <div>
+                      {b ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            color: '#1E40AF',
+                            backgroundColor: '#EFF6FF',
+                            border: '1px solid #BFDBFE',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                          }}
+                        >
+                          📍 {b.name}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Unassigned</span>
+                      )}
+                      {l.source === 'Meta Ads' && (
+                        <div style={{ fontSize: '10.5px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
+                          ⚡ Meta: {l.metaFormName || 'Instant Form'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                },
+              },
+              {
+                header: 'STATUS',
+                render: (l) => <StatusBadge status={l.status} />,
+              },
+              {
+                header: 'CURRENT STAGE',
+                render: (l) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
+              },
+              {
+                header: 'ACTIONS',
+                align: 'right',
+                render: (l) => (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
+                    <PinButton
+                      item={{
+                        id: l._id,
+                        category: 'student',
+                        title: l.name,
+                        subtitle: `${l.email} • ${l.targetCountry || 'Student'}`,
+                        path: isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`,
+                        pinnedAt: new Date().toISOString(),
+                      }}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Eye size={14} />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`);
                       }}
                     >
-                      📍 {b.name}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Unassigned</span>
-                  )}
-                  {l.source === 'Meta Ads' && (
-                    <div style={{ fontSize: '10.5px', color: '#059669', marginTop: '2px', fontWeight: 600 }}>
-                      ⚡ Meta: {l.metaFormName || 'Instant Form'}
-                    </div>
-                  )}
-                </div>
-              );
-            },
-          },
-          {
-            header: 'STATUS',
-            render: (l) => <StatusBadge status={l.status} />,
-          },
-          {
-            header: 'CURRENT STAGE',
-            render: (l) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
-          },
-          {
-            header: 'ACTIONS',
-            align: 'right',
-            render: (l) => (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
-                <PinButton
-                  item={{
-                    id: l._id,
-                    category: 'student',
-                    title: l.name,
-                    subtitle: `${l.email} • ${l.targetCountry || 'Student'}`,
-                    path: isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`,
-                    pinnedAt: new Date().toISOString(),
-                  }}
-                />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<Eye size={14} />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`);
-                  }}
-                >
-                  View Lead
-                </Button>
-              </div>
-            ),
-          },
-        ]}
-        data={leads}
-        loading={loading}
-      />
+                      View Lead
+                    </Button>
+                  </div>
+                ),
+              },
+            ]}
+            data={leads}
+            loading={loading}
+          />
 
-      <Pagination
-        currentPage={page}
-        totalPages={meta.totalPages}
-        totalItems={meta.total}
-        pageSize={20}
-        onPageChange={setPage}
-      />
+          <Pagination
+            currentPage={page}
+            totalPages={meta.totalPages}
+            totalItems={meta.total}
+            pageSize={20}
+            onPageChange={setPage}
+          />
+        </>
+      ) : (
+        <div className="kanban-board-container">
+          {kanbanColumns.map((col) => (
+            <div key={col.id} className="kanban-column">
+              <div className="kanban-column-header">
+                <span className="kanban-column-title">{col.title}</span>
+                <span className="kanban-column-badge">{col.leads.length}</span>
+              </div>
+              <div className="kanban-column-cards">
+                {col.leads.length === 0 ? (
+                  <div style={{ padding: '36px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                    No records in this stage
+                  </div>
+                ) : (
+                  col.leads.map((l) => (
+                    <div
+                      key={l._id}
+                      className="kanban-card"
+                      onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
+                    >
+                      <div className="kanban-card-title">
+                        <span style={{ fontWeight: 600 }}>{l.name}</span>
+                        <StatusBadge status={l.status} />
+                      </div>
+                      <div className="kanban-card-meta">
+                        <span className="kanban-card-tag">
+                          <Globe size={11} color="var(--primary)" />
+                          {l.targetCountry || 'Any Country'}
+                        </span>
+                        <span className="kanban-card-tag">
+                          <Calendar size={11} />
+                          {l.targetIntake || 'Fall 2026'}
+                        </span>
+                      </div>
+                      {l.targetCourse && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 500,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          🎓 {l.targetCourse}
+                        </div>
+                      )}
+                      <div className="kanban-card-footer">
+                        <span>
+                          {l.source ? String(l.source).replace(/_/g, ' ') : 'Inquiry'}
+                        </span>
+                        <span>
+                          {l.createdAt ? new Date(l.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* --- Create Lead Drawer --- */}
       <Drawer

@@ -186,7 +186,7 @@ export class EmailService {
     const loginUrl = 'https://overseas-crm-skxf.vercel.app/dashboard';
 
     switch (trigger) {
-      case 'lead.created': {
+      case 'student.created': {
         const targetCountry = escapeHtml(payload.targetCountry || 'Abroad');
         const targetCourse = escapeHtml(payload.targetCourse || 'your desired program');
         const username = escapeHtml(payload.portalUsername || payload.studentEmail || payload.email || '');
@@ -196,7 +196,7 @@ export class EmailService {
           ? `<div style="background-color:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:20px;margin:24px 0;">
               <p style="margin:0 0 12px 0;font-size:13px;font-weight:700;color:#0F172A;text-transform:uppercase;letter-spacing:0.5px;">Your Student Portal Login Credentials</p>
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="font-size:14px;color:#334155;">
-                <tr><td style="padding:6px 0;color:#64748B;width:140px;">Portal Login:</td><td style="padding:6px 0;"><a href="${loginUrl}" style="color:#0057F8;text-decoration:none;font-weight:600;">${loginUrl}</a></td></tr>
+                <tr><td style="padding:6px 0;color:#64748B;width:140px;">Portal Login:</td><td style="padding:6px 0;"><a href="${portalUrl}" style="color:#0057F8;text-decoration:none;font-weight:600;">${portalUrl}</a></td></tr>
                 <tr><td style="padding:6px 0;color:#64748B;">Username / Email:</td><td style="padding:6px 0;font-weight:600;color:#0F172A;">${username}</td></tr>
                 <tr><td style="padding:6px 0;color:#64748B;">Temporary Password:</td><td style="padding:6px 0;"><span style="font-family:monospace;font-size:15px;font-weight:700;background-color:#EEF4FF;color:#0057F8;padding:3px 8px;border-radius:4px;border:1px solid #D0E2FF;">${escapeHtml(tempPassword)}</span></td></tr>
               </table>
@@ -205,23 +205,43 @@ export class EmailService {
           : '';
 
         const credentialsText = tempPassword
-          ? `\n\nYour Student Portal Login Credentials:\nPortal Login: ${loginUrl}\nUsername: ${payload.portalUsername || payload.studentEmail || payload.email}\nTemporary Password: ${tempPassword}\n`
+          ? `\n\nYour Student Portal Login Credentials:\nPortal Login: ${portalUrl}\nUsername: ${username}\nTemporary Password: ${tempPassword}\n`
           : '';
 
         return {
-          subject: 'Welcome to IIEC Overseas Education',
-          preheader: 'Welcome to IIEC! Your student portal login credentials are ready.',
-          title: 'Welcome to Your Study Abroad Journey',
-          badge: 'Registration Confirmed',
+          subject: 'Congratulations! Your IIEC Student Portal Account is Ready',
+          preheader: 'Your profile has been approved! Here are your Student Portal login credentials.',
+          title: 'Welcome to IIEC Overseas Education',
+          badge: 'Student Account Activated',
+          badgeBg: '#F0FDF4',
+          badgeColor: '#166534',
+          bodyHtml: `<p>Dear ${studentName},</p>
+            <p>Congratulations! Following your counselling session, your student profile for studying ${targetCourse} in ${targetCountry} has been officially approved and activated.</p>
+            ${credentialsHtml}
+            <p>You can now log in to your dedicated student portal to upload documents, track university applications, view offer letters, and message your advisor directly.</p>`,
+          ctaText: 'Access Student Portal',
+          ctaUrl: portalUrl,
+          textTwin: `Dear ${studentName},\n\nCongratulations! Your student profile for studying ${targetCourse} in ${targetCountry} has been approved.${credentialsText}\nLog in to your portal at ${portalUrl}\n\nWarm regards,\nIIEC Overseas Education`,
+        };
+      }
+
+      case 'lead.created': {
+        const targetCountry = escapeHtml(payload.targetCountry || 'Abroad');
+        const targetCourse = escapeHtml(payload.targetCourse || 'your desired program');
+
+        return {
+          subject: 'Thank You for Your Inquiry - IIEC Overseas Education',
+          preheader: 'We have received your study abroad inquiry. A counsellor will contact you shortly.',
+          title: 'Inquiry Received',
+          badge: 'Inquiry Registered',
           badgeBg: '#EEF4FF',
           badgeColor: '#0057F8',
           bodyHtml: `<p>Dear ${studentName},</p>
-            <p>Thank you for connecting with IIEC Overseas Education. We are thrilled to partner with you on your goal of studying ${targetCourse} in ${targetCountry}.</p>
-            ${credentialsHtml}
-            <p>Your dedicated counsellor will contact you shortly to review your academic aspirations, shortlist top university programs, and assist with document preparation.</p>`,
-          ctaText: 'Log In to Student Portal',
-          ctaUrl: loginUrl,
-          textTwin: `Dear ${studentName},\n\nThank you for connecting with IIEC Overseas Education! We are thrilled to partner with you on your journey to study ${targetCourse} in ${targetCountry}.\n\nYour assigned counsellor will contact you shortly.${credentialsText}\nLog in to your portal at ${loginUrl}\n\nWarm regards,\nIIEC Overseas Education`,
+            <p>Thank you for connecting with IIEC Overseas Education. We have received your inquiry regarding studying ${targetCourse} in ${targetCountry}.</p>
+            <p>Your dedicated counsellor will contact you shortly to review your academic aspirations, answer questions, and schedule a preliminary counselling session.</p>`,
+          ctaText: 'Visit IIEC Website',
+          ctaUrl: 'https://iiec.in',
+          textTwin: `Dear ${studentName},\n\nThank you for connecting with IIEC Overseas Education! We have received your inquiry to study ${targetCourse} in ${targetCountry}.\n\nYour assigned counsellor will contact you shortly to guide you through the process.\n\nWarm regards,\nIIEC Overseas Education`,
         };
       }
 

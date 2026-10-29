@@ -1,196 +1,1702 @@
 /* ==========================================================================
-   STUDENT PORTAL FEATURE - SCOPED MOBILE RESPONSIVENESS STYLES
-   STUDENT PORTAL FEATURE - UNIVERSAL RESPONSIVE STYLES
+   STUDENT PORTAL & DASHBOARD - ENTERPRISE CRM DESIGN SYSTEM
+   Optimized for High Accessibility (WCAG AA), Bento Grid, & Fluid Responsiveness
    ========================================================================== */
 
-/* Main Student Portal Container */
-/* Root Container with Ultrawide Constraint */
+/* Root Container with Responsive Constraints */
 .student-portal-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   width: 100%;
-  max-width: 100%;
   max-width: 1400px;
   margin: 0 auto;
   box-sizing: border-box;
+  padding: 0 4px 40px 4px;
 }
 
-/* Header Welcome Card */
-.student-welcome-card {
+/* --------------------------------------------------------------------------
+   1. HERO BANNER & WELCOME HEADER
+   -------------------------------------------------------------------------- */
+.student-hero-banner {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  padding: 22px 26px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.student-hero-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
 }
 
-/* Responsive Welcome Typography */
-.student-header-top {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* Responsive Welcome Typography with Clamp */
-.student-welcome-title {
-  font-size: clamp(17px, 3.5vw, 20px);
-  font-size: clamp(16px, 2.5vw, 22px);
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.25;
-}
-
-.student-welcome-subtext {
-  font-size: 12.5px;
-  font-size: clamp(11.5px, 1.2vw, 13px);
-  color: var(--text-secondary);
-  margin-top: 4px;
-  line-height: 1.4;
-}
-
-/* Scrollable Touch-Friendly & Sticky Tab Bar */
-/* Scrollable & Sticky Tab Bar */
-.student-tabs-header {
+.student-hero-profile-group {
   display: flex;
   align-items: center;
-  gap: 4px;
-  gap: 6px;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 16px;
-  overflow-x: auto;
-  white-space: nowrap;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  /* Firefox */
-  -ms-overflow-style: none;
-  /* IE/Edge */
-  padding-bottom: 2px;
+  gap: 16px;
+  min-width: 0;
 }
 
-.student-tabs-header::-webkit-scrollbar {
-  display: none;
-  /* Chrome/Safari */
-}
-
-.student-tab-btn {
-  padding: 10px 14px;
-  font-size: 13px;
-  font-size: clamp(12px, 1.1vw, 13.5px);
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  user-select: none;
+.student-hero-avatar-wrapper {
+  position: relative;
   flex-shrink: 0;
 }
 
-.student-tab-btn:hover {
-  color: var(--text-primary);
+.student-hero-avatar-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--primary, #0057F8);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(0, 87, 248, 0.22);
 }
 
-.student-tab-btn.active {
+.student-hero-status-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.student-hero-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.student-hero-greeting-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.student-hero-greeting-time {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #6B7280);
+}
+
+.student-hero-stage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #EEF2FF;
+  color: #4338CA;
+  border: 1px solid #C7D2FE;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.student-hero-stage-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4F46E5;
+}
+
+.student-hero-greeting {
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.student-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.student-btn-label-desktop {
+  display: inline;
+}
+
+.student-btn-label-mobile {
+  display: none;
+}
+
+/* Structured 4-Column Attribute Matrix (Desktop) */
+.student-hero-matrix {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #F3F4F6);
+}
+
+.student-hero-matrix-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  min-width: 0;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.student-hero-matrix-item:hover {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+.student-hero-matrix-highlight {
+  background: #FFFBEB !important;
+  border-color: #FDE68A !important;
+}
+
+.student-hero-matrix-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #EEF2FF;
   color: var(--primary, #0057F8);
-  border-bottom-color: var(--primary, #0057F8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-hero-matrix-highlight .student-hero-matrix-icon {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.student-hero-matrix-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.student-hero-matrix-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #6B7280);
+  line-height: 1.2;
+}
+
+.student-hero-matrix-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.student-hero-matrix-highlight .student-hero-matrix-value {
+  color: #B45309;
+  font-weight: 800;
+}
+
+/* Fallback legacy pills support if needed */
+.student-hero-meta-pills {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-secondary, #4B5563);
+  margin-top: 4px;
+}
+
+.student-hero-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border-color, #E5E7EB);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.student-hero-meta-pill strong {
+  color: var(--text-primary, #111827);
   font-weight: 600;
 }
 
-/* Dashboard 2-Column Grid to 1-Column Stacking */
-/* Multi-Column Grid Layouts */
-.student-grid-2col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  width: 100%;
-}
-
-/* Document & Action List Items on Mobile */
-/* Document & Action List Items */
-.student-action-item {
-  padding: 12px 14px;
-  background-color: var(--bg-subtle);
-  border-radius: var(--radius-md);
+/* --------------------------------------------------------------------------
+   2. STAGE SPOTLIGHT (IMMEDIATE NEXT BEST ACTION)
+   -------------------------------------------------------------------------- */
+.student-spotlight-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 87, 248, 0.2);
+  border-left: 5px solid var(--primary, #0057F8);
+  border-radius: var(--radius-lg, 12px);
+  padding: 18px 22px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  gap: 12px;
+  gap: 20px;
+  box-shadow: var(--shadow-sm);
+  background-color: #FAFCFF;
+  position: relative;
+  transition: all 0.2s ease;
 }
 
-/* Mobile Responsive Table Wrapper */
-.student-table-responsive {
+.student-spotlight-card:hover {
+  border-color: rgba(0, 87, 248, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 87, 248, 0.08);
+}
+
+.student-spotlight-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.student-spotlight-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--primary-light, #EFF6FF);
+  color: var(--primary, #0057F8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-spotlight-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.student-spotlight-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary, #0057F8);
+}
+
+.student-spotlight-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-spotlight-desc {
+  font-size: 13px;
+  color: var(--text-secondary, #4B5563);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.student-spotlight-cta {
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   3. ROADMAP & LIFECYCLE STEPPER
+   -------------------------------------------------------------------------- */
+.student-lifecycle-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  padding: 18px 22px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.student-lifecycle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.student-lifecycle-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.student-lifecycle-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-lifecycle-stage-pill {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary, #0057F8);
+  background: var(--primary-light, #EFF6FF);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.student-lifecycle-percentage {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary, #0057F8);
+}
+
+/* Stepper Track with continuous horizontal line passing through checkpoint centers */
+.student-stepper-wrapper {
   width: 100%;
   overflow-x: auto;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 0;
+}
+
+.student-stepper-wrapper::-webkit-scrollbar {
+  display: none !important;
+  height: 0px !important;
+  width: 0px !important;
+}
+
+.student-stepper-track {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.student-stepper-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.student-stepper-node-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  justify-content: center;
+  height: 32px;
+}
+
+.student-stepper-line {
+  flex: 1;
+  height: 3px;
+  background-color: var(--border-color, #E5E7EB);
+  transition: background-color 0.2s ease;
+}
+
+.student-stepper-line.is-active {
+  background-color: var(--success, #10B981);
+}
+
+.student-stepper-line.is-hidden {
+  visibility: hidden;
+}
+
+.student-stepper-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  border: 2px solid var(--border-color, #E5E7EB);
+  color: var(--text-muted, #9CA3AF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.student-stepper-step:hover .student-stepper-circle {
+  border-color: var(--primary, #0057F8);
+  transform: scale(1.08);
+}
+
+/* Completed Step */
+.student-stepper-step.is-completed .student-stepper-circle {
+  background-color: var(--success, #10B981);
+  border-color: var(--success, #10B981);
+  color: #FFFFFF;
+}
+
+/* Current Active Step */
+.student-stepper-step.is-current .student-stepper-circle {
+  background-color: var(--primary, #0057F8);
+  border-color: var(--primary, #0057F8);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(0, 87, 248, 0.2);
+}
+
+/* Locked Step */
+.student-stepper-step.is-locked .student-stepper-circle {
+  background-color: var(--bg-hover, #F3F4F6);
+  border-color: var(--border-color, #E5E7EB);
+  color: var(--text-muted, #9CA3AF);
+}
+
+.student-stepper-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #4B5563);
+  text-align: center;
+  margin-top: 6px;
+  line-height: 1.25;
+  padding: 0 2px;
+  word-break: break-word;
+  transition: color 0.15s ease;
+}
+
+.student-stepper-step:hover .student-stepper-label {
+  color: var(--primary, #0057F8);
+}
+
+.student-stepper-step.is-current .student-stepper-label {
+  font-weight: 700;
+  color: var(--primary, #0057F8);
+}
+
+.student-stepper-step.is-completed .student-stepper-label {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.student-stepper-step.is-locked .student-stepper-label {
+  color: var(--text-muted, #9CA3AF);
+}
+
+.student-accordion-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 6px 0 0 0;
+  color: var(--primary, #0057F8);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.student-accordion-btn:hover {
+  color: var(--primary-hover, #0047D4);
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   4. PRIMARY TAB NAVIGATION BAR
+   -------------------------------------------------------------------------- */
+.student-nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  padding: 6px;
+  box-shadow: var(--shadow-xs);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Progress Stepper Mobile Summary Card & Accordion */
-.student-progress-summary-card {
+.student-nav-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.student-nav-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #4B5563);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  flex-shrink: 0;
+  min-height: 38px;
+}
+
+.student-nav-item:hover {
+  background: var(--bg-hover, #F3F4F6);
+  color: var(--text-primary, #111827);
+}
+
+.student-nav-item.is-active {
+  background: var(--primary, #0057F8);
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 87, 248, 0.25);
+}
+
+.student-nav-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+
+.student-nav-item.is-active .student-nav-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+/* --------------------------------------------------------------------------
+   5. BENTO GRID KPI METRIC CARDS
+   -------------------------------------------------------------------------- */
+.student-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.student-bento-card {
   background: #FFFFFF;
   border: 1px solid var(--border-color, #E5E7EB);
-  border-radius: 12px;
-  padding: 14px 16px;
-  padding: 16px;
+  border-radius: var(--radius-lg, 12px);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.student-bento-card:hover {
+  border-color: rgba(0, 87, 248, 0.35);
+  box-shadow: 0 6px 16px -2px rgba(0, 87, 248, 0.08), 0 2px 4px rgba(0, 0, 0, 0.03);
+  transform: translateY(-2px);
+}
+
+.student-bento-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: 12px;
 }
 
-.student-progress-bar-bg {
+.student-bento-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.student-bento-card:hover .student-bento-icon-box {
+  transform: scale(1.05);
+}
+
+.student-bento-icon-box.blue {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.student-bento-icon-box.green {
+  background: #ECFDF5;
+  color: #059669;
+}
+
+.student-bento-icon-box.purple {
+  background: #FAF5FF;
+  color: #7C3AED;
+}
+
+.student-bento-icon-box.amber {
+  background: #FFFBEB;
+  color: #D97706;
+}
+
+.student-bento-icon-box.sky {
+  background: #F0F9FF;
+  color: #0284C7;
+}
+
+.student-bento-icon-box.indigo {
+  background: #EEF2FF;
+  color: #4F46E5;
+}
+
+.student-bento-card-middle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.student-bento-metric {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.student-bento-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.student-bento-subtext {
+  font-size: 12px;
+  color: var(--text-secondary, #6B7280);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.student-bento-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light, #F3F4F6);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary, #0057F8);
+}
+
+.student-bento-card-footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: gap 0.15s ease;
+}
+
+.student-bento-card:hover .student-bento-card-footer span {
+  gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   5b. ADMISSIONS READINESS INDEX CARD
+   -------------------------------------------------------------------------- */
+.student-readiness-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 14px);
+  padding: 20px 22px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.student-readiness-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.student-readiness-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-readiness-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background-color: var(--primary-light, #EFF6FF);
+  color: var(--primary, #0057F8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-readiness-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-readiness-subtitle {
+  font-size: 12px;
+  color: var(--text-muted, #6B7280);
+  margin: 2px 0 0 0;
+}
+
+.student-readiness-body {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+@media (max-width: 640px) {
+  .student-readiness-body {
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+}
+
+.student-readiness-gauge-wrapper {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.student-readiness-gauge-svg {
+  transform: rotate(-90deg);
+}
+
+.student-readiness-gauge-bg {
+  fill: none;
+  stroke: var(--bg-hover, #F3F4F6);
+}
+
+.student-readiness-gauge-fill {
+  fill: none;
+  stroke: var(--primary, #0057F8);
+  transition: stroke-dashoffset 0.6s ease;
+}
+
+.student-readiness-gauge-text {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.student-readiness-score-num {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--text-primary, #111827);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.student-readiness-score-denom {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted, #9CA3AF);
+  margin-left: 1px;
+}
+
+.student-readiness-breakdown {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
+}
+
+.student-readiness-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-readiness-bar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary, #4B5563);
+  font-weight: 500;
+}
+
+.student-readiness-track {
   height: 6px;
   background-color: var(--bg-hover, #F3F4F6);
   border-radius: 999px;
   overflow: hidden;
 }
 
-.student-progress-bar-fill {
+.student-readiness-fill {
   height: 100%;
-  background-color: var(--primary, #0057F8);
   border-radius: 999px;
-  transition: width 0.3s ease;
+  transition: width 0.4s ease;
 }
 
-.student-accordion-toggle {
+.student-readiness-fill.success {
+  background-color: #10B981;
+}
+
+.student-readiness-fill.primary {
+  background-color: var(--primary, #0057F8);
+}
+
+.student-readiness-fill.warning {
+  background-color: #F59E0B;
+}
+
+.student-readiness-fill.neutral {
+  background-color: #9CA3AF;
+}
+
+.student-readiness-callout {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  background: none;
-  border: none;
-  padding: 8px 0 0 0;
-  color: var(--primary, #0057F8);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
+  align-items: center;
+  padding: 10px 14px;
+  background-color: var(--bg-subtle, #F8FAFC);
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* --------------------------------------------------------------------------
+   6. 2-COLUMN SECTION (COUNSELLOR + TASKS)
+   -------------------------------------------------------------------------- */
+.student-dual-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
   width: 100%;
 }
 
-/* Empty State Micro-Card */
-.student-empty-microcard {
-  padding: 24px 16px;
+/* Counsellor Card Component Styling */
+.student-counsellor-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.student-counsellor-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.student-counsellor-card.empty-state {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  background-color: var(--bg-subtle, #F9FAFB);
+  border-style: dashed;
+}
+
+.student-counsellor-avatar-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-hover, #F3F4F6);
+  color: var(--text-muted, #9CA3AF);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-counsellor-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.student-counsellor-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.student-counsellor-avatar-initials {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--primary, #0057F8);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.student-counsellor-avatar-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.student-counsellor-status-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--success, #10B981);
+  border: 2px solid #FFFFFF;
+}
+
+.student-counsellor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.student-counsellor-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+}
+
+.student-counsellor-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary, #4B5563);
+  font-weight: 600;
+}
+
+.student-counsellor-online-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #065F46;
+  background: #ECFDF5;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.student-counsellor-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-counsellor-contact-list {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.student-counsellor-contact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary, #4B5563);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.student-counsellor-contact-item:hover {
+  color: var(--primary, #0057F8);
+  text-decoration: underline;
+}
+
+.student-counsellor-upcoming-session {
+  background: var(--bg-subtle, #F9FAFB);
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.student-counsellor-session-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, #4B5563);
+}
+
+.student-counsellor-meet-link {
+  color: var(--primary, #0057F8);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.student-counsellor-meet-link:hover {
+  text-decoration: underline;
+}
+
+/* Tasks Card Component Styling */
+.student-tasks-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  padding: 20px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.student-tasks-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #E5E7EB);
+}
+
+.student-tasks-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.student-tasks-icon-box {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--primary-light, #EFF6FF);
+  color: var(--primary, #0057F8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.student-tasks-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-tasks-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary, #6B7280);
+  margin: 0;
+}
+
+.student-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 290px;
+  overflow-y: auto;
+}
+
+.student-task-item {
+  padding: 12px 14px;
+  background: var(--bg-subtle, #F9FAFB);
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.15s ease;
+}
+
+.student-task-item:hover {
+  border-color: var(--border-dark, #D1D5DB);
+  background: #FFFFFF;
+}
+
+.student-task-item.overdue {
+  border-color: #FECACA;
+  background: #FEF2F2;
+}
+
+.student-task-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-task-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.student-task-item-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-task-item-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #4B5563);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.student-task-item-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--text-muted, #9CA3AF);
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.student-task-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.student-task-due.is-overdue {
+  color: var(--danger, #EF4444);
+  font-weight: 600;
+}
+
+.student-task-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: capitalize;
+}
+
+.student-tasks-empty-state {
   text-align: center;
+  padding: 30px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  background-color: var(--bg-subtle, #F9FAFB);
-  border: 1px dashed var(--border-color, #E5E7EB);
+}
+
+.student-tasks-empty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ECFDF5;
+  color: #10B981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.student-tasks-empty-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-tasks-empty-subtext {
+  font-size: 12.5px;
+  color: var(--text-secondary, #6B7280);
+  max-width: 320px;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.student-tasks-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-tasks-skeleton-item {
+  height: 52px;
+  border-radius: 8px;
+  background: var(--bg-hover, #F3F4F6);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.3; }
+}
+
+/* --------------------------------------------------------------------------
+   7. FULL-PAGE UNIVERSITY SHOWCASE & COUNSELLOR-STYLE CARDS
+   -------------------------------------------------------------------------- */
+.student-univ-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.student-univ-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.student-univ-showcase-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.student-univ-showcase-banner {
+  position: relative;
+  height: 240px;
+  width: 100%;
+  background-color: #0F172A;
+  overflow: hidden;
+}
+
+.student-univ-showcase-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.student-univ-partner-badge {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  background-color: rgba(16, 185, 129, 0.95);
+  backdrop-filter: blur(4px);
+  color: #FFFFFF;
+  border-radius: 9999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.student-univ-ranking-chip {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  color: #FBBF24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 9999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.student-univ-showcase-body {
+  padding: 0 28px 28px 28px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.student-univ-showcase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: -42px;
+}
+
+.student-univ-showcase-logo {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+  background-color: #FFFFFF;
+  padding: 6px;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.student-univ-showcase-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   border-radius: 12px;
 }
 
-/* Upload Dropzone Styles */
+.student-univ-showcase-logo-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background-color: var(--primary-light, #EFF6FF);
+  color: var(--primary, #0057F8);
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.student-univ-showcase-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.student-univ-showcase-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.student-univ-showcase-title {
+  font-size: clamp(20px, 3vw, 26px);
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.student-univ-showcase-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary, #4B5563);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+/* 4-Stat Box with Dividers */
+.student-univ-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background-color: var(--bg-subtle, #F8FAFC);
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.student-univ-stat-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 0 12px;
+  border-right: 1px solid var(--border-color, #E5E7EB);
+}
+
+.student-univ-stat-col:last-child {
+  border-right: none;
+}
+
+.student-univ-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #9CA3AF);
+}
+
+.student-univ-stat-val {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+}
+
+.student-univ-stat-val.gold {
+  color: #D97706;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.student-univ-stat-val.blue {
+  color: var(--primary, #0057F8);
+}
+
+/* Gallery Strip */
+.student-univ-gallery-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.student-univ-gallery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.student-univ-gallery-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.student-univ-gallery-count {
+  font-size: 12px;
+  color: var(--text-muted, #9CA3AF);
+  font-weight: 500;
+}
+
+.student-univ-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.student-univ-gallery-thumb {
+  height: 140px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  border: 1px solid var(--border-color, #E5E7EB);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.student-univ-gallery-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.student-univ-gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.student-univ-gallery-thumb:hover img {
+  transform: scale(1.04);
+}
+
+/* Counsellor-Dashboard Style Grid */
+.student-counsellor-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.student-counsellor-uni-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: 14px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+
+.student-counsellor-uni-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: rgba(0, 87, 248, 0.35);
+}
+
+.student-counsellor-uni-card.is-active-featured {
+  border-color: var(--primary, #0057F8);
+  box-shadow: 0 0 0 2px rgba(0, 87, 248, 0.25);
+}
+
+.student-counsellor-uni-card.is-confirmed-choice {
+  border-color: #10B981;
+}
+
+.student-uni-card-banner {
+  position: relative;
+  height: 130px;
+  width: 100%;
+  background-color: #0F172A;
+  overflow: hidden;
+}
+
+.student-uni-card-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.student-uni-card-logo {
+  margin-top: -28px;
+  margin-left: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background-color: #FFFFFF;
+  padding: 4px;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.student-uni-card-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.student-uni-card-body {
+  padding: 12px 16px 14px 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-uni-card-actions {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-color, #E5E7EB);
+  background-color: var(--bg-subtle, #F9FAFB);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   8. ENHANCED DOCUMENT LOCKER
+   -------------------------------------------------------------------------- */
+.student-docs-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.student-doc-summary-pill {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-doc-summary-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-doc-summary-count {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  line-height: 1;
+}
+
+.student-doc-summary-label {
+  font-size: 11.5px;
+  color: var(--text-secondary, #6B7280);
+  margin-top: 2px;
+}
+
+.student-doc-rejection-callout {
+  padding: 8px 12px;
+  background-color: #FEF2F2;
+  border-radius: 6px;
+  border: 1px solid #FECACA;
+  color: var(--danger, #EF4444);
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+/* Dropzone & Progress */
 .student-dropzone {
   border: 2px dashed var(--border-color, #D1D5DB);
   border-radius: var(--radius-lg, 10px);
@@ -213,8 +1719,8 @@
 }
 
 .student-dropzone-icon {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background-color: #DBEAFE;
   color: var(--primary, #0057F8);
@@ -252,102 +1758,384 @@
   transition: width 0.3s ease;
 }
 
-/* ==========================================================================
-   MOBILE SPECIFIC OVERRIDES (<= 768px)
-   BREAKPOINT OVERRIDES
-   ========================================================================== */
+/* --------------------------------------------------------------------------
+   9. CHAT CONVERSATION THREAD
+   -------------------------------------------------------------------------- */
+.student-tab-animated-pane {
+  animation: tabSlideFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 
-/* 1. Ultrawide Displays (> 1440px) */
-@media (min-width: 1441px) {
-  .student-portal-container {
-    gap: 24px;
+@keyframes tabSlideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-/* 2. Tablets & Small Laptops (769px - 1024px) */
-@media (max-width: 1024px) and (min-width: 769px) {
-  .student-grid-2col {
-    gap: 16px;
+.student-chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-radius: var(--radius-lg, 12px);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  scroll-margin-top: 80px;
+}
+
+@keyframes chatAttentionPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 87, 248, 0.45), 0 4px 12px rgba(0, 87, 248, 0.08);
+    border-color: var(--primary, #0057F8);
+    transform: translateY(0);
   }
-  .student-welcome-card {
-    gap: 14px;
+  30% {
+    box-shadow: 0 0 0 8px rgba(0, 87, 248, 0.2), 0 8px 24px rgba(0, 87, 248, 0.15);
+    border-color: var(--primary, #0057F8);
+    transform: translateY(-3px);
+  }
+  60% {
+    box-shadow: 0 0 0 4px rgba(0, 87, 248, 0.1), 0 6px 16px rgba(0, 87, 248, 0.08);
+    border-color: var(--primary, #0057F8);
+    transform: translateY(-1px);
+  }
+  100% {
+    box-shadow: var(--shadow-xs);
+    border-color: var(--border-color, #E5E7EB);
+    transform: translateY(0);
   }
 }
 
-/* 3. Mobile Screens (<= 768px) */
+.student-chat-container.highlight-pulse {
+  animation: chatAttentionPulse 1.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.student-chat-messages-box {
+  min-height: 240px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 16px;
+  background-color: var(--bg-app, #FAFAFB);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-light, #F3F4F6);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.student-chat-bubble {
+  max-width: 75%;
+  padding: 11px 15px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.student-chat-bubble.student {
+  align-self: flex-end;
+  background: var(--primary, #0057F8);
+  color: #FFFFFF;
+  border-bottom-right-radius: 3px;
+}
+
+.student-chat-bubble.counsellor {
+  align-self: flex-start;
+  background: #FFFFFF;
+  color: var(--text-primary, #111827);
+  border: 1px solid var(--border-color, #E5E7EB);
+  border-bottom-left-radius: 3px;
+}
+
+.student-chat-meta {
+  font-size: 11px;
+  margin-bottom: 4px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.student-chat-bubble.student .student-chat-meta {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.student-chat-bubble.counsellor .student-chat-meta {
+  color: var(--text-muted, #6B7280);
+}
+
+/* --------------------------------------------------------------------------
+   10. RESPONSIVE BREAKPOINTS (Mobile, Tablet, Desktop)
+   -------------------------------------------------------------------------- */
+
+/* Tablet & Smaller Laptops (<= 1024px) */
+@media (max-width: 1024px) {
+  .student-bento-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-docs-summary-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .student-dual-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile Screens (<= 768px) */
 @media (max-width: 768px) {
   .student-portal-container {
-    gap: 14px;
+    gap: 16px;
+    padding: 0 12px 92px 12px !important;
   }
 
-  /* Header & Greeting Compact Single-Line on Mobile */
-  .student-welcome-card {
+  .student-univ-page-header {
     flex-direction: column;
     align-items: stretch;
     padding: 14px 16px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color, #E5E7EB);
     gap: 12px;
   }
 
-  .student-header-top {
-    display: flex;
-    align-items: center;
-    align-items: flex-start;
-    justify-content: space-between;
-    width: 100%;
-    gap: 10px;
-  }
-
-  .student-welcome-title {
-    font-size: 16px;
-    font-weight: 700;
-  }
-
-  .student-welcome-subtext {
-    font-size: 12px;
-    margin-top: 2px;
-  }
-
-  /* Sticky Horizontal Tab Sub-Header */
-  .student-tabs-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: #FFFFFF;
-    margin-left: -16px;
-    margin-right: -16px;
-    padding-left: 16px;
-    padding-right: 16px;
-    padding-top: 6px;
-    padding-bottom: 6px;
-    margin-bottom: 14px;
-    border-bottom: 1px solid var(--border-color, #E5E7EB);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
-  }
-
-  /* Standardized Card Rhythm */
-  .student-portal-container .card {
+  .student-hero-banner {
+    padding: 16px 14px;
+    gap: 14px;
     border-radius: 12px;
-    border: 1px solid var(--border-color, #E5E7EB);
-    padding: 14px 16px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   }
 
-  /* Grid 2-Col to 1-Col Stacking */
-  .student-grid-2col {
-    grid-template-columns: 1fr;
+  .student-hero-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .student-hero-profile-group {
+    align-items: center;
+    gap: 12px;
+  }
+
+  .student-hero-avatar-box {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+    border-radius: 50%;
+  }
+
+  .student-hero-status-dot {
+    width: 12px;
+    height: 12px;
+    border-width: 2px;
+  }
+
+  .student-hero-greeting {
+    font-size: 18px;
+  }
+
+  .student-hero-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .student-hero-actions .btn {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 13px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .student-btn-label-desktop {
+    display: none;
+  }
+
+  .student-btn-label-mobile {
+    display: inline;
+  }
+
+  /* 2x2 Mobile Attribute Matrix */
+  .student-hero-matrix {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding-top: 12px;
+  }
+
+  .student-hero-matrix-item {
+    padding: 8px 10px;
+    gap: 8px;
+    border-radius: 8px;
+  }
+
+  .student-hero-matrix-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+  }
+
+  .student-hero-matrix-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .student-hero-matrix-label {
+    font-size: 9.5px;
+  }
+
+  .student-hero-matrix-value {
+    font-size: 12px;
+  }
+
+  .student-spotlight-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px 16px;
     gap: 14px;
   }
 
-  /* Document / Action items vertical stacking */
-  .student-action-item {
-    flex-direction: column;
-    align-items: stretch !important;
-    gap: 10px;
+  .student-spotlight-cta {
+    width: 100%;
   }
 
-  /* Full-width Touch Targets */
+  .student-spotlight-cta .btn {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .student-bento-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .student-bento-card {
+    padding: 16px;
+  }
+
+  .student-stepper-wrapper {
+    scroll-snap-type: x proximity;
+    scroll-padding: 0 16px;
+  }
+
+  .student-stepper-step {
+    scroll-snap-align: center;
+  }
+
+  .student-univ-stats-strip {
+    grid-template-columns: repeat(2, 1fr) !important;
+    row-gap: 12px;
+    padding: 12px 14px !important;
+  }
+
+  .student-univ-stat-col:nth-child(2) {
+    border-right: none;
+  }
+
+  .student-univ-gallery-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .student-univ-showcase-banner {
+    height: 180px !important;
+  }
+
+  .student-univ-showcase-logo {
+    width: 64px !important;
+    height: 64px !important;
+    margin-top: -32px !important;
+  }
+
+  .student-univ-showcase-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .student-univ-showcase-actions .btn {
+    width: 100% !important;
+    min-height: 42px !important;
+    justify-content: center !important;
+  }
+
+  .student-univ-showcase-body {
+    padding: 0 16px 20px 16px !important;
+  }
+
+  .student-counsellor-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .student-counsellor-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 16px !important;
+    gap: 14px !important;
+  }
+
+  .student-counsellor-action-row {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .student-counsellor-action-row .btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  .student-uni-card-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .student-uni-card-actions .btn {
+    width: 100% !important;
+    min-height: 40px !important;
+    justify-content: center !important;
+  }
+
+  .student-nav-bar {
+    position: sticky;
+    top: 56px;
+    z-index: 80;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 8px 12px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color, #E5E7EB);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  }
+
+  .student-nav-item {
+    min-height: 42px;
+    padding: 8px 14px;
+    font-size: 13px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .student-docs-summary-strip {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .student-chat-bubble {
+    max-width: 90%;
+  }
+
   .student-card-btn-full {
     width: 100% !important;
     min-height: 44px !important;
@@ -355,24 +2143,21 @@
   }
 }
 
-/* 4. Ultra-Small Mobile Devices (<= 380px) */
-@media (max-width: 380px) {
-  .student-welcome-card {
-    padding: 12px;
+/* Very Small Mobile (< 400px) */
+@media (max-width: 400px) {
+  .student-docs-summary-strip {
+    grid-template-columns: 1fr;
   }
+}
 
-  .student-portal-container .card {
-    padding: 12px;
-  }
-
-  .student-action-item {
-    padding: 10px;
-  }
-
-  .student-tabs-header {
-    margin-left: -12px;
-    margin-right: -12px;
-    padding-left: 12px;
-    padding-right: 12px;
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

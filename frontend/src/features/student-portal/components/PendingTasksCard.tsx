@@ -1,21 +1,23 @@
 import React from 'react';
-import { ListTodo, CheckCircle2, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Calendar, AlertCircle, Clock, CheckSquare2 } from 'lucide-react';
 import { Task, TaskStatus, TaskPriority } from '../../../types';
 import { Badge } from '../../../components/Badge';
 
 interface PendingTasksCardProps {
   tasks?: Task[];
   loading?: boolean;
+  onNavigateToTasks?: () => void;
 }
 
 export const PendingTasksCard: React.FC<PendingTasksCardProps> = ({
   tasks,
   loading = false,
+  onNavigateToTasks,
 }) => {
   // Defensive filtering for non-completed pending tasks
   const pendingTasks = tasks?.filter((t) => t && t.status !== TaskStatus.COMPLETED) ?? [];
 
-  const getPriorityBadgeVariant = (priority: TaskPriority) => {
+  const getPriorityBadgeVariant = (priority?: TaskPriority) => {
     switch (priority) {
       case TaskPriority.URGENT:
         return 'danger';
@@ -29,65 +31,46 @@ export const PendingTasksCard: React.FC<PendingTasksCardProps> = ({
   };
 
   return (
-    <div
-      className="card"
-      style={{
-        backgroundColor: '#FFFFFF',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '18px 20px',
-        boxShadow: 'var(--shadow-xs)',
-      }}
-    >
-      {/* Card Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '16px',
-          paddingBottom: '12px',
-          borderBottom: '1px solid var(--border-color)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ListTodo size={18} color="var(--primary)" />
-          <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-            Pending Tasks
-          </h3>
+    <div className="student-tasks-card">
+      <div className="student-tasks-card-header">
+        <div className="student-tasks-card-title-group">
+          <div className="student-tasks-icon-box">
+            <CheckSquare2 size={18} />
+          </div>
+          <div>
+            <h3 className="student-tasks-title">Action Items & Tasks</h3>
+            <p className="student-tasks-subtitle">Assigned steps by your admissions advisor</p>
+          </div>
         </div>
-        <Badge variant={pendingTasks.length > 0 ? 'primary' : 'neutral'}>
-          {pendingTasks.length} {pendingTasks.length === 1 ? 'Action' : 'Actions'}
+        <Badge variant={pendingTasks.length > 0 ? 'primary' : 'success'}>
+          {pendingTasks.length === 0 ? 'All Done ✓' : `${pendingTasks.length} Pending`}
         </Badge>
       </div>
 
-      {/* Loading Skeleton */}
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px 0' }}>
-          <div style={{ height: '48px', backgroundColor: 'var(--bg-hover)', borderRadius: 'var(--radius-md)' }} />
-          <div style={{ height: '48px', backgroundColor: 'var(--bg-hover)', borderRadius: 'var(--radius-md)' }} />
+        <div className="student-tasks-skeleton-list">
+          <div className="student-tasks-skeleton-item" />
+          <div className="student-tasks-skeleton-item" />
         </div>
       ) : pendingTasks.length === 0 ? (
-        /* Empty State Micro-Card */
-        <div className="student-empty-microcard">
-          <CheckCircle2 size={32} style={{ color: 'var(--success)', opacity: 0.9 }} />
-          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            No pending tasks
+        <div className="student-tasks-empty-state">
+          <div className="student-tasks-empty-icon">
+            <CheckCircle2 size={32} />
           </div>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, maxWidth: '320px', lineHeight: 1.4 }}>
-            You are all caught up! Check back when your counsellor assigns new actions.
+          <h4 className="student-tasks-empty-title">All tasks are up to date!</h4>
+          <p className="student-tasks-empty-subtext">
+            No outstanding action items required from you right now. Your counsellor will post new tasks as your applications progress.
           </p>
         </div>
       ) : (
-        /* Task List Rendering */
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div className="student-tasks-list">
           {pendingTasks.map((task) => {
             const dueDateFormatted = task.dueDate
               ? new Date(task.dueDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
               : null;
 
             const isOverdue = task.dueDate && new Date(task.dueDate) < new Date();
@@ -95,71 +78,41 @@ export const PendingTasksCard: React.FC<PendingTasksCardProps> = ({
             return (
               <div
                 key={task._id}
-                style={{
-                  padding: '12px 14px',
-                  backgroundColor: 'var(--bg-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-color)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  transition: 'border-color 0.15s ease',
-                }}
+                className={`student-task-item ${isOverdue ? 'overdue' : ''}`}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-                  <div>
-                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {task.title}
-                    </div>
-                    {task.description && (
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: 1.4 }}>
-                        {task.description}
-                      </div>
-                    )}
+                <div className="student-task-item-content">
+                  <div className="student-task-item-header">
+                    <h5 className="student-task-item-title">{task.title}</h5>
+                    <Badge variant={getPriorityBadgeVariant(task.priority)}>
+                      {task.priority || 'NORMAL'}
+                    </Badge>
                   </div>
-                  <Badge variant={getPriorityBadgeVariant(task.priority)}>
-                    {task.priority || 'MEDIUM'}
-                  </Badge>
-                </div>
 
-                {/* Footer metadata */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginTop: '4px',
-                    fontSize: '11.5px',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {task.description && (
+                    <p className="student-task-item-desc">{task.description}</p>
+                  )}
+
+                  <div className="student-task-item-footer">
                     {dueDateFormatted && (
-                      <span
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          color: isOverdue ? 'var(--danger)' : 'var(--text-muted)',
-                          fontWeight: isOverdue ? 600 : 400,
-                        }}
-                      >
+                      <span className={`student-task-due ${isOverdue ? 'is-overdue' : ''}`}>
                         {isOverdue ? <AlertCircle size={12} /> : <Calendar size={12} />}
                         Due: {dueDateFormatted}
                       </span>
                     )}
+
                     {task.type && (
-                      <span style={{ textTransform: 'capitalize' }}>
-                        • {task.type.replace(/_/g, ' ').toLowerCase()}
+                      <span className="student-task-type">
+                        <Clock size={12} />
+                        {task.type.replace(/_/g, ' ').toLowerCase()}
+                      </span>
+                    )}
+
+                    {task.createdByName && (
+                      <span className="student-task-author">
+                        By {task.createdByName}
                       </span>
                     )}
                   </div>
-
-                  {task.createdByName && (
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Assigned by {task.createdByName}
-                    </span>
-                  )}
                 </div>
               </div>
             );
@@ -169,4 +122,3 @@ export const PendingTasksCard: React.FC<PendingTasksCardProps> = ({
     </div>
   );
 };
-
