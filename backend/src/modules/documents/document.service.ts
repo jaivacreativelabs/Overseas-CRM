@@ -24,6 +24,21 @@ export class DocumentService {
       .lean();
   }
 
+  static async getAllDocuments(): Promise<any[]> {
+    const docs = await DocumentModel.find()
+      .populate('leadId', 'name email phone country stage status')
+      .sort({ updatedAt: -1 })
+      .lean();
+    return docs.map((d: any) => ({
+      ...d,
+      studentName: d.leadId?.name || 'Unknown Student',
+      studentEmail: d.leadId?.email,
+      studentPhone: d.leadId?.phone,
+      targetCountry: d.leadId?.country,
+      leadId: d.leadId?._id ? d.leadId._id.toString() : d.leadId?.toString(),
+    }));
+  }
+
   static async requestDocument(
     leadId: string,
     data: {

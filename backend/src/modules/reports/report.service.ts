@@ -133,6 +133,12 @@ export class ReportService {
       })
     );
 
+    const urgentTasks = await TaskModel.find({ status: TaskStatus.PENDING })
+      .populate('leadId', 'name email country stage')
+      .sort({ dueDate: 1, createdAt: -1 })
+      .limit(8)
+      .lean();
+
     return {
       kpis: {
         totalLeads,
@@ -146,6 +152,7 @@ export class ReportService {
       funnelStages,
       leadsByMonth,
       counsellorStats,
+      urgentTasks,
     };
   }
 }

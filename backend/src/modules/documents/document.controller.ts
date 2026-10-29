@@ -3,6 +3,15 @@ import { DocumentService } from './document.service';
 import { ApiResponse } from '../../utils/api-response';
 
 export class DocumentController {
+  static async getAllDocuments(req: Request, res: Response, next: NextFunction) {
+    try {
+      const docs = await DocumentService.getAllDocuments();
+      return ApiResponse.success(res, 'All documents fetched', docs);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getDocuments(req: Request, res: Response, next: NextFunction) {
     try {
       const docs = await DocumentService.getDocumentsForLead(
