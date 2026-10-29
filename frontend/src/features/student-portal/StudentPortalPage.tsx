@@ -2417,7 +2417,7 @@ export const StudentPortalPage: React.FC = () => {
                   header: 'ADVISOR',
                   render: (s: any) => (
                     <div>
-                      <strong>{s.counsellorName || lead?.counsellorId?.name || 'Sarah Jenkins'}</strong>
+                      <strong>{s.counsellorName || lead?.counsellorId?.name || 'Admissions Advisor'}</strong>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Education Advisor</div>
                     </div>
                   ),

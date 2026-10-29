@@ -931,8 +931,8 @@ export const VisaPage: React.FC = () => {
                   <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisa.visaType || 'Student Visa'}</div>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Assigned Counsellor:</span>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisa.counsellorName || 'Unassigned'}</div>
+                  <span style={{ color: 'var(--text-muted)' }}>Admissions Advisor:</span>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{selectedVisa.counsellorName || 'Admissions Advisory Team'}</div>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-muted)' }}>Submission Date:</span>

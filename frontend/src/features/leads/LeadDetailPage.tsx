@@ -1552,7 +1552,7 @@ export const LeadDetailPage: React.FC = () => {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      <span>Counsellor: <strong>{sess.counsellorName || lead.counsellorId?.name || 'Assigned Counsellor'}</strong></span>
+                      <span>Counsellor: <strong>{sess.counsellorName || lead.counsellorId?.name || 'Admissions Advisor'}</strong></span>
                       {sess.googleMeetLink && (
                         <a
                           href={sess.googleMeetLink}

@@ -443,7 +443,7 @@ export const CounsellingPage: React.FC = () => {
                       {s.studentName}
                     </h3>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Advisor: {s.counsellorName || 'Assigned Staff'}
+                      Advisor: {s.counsellorName || 'Admissions Advisory Team'}
                     </div>
                   </div>
                   <Badge variant={s.attendance === 'ATTENDED' ? 'success' : s.attendance === 'ABSENT' ? 'danger' : 'neutral'}>
@@ -576,7 +576,7 @@ export const CounsellingPage: React.FC = () => {
                   >
                     {s.studentName}
                   </strong>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Advisor: {s.counsellorName || 'Assigned Staff'}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Advisor: {s.counsellorName || 'Admissions Advisory Team'}</div>
                 </div>
               ),
             },
