@@ -59,7 +59,8 @@ export const DashboardPage: React.FC = () => {
       {/* Welcome Banner */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #154D96 0%, #0057F8 100%)',
+          backgroundColor: '#0057F8',
+          border: '1px solid rgba(0, 87, 248, 0.25)',
           borderRadius: 'var(--radius-lg)',
           padding: '24px 28px',
           color: '#FFFFFF',
@@ -68,7 +69,7 @@ export const DashboardPage: React.FC = () => {
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '16px',
-          boxShadow: '0 4px 14px rgba(0, 87, 248, 0.2)',
+          boxShadow: '0 4px 14px rgba(0, 87, 248, 0.15)',
         }}
       >
         <div>

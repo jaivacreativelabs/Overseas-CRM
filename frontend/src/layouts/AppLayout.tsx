@@ -190,7 +190,7 @@ export const AppLayout: React.FC = () => {
   })).filter((section) => section.items.length > 0);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       <style>{`
         @media (max-width: 768px) {
           .app-sidebar-panel {
@@ -599,7 +599,9 @@ export const AppLayout: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           minWidth: 0,
-          width: '100%',
+          width: isMobile ? '100%' : (sidebarCollapsed ? '100%' : 'calc(100% - 260px)'),
+          maxWidth: isMobile ? '100%' : (sidebarCollapsed ? '100%' : 'calc(100% - 260px)'),
+          overflowX: 'hidden',
         }}
       >
         {/* Top Header */}
@@ -1022,7 +1024,7 @@ export const AppLayout: React.FC = () => {
         </header>
 
         {/* Page Content Body */}
-        <main className="app-main-content-area" style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+        <main className="app-main-content-area" style={{ flex: 1, padding: isMobile ? '16px 12px 90px 12px' : '24px', overflowY: 'auto', overflowX: 'hidden', minWidth: 0, width: '100%', maxWidth: '100%' }}>
           <Outlet />
         </main>
       </div>

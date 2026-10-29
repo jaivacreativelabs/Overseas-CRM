@@ -380,20 +380,22 @@
 .student-stepper-wrapper {
   width: 100%;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
   -webkit-overflow-scrolling: touch;
   padding: 6px 0;
 }
 
 .student-stepper-wrapper::-webkit-scrollbar {
-  display: none;
+  display: none !important;
+  height: 0px !important;
+  width: 0px !important;
 }
 
 .student-stepper-track {
   display: flex;
   align-items: flex-start;
   width: 100%;
-  min-width: 960px;
 }
 
 .student-stepper-step {
