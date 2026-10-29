@@ -27,6 +27,10 @@ export const connectDatabase = async (): Promise<void> => {
     // Set a 5-second serverSelectionTimeoutMS so if local/remote MongoDB is unreachable, it fails quickly to memory fallback in dev
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      socketTimeoutMS: 20000,
+      connectTimeoutMS: 5000,
     });
 
     isConnected = true;

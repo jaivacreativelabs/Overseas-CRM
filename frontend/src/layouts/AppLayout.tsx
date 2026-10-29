@@ -39,8 +39,13 @@ export const AppLayout: React.FC = () => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       return true; // Auto-collapsed on mobile
     }
+    // Student portal requirement: Keep sidebar collapsed by default
+    if (isStudent || (typeof window !== 'undefined' && window.location.pathname.startsWith('/portal'))) {
+      const savedStudent = localStorage.getItem('student_sidebar_collapsed');
+      return savedStudent !== null ? savedStudent === 'true' : true;
+    }
     const saved = localStorage.getItem('sidebar_collapsed');
-    return saved !== null ? saved === 'true' : false; // Default EXPANDED (false) on desktop/laptop
+    return saved !== null ? saved === 'true' : false; // Default EXPANDED (false) on desktop for staff
   };
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(getInitialSidebarState);
@@ -88,7 +93,11 @@ export const AppLayout: React.FC = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
       if (window.innerWidth >= 768) {
-        localStorage.setItem('sidebar_collapsed', String(next));
+        if (isStudent) {
+          localStorage.setItem('student_sidebar_collapsed', String(next));
+        } else {
+          localStorage.setItem('sidebar_collapsed', String(next));
+        }
       }
       return next;
     });
@@ -111,9 +120,20 @@ export const AppLayout: React.FC = () => {
   useEffect(() => {
     const fetchStudentStage = async () => {
       try {
-        const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
-        if (res.data?.[0]?.stage) {
-          setStudentStage(res.data[0].stage as StudentStage);
+        let currentStage: StudentStage | null = null;
+        try {
+          const profileRes = await apiClient.get<Lead>('/leads/my-student-profile');
+          if (profileRes.data?.stage) {
+            currentStage = profileRes.data.stage as StudentStage;
+          }
+        } catch {
+          const res = await apiClient.get<Lead[]>('/leads', { isStudent: true, limit: 1 });
+          if (res.data?.[0]?.stage) {
+            currentStage = res.data[0].stage as StudentStage;
+          }
+        }
+        if (currentStage) {
+          setStudentStage(currentStage);
         }
       } catch (err) {
         // silent fail
@@ -975,6 +995,8 @@ export const AppLayout: React.FC = () => {
                     ? user.adminType === 'OWNER_ADMIN'
                       ? 'Owner Admin'
                       : 'Administrator'
+                    : user?.role === UserRole.STUDENT
+                    ? 'Student'
                     : 'Counsellor'}
                 </div>
               </div>

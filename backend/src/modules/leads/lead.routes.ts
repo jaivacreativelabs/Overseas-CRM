@@ -20,6 +20,7 @@ router.get('/webhook/meta', LeadController.verifyMetaWebhook);
 router.post('/webhook/meta', LeadController.handleMetaWebhook);
 
 router.get('/:id/download-all-details', authenticate, LeadController.downloadAllDetails);
+router.get('/my-student-profile', authenticate, LeadController.getMyStudentProfile);
 
 router.use(authenticate, requireStaff);
 

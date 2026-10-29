@@ -5,6 +5,7 @@ import { StudentStage, UserRole } from '../../config/constants';
 import { NotFoundError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
 
 export class ProfileEvaluationService {
   static MANDATORY_FIELDS = [
@@ -66,6 +67,7 @@ export class ProfileEvaluationService {
     }
 
     const beforeState = profile.toObject();
+    const wasComplete = beforeState?.isComplete || false;
 
     Object.assign(profile, data);
     profile.evaluatedById = new Types.ObjectId(actorUserId);
@@ -77,7 +79,17 @@ export class ProfileEvaluationService {
 
     await profile.save();
 
-    // If complete and lead is currently at PROFILE_EVALUATION stage, unlock and advance to UNIVERSITY_SHORTLISTING
+    if (profile.isComplete && !wasComplete) {
+      void AutomationService.triggerWorkflows('profile.verified', {
+        _id: profile._id.toString(),
+        leadId: lead._id.toString(),
+        name: lead.name,
+        email: lead.email,
+        studentEmail: lead.email,
+        counsellorId: lead.counsellorId?.toString(),
+      } as any).catch(() => undefined);
+    }
+
     if (profile.isComplete && lead.stage === StudentStage.PROFILE_EVALUATION) {
       lead.stage = StudentStage.UNIVERSITY_SHORTLISTING;
       await lead.save();

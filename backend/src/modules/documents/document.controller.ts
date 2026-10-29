@@ -5,7 +5,11 @@ import { ApiResponse } from '../../utils/api-response';
 export class DocumentController {
   static async getDocuments(req: Request, res: Response, next: NextFunction) {
     try {
-      const docs = await DocumentService.getDocumentsForLead(req.params.leadId);
+      const docs = await DocumentService.getDocumentsForLead(
+        req.params.leadId,
+        req.user?.userId,
+        req.user?.role
+      );
       return ApiResponse.success(res, 'Documents fetched', docs);
     } catch (error) {
       next(error);
