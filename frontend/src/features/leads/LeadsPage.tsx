@@ -327,10 +327,25 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                 render: (l) => (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                     <div
-                      style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
+                      style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}
                       onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
                     >
-                      {l.name}
+                      <span>{l.name}</span>
+                      {l.studentId && (
+                        <span
+                          style={{
+                            fontSize: '10.5px',
+                            fontWeight: 600,
+                            color: '#0057F8',
+                            backgroundColor: '#EFF6FF',
+                            border: '1px solid #BFDBFE',
+                            padding: '1px 5px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          {l.studentId}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.email}</div>
                     {l.phone && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.phone}</div>}

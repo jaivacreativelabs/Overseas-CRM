@@ -105,7 +105,9 @@ export const createApp = (): Express => {
   // Serve static frontend build (merged single-port application)
   if (!process.env.VERCEL) {
     try {
-      const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
+      const frontendDist = fs.existsSync(path.resolve(process.cwd(), 'frontend/dist'))
+        ? path.resolve(process.cwd(), 'frontend/dist')
+        : path.resolve(process.cwd(), '../frontend/dist');
       if (fs.existsSync(frontendDist)) {
         app.use(express.static(frontendDist));
         app.get('*', (req: Request, res: Response, next) => {

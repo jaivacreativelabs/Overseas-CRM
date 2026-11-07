@@ -891,6 +891,21 @@ export const StudentPortalPage: React.FC = () => {
                   <span className="student-hero-stage-dot" />
                   {lead?.stage?.replace(/_/g, ' ') || 'PROFILE EVALUATION'}
                 </span>
+                {lead?.studentId && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: '#0057F8',
+                      backgroundColor: '#EFF6FF',
+                      border: '1px solid #BFDBFE',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    ID: {lead.studentId}
+                  </span>
+                )}
                 {user?.role !== UserRole.STUDENT && (
                   <Badge variant="warning">Staff Preview Mode</Badge>
                 )}
@@ -906,7 +921,7 @@ export const StudentPortalPage: React.FC = () => {
               variant="secondary"
               size="sm"
               icon={<Download size={14} />}
-              onClick={() => lead && window.open(`/api/v1/leads/${lead._id}/download-all-details`, '_blank')}
+              onClick={() => lead && window.open('/api/v1/leads/' + lead._id + '/download-all-details', '_blank')}
             >
               <span className="student-btn-label-desktop">Download Dossier</span>
               <span className="student-btn-label-mobile">Dossier</span>

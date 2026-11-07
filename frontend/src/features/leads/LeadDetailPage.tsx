@@ -821,7 +821,6 @@ export const LeadDetailPage: React.FC = () => {
           >
             Back
           </Button>
-
           <div className="lead-avatar-badge">
             {lead.name ? lead.name.charAt(0).toUpperCase() : 'S'}
           </div>
@@ -829,6 +828,21 @@ export const LeadDetailPage: React.FC = () => {
           <div className="lead-identity-meta">
             <div className="lead-title-row">
               <h1 className="lead-name-text">{lead.name}</h1>
+              {lead.studentId && (
+                <span
+                  style={{
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    color: '#0057F8',
+                    backgroundColor: '#EFF6FF',
+                    border: '1px solid #BFDBFE',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                  }}
+                >
+                  ID: {lead.studentId}
+                </span>
+              )}
               <PinButton
                 item={{
                   id: lead._id,
@@ -1040,7 +1054,7 @@ export const LeadDetailPage: React.FC = () => {
               <div className="card-header" style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 className="card-title">Study Preferences</h3>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  ID: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-secondary)' }}>{lead._id?.slice(-8)}</span>
+                  {lead.studentId ? <strong>Student ID: <span style={{ color: '#0057F8' }}>{lead.studentId}</span> • </strong> : ''}ID: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-secondary)' }}>{lead._id?.slice(-8)}</span>
                 </span>
               </div>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>

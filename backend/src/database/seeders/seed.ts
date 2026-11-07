@@ -32,12 +32,17 @@ import {
   TaskType,
 } from '../../config/constants';
 import { logger } from '../../utils/logger';
+import { connectDatabase } from '../../config/database';
+import { seedFifteenStudents } from './seed-15-students';
 
 export const seedDatabase = async () => {
   try {
+    // Always idempotently ensure the 15 students are present with working auth
+    await seedFifteenStudents();
+
     const userCount = await UserModel.countDocuments();
-    if (userCount > 0) {
-      logger.info('Database already contains records. Skipping seed.');
+    if (userCount > 15) {
+      logger.info('Database already contains base seed records.');
       return;
     }
 
@@ -519,3 +524,15 @@ export const seedDatabase = async () => {
     logger.error('Error during database seed:', error);
   }
 };
+
+if (require.main === module) {
+  connectDatabase()
+    .then(async () => {
+      await seedDatabase();
+      process.exit(0);
+    })
+    .catch((err) => {
+      logger.error('Seed execution error:', err);
+      process.exit(1);
+    });
+}

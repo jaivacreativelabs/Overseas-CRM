@@ -11,7 +11,7 @@ const startServer = async () => {
     const app = createApp();
 
     // 2. Start HTTP Server immediately
-    const server = app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, '127.0.0.1', () => {
       logger.info(`🚀 Overseas Education CRM Backend & Frontend running on http://localhost:${env.PORT}`);
       logger.info(`📡 API Base URL: http://localhost:${env.PORT}/api/v1`);
     });

@@ -136,9 +136,18 @@ export interface User {
 
 export interface Lead {
   _id: string;
+  studentId?: string;
   name: string;
   email: string;
   phone: string;
+  gender?: string;
+  age?: number;
+  collegeName?: string;
+  department?: string;
+  course?: string;
+  currentSemester?: string;
+  academicYear?: string;
+  enrollmentDate?: string;
   city?: string;
   state?: string;
   country?: string;

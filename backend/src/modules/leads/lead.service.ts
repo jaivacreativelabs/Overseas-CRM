@@ -4,6 +4,7 @@ import { LeadModel, ILead } from './lead.model';
 import { ContactAttemptModel, IContactAttempt } from './contact-attempt.model';
 import { CounsellingSessionModel, ICounsellingSession } from './counselling-session.model';
 import { UserModel } from '../users/user.model';
+import '../branches/branch.model';
 import { TaskModel } from '../tasks/task.model';
 import { ProfileEvaluationModel } from '../profile-evaluation/profile-evaluation.model';
 import {
@@ -185,13 +186,19 @@ export class LeadService {
     if (query.branchId) conditions.push({ branchId: new Types.ObjectId(query.branchId) });
 
     if (query.search) {
+      const searchRegex = { $regex: query.search, $options: 'i' };
       conditions.push({
         $or: [
-          { name: { $regex: query.search, $options: 'i' } },
-          { email: { $regex: query.search, $options: 'i' } },
-          { phone: { $regex: query.search, $options: 'i' } },
-          { city: { $regex: query.search, $options: 'i' } },
-          { targetCountry: { $regex: query.search, $options: 'i' } },
+          { name: searchRegex },
+          { email: searchRegex },
+          { phone: searchRegex },
+          { city: searchRegex },
+          { targetCountry: searchRegex },
+          { studentId: searchRegex },
+          { collegeName: searchRegex },
+          { department: searchRegex },
+          { targetCourse: searchRegex },
+          { course: searchRegex },
         ],
       });
     }
