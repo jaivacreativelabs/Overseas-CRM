@@ -12,9 +12,17 @@ export class TaskController {
       const priority = req.query.priority as TaskPriority;
       const type = req.query.type as TaskType;
       const assignedTo = req.query.assignedTo as string;
-      const leadId = req.query.leadId as string;
+      let leadId = req.query.leadId as string;
       const isOverdue = req.query.isOverdue === 'true';
       const search = req.query.search as string;
+
+      // If requested by a student, enforce leadId isolation
+      if (req.user?.role === 'STUDENT') {
+        const studentProfile = await import('../leads/lead.service').then(m =>
+          m.LeadService.getStudentProfileForUser(req.user!.userId, req.user!.email)
+        );
+        leadId = studentProfile._id.toString();
+      }
 
       const result = await TaskService.getTasks({
         page,

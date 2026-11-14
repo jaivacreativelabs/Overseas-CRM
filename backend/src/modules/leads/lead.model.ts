@@ -34,6 +34,15 @@ export interface ILead extends Document {
   previousStage?: StudentStage;
   isArchived: boolean;
   notes?: string;
+  studentId?: string;
+  gender?: string;
+  age?: number;
+  collegeName?: string;
+  department?: string;
+  course?: string;
+  currentSemester?: string;
+  academicYear?: string;
+  enrollmentDate?: Date;
   lastContactedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -73,6 +82,15 @@ const leadSchema = new Schema<ILead>(
     previousStage: { type: String, enum: Object.values(StudentStage) },
     isArchived: { type: Boolean, default: false, index: true },
     notes: { type: String },
+    studentId: { type: String, trim: true, index: true },
+    gender: { type: String, trim: true },
+    age: { type: Number },
+    collegeName: { type: String, trim: true },
+    department: { type: String, trim: true },
+    course: { type: String, trim: true },
+    currentSemester: { type: String, trim: true },
+    academicYear: { type: String, trim: true },
+    enrollmentDate: { type: Date },
     lastContactedAt: { type: Date },
   },
   {

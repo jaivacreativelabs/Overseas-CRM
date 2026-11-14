@@ -3,6 +3,8 @@ import { OrientationModel, IOrientation } from './orientation.model';
 import { UserRole } from '../../config/constants';
 import { NotFoundError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
+import { UserModel } from '../users/user.model';
+import { AutomationService } from '../integrations/automation.service';
 
 export class OrientationService {
   static async getOrientations(studentId?: string): Promise<any[]> {
@@ -58,6 +60,35 @@ export class OrientationService {
       entityId: orientation._id.toString(),
       after: orientation.toObject(),
     });
+
+    if (data.invitedStudentIds && data.invitedStudentIds.length > 0) {
+      void (async () => {
+        try {
+          const students = await UserModel.find({
+            _id: { $in: data.invitedStudentIds!.map((id) => new Types.ObjectId(id)) },
+          }).lean();
+
+          for (const student of students) {
+            if (student.email) {
+              void AutomationService.triggerWorkflows('orientation.invited', {
+                _id: orientation._id.toString(),
+                orientationId: orientation._id.toString(),
+                name: student.name,
+                email: student.email,
+                studentEmail: student.email,
+                title: orientation.title,
+                country: orientation.country,
+                intake: orientation.intake,
+                sessionDate: orientation.sessionDate,
+                sessionTime: orientation.sessionTime,
+                venue: orientation.venue,
+                googleMeetLink: orientation.googleMeetLink,
+              } as any).catch(() => undefined);
+            }
+          }
+        } catch {}
+      })();
+    }
 
     return orientation;
   }

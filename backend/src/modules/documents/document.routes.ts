@@ -8,6 +8,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/', requireStaff, DocumentController.getAllDocuments);
 router.get('/lead/:leadId', DocumentController.getDocuments);
 router.post('/lead/:leadId/request', requireStaff, DocumentController.requestDocument);
 router.post('/:id/upload', upload.single('file'), DocumentController.uploadDocument);

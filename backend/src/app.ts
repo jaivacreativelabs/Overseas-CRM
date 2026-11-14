@@ -36,7 +36,22 @@ export const createApp = (): Express => {
   const app = express();
 
   // Security & standard middleware
-  app.use(helmet({ crossOriginResourcePolicy: false, hidePoweredBy: false }));
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false,
+      hidePoweredBy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+          imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+          fontSrc: ["'self'", 'https:', 'data:'],
+          connectSrc: ["'self'", 'https:', 'http:'],
+        },
+      },
+    })
+  );
   const corsOptions = {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -105,7 +120,9 @@ export const createApp = (): Express => {
   // Serve static frontend build (merged single-port application)
   if (!process.env.VERCEL) {
     try {
-      const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
+      const frontendDist = fs.existsSync(path.resolve(process.cwd(), 'frontend/dist'))
+        ? path.resolve(process.cwd(), 'frontend/dist')
+        : path.resolve(process.cwd(), '../frontend/dist');
       if (fs.existsSync(frontendDist)) {
         app.use(express.static(frontendDist));
         app.get('*', (req: Request, res: Response, next) => {

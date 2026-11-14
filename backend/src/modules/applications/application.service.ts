@@ -115,6 +115,20 @@ export class ApplicationService {
       description: `Application submitted for ${application.courseTitle} at ${application.universityName}`,
     });
 
+    void AutomationService.triggerWorkflows('application.submitted', {
+      _id: application._id.toString(),
+      applicationId: application._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      studentEmail: lead.email,
+      universityName: application.universityName,
+      courseTitle: application.courseTitle,
+      intake: application.intake,
+      applicationNumber: application.applicationNumber,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
+
     return application;
   }
 
@@ -209,6 +223,22 @@ export class ApplicationService {
         counsellorId: (lead as any)?.counsellorId?.toString?.() || (lead as any)?.assignedCounsellorId?.toString?.(),
         universityName: app.universityName,
         courseTitle: (app as any).courseTitle,
+      } as any).catch(() => undefined);
+    }
+
+    if (data.status === ApplicationStatus.REJECTED) {
+      void AutomationService.triggerWorkflows('application.rejected', {
+        _id: app._id.toString(),
+        applicationId: app._id.toString(),
+        leadId: app.leadId.toString(),
+        name: lead?.name,
+        email: lead?.email,
+        studentEmail: lead?.email,
+        universityName: app.universityName,
+        courseTitle: app.courseTitle,
+        intake: app.intake,
+        rejectionReason: app.rejectionReason,
+        counsellorId: lead?.counsellorId?.toString(),
       } as any).catch(() => undefined);
     }
 

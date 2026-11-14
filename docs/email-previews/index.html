@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Overseas CRM - Email Templates Gallery & Screenshots</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { display: flex; height: 100vh; background-color: #F8FAFC; color: #0F172A; }
+    #sidebar { width: 340px; background: #FFFFFF; border-right: 1px solid #E2E8F0; overflow-y: auto; padding: 20px 16px; flex-shrink: 0; }
+    #sidebar h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: #0057F8; }
+    #sidebar p { font-size: 12px; color: #64748B; margin-bottom: 16px; }
+    .nav-btn { display: block; width: 100%; text-align: left; padding: 10px 12px; margin-bottom: 6px; border-radius: 6px; border: 1px solid transparent; background: transparent; font-size: 13px; font-weight: 500; color: #334155; cursor: pointer; transition: all 0.15s; }
+    .nav-btn:hover { background: #F1F5F9; color: #0F172A; }
+    .nav-btn.active { background: #EEF4FF; border-color: #C3D9FF; color: #0057F8; font-weight: 600; }
+    #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #topbar { padding: 14px 24px; background: #FFFFFF; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; }
+    #topbar h3 { font-size: 15px; font-weight: 600; }
+    .actions { display: flex; gap: 10px; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; }
+    .btn-primary { background: #0057F8; color: #FFFFFF; border-color: #0057F8; }
+    #preview-area { flex: 1; padding: 24px; overflow-y: auto; display: flex; justify-content: center; background: #F1F5F9; }
+    .preview-card { background: #FFFFFF; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; max-width: 650px; width: 100%; border: 1px solid #E2E8F0; }
+    iframe { width: 100%; height: 850px; border: none; display: block; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>Email Templates Gallery</h2>
+    <p>19 Full-Lifecycle Student Email Templates</p>
+    <div id="list">
+      
+        <button class="nav-btn active" onclick="selectItem('01_lead_created', '1. Lead Capture - Welcome & Portal Credentials', '01_lead_created.html', '01_lead_created.png', this)">
+          1. Lead Capture - Welcome & Portal Credentials
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('02_counselling_scheduled', '2. Counselling - Meeting Scheduled', '02_counselling_scheduled.html', '02_counselling_scheduled.png', this)">
+          2. Counselling - Meeting Scheduled
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('03_profile_verified', '3. Profile Evaluation - Verified', '03_profile_verified.html', '03_profile_verified.png', this)">
+          3. Profile Evaluation - Verified
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('04_shortlist_updated', '4. Shortlist - University Options Ready', '04_shortlist_updated.html', '04_shortlist_updated.png', this)">
+          4. Shortlist - University Options Ready
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('05_document_requested', '5. Documents - Document Requested', '05_document_requested.html', '05_document_requested.png', this)">
+          5. Documents - Document Requested
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('06_document_approved', '6. Documents - Document Approved', '06_document_approved.html', '06_document_approved.png', this)">
+          6. Documents - Document Approved
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('07_document_rejected', '7. Documents - Document Re-upload Requested', '07_document_rejected.html', '07_document_rejected.png', this)">
+          7. Documents - Document Re-upload Requested
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('08_application_submitted', '8. Application - Application Submitted', '08_application_submitted.html', '08_application_submitted.png', this)">
+          8. Application - Application Submitted
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('09_application_rejected', '9. Application - Application Decision Update', '09_application_rejected.html', '09_application_rejected.png', this)">
+          9. Application - Application Decision Update
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('10_offer_received', '10. Offers - Official Offer Letter Issued', '10_offer_received.html', '10_offer_received.png', this)">
+          10. Offers - Official Offer Letter Issued
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('11_offer_accepted', '11. Offers - Signed Acceptance Approved', '11_offer_accepted.html', '11_offer_accepted.png', this)">
+          11. Offers - Signed Acceptance Approved
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('12_offer_rejected', '12. Offers - Offer Revision Required', '12_offer_rejected.html', '12_offer_rejected.png', this)">
+          12. Offers - Offer Revision Required
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('13_payment_requested', '13. Payments - Fee Deposit Invoice', '13_payment_requested.html', '13_payment_requested.png', this)">
+          13. Payments - Fee Deposit Invoice
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('14_payment_success', '14. Payments - Payment Receipt Confirmed', '14_payment_success.html', '14_payment_success.png', this)">
+          14. Payments - Payment Receipt Confirmed
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('15_visa_updated', '15. Visa - Visa Decision Update', '15_visa_updated.html', '15_visa_updated.png', this)">
+          15. Visa - Visa Decision Update
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('16_travel_updated', '16. Travel - Pre-Departure Arrangements', '16_travel_updated.html', '16_travel_updated.png', this)">
+          16. Travel - Pre-Departure Arrangements
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('17_departure_recorded', '17. Travel - Departure Confirmed', '17_departure_recorded.html', '17_departure_recorded.png', this)">
+          17. Travel - Departure Confirmed
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('18_arrival_confirmed', '18. Travel - Arrival Confirmed', '18_arrival_confirmed.html', '18_arrival_confirmed.png', this)">
+          18. Travel - Arrival Confirmed
+        </button>
+      
+        <button class="nav-btn " onclick="selectItem('19_orientation_invited', '19. Orientation - Pre-Departure Session Invite', '19_orientation_invited.html', '19_orientation_invited.png', this)">
+          19. Orientation - Pre-Departure Session Invite
+        </button>
+      
+    </div>
+  </div>
+
+  <div id="content">
+    <div id="topbar">
+      <h3 id="current-title">1. Lead Capture - Welcome & Portal Credentials</h3>
+      <div class="actions">
+        <a id="btn-html" href="html/01_lead_created.html" target="_blank" class="btn">View Raw HTML</a>
+        <a id="btn-png" href="screenshots/01_lead_created.png" download class="btn btn-primary">Download Screenshot (.PNG)</a>
+      </div>
+    </div>
+    <div id="preview-area">
+      <div class="preview-card">
+        <iframe id="preview-frame" src="html/01_lead_created.html"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function selectItem(filename, title, htmlName, pngName, el) {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('current-title').textContent = title;
+      document.getElementById('preview-frame').src = 'html/' + htmlName;
+      document.getElementById('btn-html').href = 'html/' + htmlName;
+      document.getElementById('btn-png').href = 'screenshots/' + pngName;
+    }
+  </script>
+</body>
+</html>
