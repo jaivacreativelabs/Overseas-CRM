@@ -192,15 +192,14 @@ export class DocumentService {
     const doc = await DocumentModel.findById(documentId);
     if (!doc) throw new NotFoundError('Document not found');
 
-    // Normalize status: treat APPROVED as SUCCESSFUL, REJECTED as FAILED if needed, or maintain APPROVED/SUCCESSFUL
     let targetStatus: DocumentStatus = data.status;
-    if (data.status === DocumentStatus.APPROVED) {
-      targetStatus = DocumentStatus.SUCCESSFUL;
-    } else if (data.status === DocumentStatus.REJECTED) {
-      targetStatus = DocumentStatus.FAILED;
+    if (data.status === DocumentStatus.SUCCESSFUL || data.status === DocumentStatus.APPROVED) {
+      targetStatus = DocumentStatus.APPROVED;
+    } else if (data.status === DocumentStatus.FAILED || data.status === DocumentStatus.REJECTED) {
+      targetStatus = DocumentStatus.REJECTED;
     }
 
-    const isRejected = targetStatus === DocumentStatus.FAILED || targetStatus === DocumentStatus.REJECTED;
+    const isRejected = targetStatus === DocumentStatus.REJECTED;
 
     if (isRejected && !data.rejectionReason) {
       throw new ValidationError('A reason must be provided when rejecting a document.');
@@ -216,12 +215,11 @@ export class DocumentService {
 
     await doc.save();
 
-    // Check if all mandatory documents are approved (either SUCCESSFUL or APPROVED)
     const allDocs = await DocumentModel.find({ leadId: doc.leadId, isMandatory: true });
     const allApproved =
       allDocs.length > 0 &&
       allDocs.every(
-        (d) => d.status === DocumentStatus.SUCCESSFUL || d.status === DocumentStatus.APPROVED
+        (d) => d.status === DocumentStatus.APPROVED || (d.status as string) === 'SUCCESSFUL'
       );
 
     const lead = await LeadModel.findById(doc.leadId);
@@ -241,7 +239,7 @@ export class DocumentService {
       after: doc.toObject(),
     });
 
-    const isApproved = targetStatus === DocumentStatus.SUCCESSFUL || targetStatus === DocumentStatus.APPROVED;
+    const isApproved = targetStatus === DocumentStatus.APPROVED;
 
     await ActivityService.log({
       leadId: doc.leadId.toString(),

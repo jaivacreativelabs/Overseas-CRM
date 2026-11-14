@@ -39,7 +39,6 @@ export const CounsellingPage: React.FC = () => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [submittingSchedule, setSubmittingSchedule] = useState(false);
 
-  // Scheduling Form
   const [scheduleForm, setScheduleForm] = useState({
     leadId: '',
     scheduledDate: new Date().toISOString().split('T')[0],
@@ -65,27 +64,24 @@ export const CounsellingPage: React.FC = () => {
   const fetchCounselling = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<any[]>('/leads', { limit: 100 });
-      setLeadsList(res.data || []);
-      const allSessions: any[] = [];
-      (res.data || []).forEach((lead) => {
-        if (lead.counsellingSessions) {
-          lead.counsellingSessions.forEach((s: any) => {
-            allSessions.push({
-              ...s,
-              studentName: lead.name,
-              leadId: lead._id,
-              studentEmail: lead.email,
-              studentPhone: lead.phone,
-              targetCountry: lead.country,
-              targetCourse: lead.preferredCourse,
-            });
-          });
-        }
-      });
-      // Sort newest first
-      allSessions.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-      setSessions(allSessions);
+      const [sessionsRes, leadsRes] = await Promise.all([
+        apiClient.get<any[]>('/leads/counselling'),
+        apiClient.get<any[]>('/leads', { limit: 100 }),
+      ]);
+
+      setLeadsList(leadsRes.data || []);
+
+      const formattedSessions = (sessionsRes.data || []).map((s: any) => ({
+        ...s,
+        studentName: s.leadId?.name || s.studentName || 'Student',
+        leadId: s.leadId?._id || s.leadId,
+        studentEmail: s.leadId?.email || s.studentEmail || '',
+        studentPhone: s.leadId?.phone || s.studentPhone || '',
+        targetCountry: s.leadId?.targetCountry || s.targetCountry || '',
+        targetCourse: s.leadId?.targetCourse || s.targetCourse || '',
+      }));
+
+      setSessions(formattedSessions);
     } catch (err: any) {
       error(err.message || 'Failed to fetch counselling sessions');
     } finally {
@@ -134,12 +130,10 @@ export const CounsellingPage: React.FC = () => {
     }
   };
 
-  // Filtered Sessions
   const todayStr = new Date().toISOString().split('T')[0];
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
-      // Search
       const matchesSearch =
         !searchQuery ||
         s.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -148,7 +142,6 @@ export const CounsellingPage: React.FC = () => {
 
       if (!matchesSearch) return false;
 
-      // Status tab
       if (activeFilter === 'today') {
         return s.scheduledDate === todayStr;
       }

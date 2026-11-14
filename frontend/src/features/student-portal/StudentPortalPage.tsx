@@ -758,13 +758,15 @@ export const StudentPortalPage: React.FC = () => {
     }
   }, [activeTab]);
 
-  // Filtered documents
+  const isApprovedDoc = (status: DocumentStatus) => status === DocumentStatus.APPROVED || (status as string) === 'SUCCESSFUL';
+  const isRejectedDoc = (status: DocumentStatus) => status === DocumentStatus.REJECTED || (status as string) === 'FAILED';
+
   const filteredDocuments = useMemo(() => {
     if (docFilter === 'VERIFIED') {
-      return documents.filter((d) => d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL);
+      return documents.filter((d) => isApprovedDoc(d.status));
     }
     if (docFilter === 'REJECTED') {
-      return documents.filter((d) => d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED);
+      return documents.filter((d) => isRejectedDoc(d.status));
     }
     if (docFilter === 'PENDING') {
       return documents.filter((d) => d.status === DocumentStatus.REQUESTED);
@@ -772,12 +774,8 @@ export const StudentPortalPage: React.FC = () => {
     return documents;
   }, [documents, docFilter]);
 
-  const verifiedDocsCount = documents.filter(
-    (d) => d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL
-  ).length;
-  const rejectedDocsCount = documents.filter(
-    (d) => d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED
-  ).length;
+  const verifiedDocsCount = documents.filter((d) => isApprovedDoc(d.status)).length;
+  const rejectedDocsCount = documents.filter((d) => isRejectedDoc(d.status)).length;
   const pendingDocsCount = documents.filter((d) => d.status === DocumentStatus.REQUESTED).length;
 
   // Dynamic Next Best Action Spotlight Data
@@ -1851,7 +1849,7 @@ export const StudentPortalPage: React.FC = () => {
                         Category: {d.category}
                         {d.description ? ` • Instructions: ${d.description}` : ''}
                       </div>
-                      {(d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED) && (
+                      {isRejectedDoc(d.status) && (
                         <div className="student-doc-rejection-callout">
                           <strong>Counsellor Feedback:</strong> {d.rejectionReason || 'Document unreadable or invalid format. Please re-upload.'}
                         </div>
@@ -1898,8 +1896,8 @@ export const StudentPortalPage: React.FC = () => {
                   header: 'ACTION',
                   align: 'right',
                   render: (d) => {
-                    const isApproved = d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL;
-                    const isRejected = d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED;
+                    const isApproved = isApprovedDoc(d.status);
+                    const isRejected = isRejectedDoc(d.status);
                     return (
                       <Button
                         variant={isApproved ? 'ghost' : isRejected ? 'danger' : 'primary'}

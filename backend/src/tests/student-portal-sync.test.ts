@@ -1,4 +1,5 @@
 import mongoose, { Types } from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app';
 import { UserModel } from '../../src/modules/users/user.model';
@@ -8,23 +9,31 @@ import { TaskModel } from '../../src/modules/tasks/task.model';
 import { UserRole, DocumentStatus, StudentStage, LeadStatus, TaskStatus, TaskPriority, TaskType } from '../../src/config/constants';
 import { env } from '../../src/config/env';
 
+let mongoServer: MongoMemoryServer | null = null;
+
 async function runTests() {
   console.log('🚀 Starting JAIVA CRM Student Portal Verification Tests...');
 
-  const testDbUri = process.env.TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017/jaiva_crm_test';
-  await mongoose.connect(testDbUri);
+  const customUri = process.env.TEST_MONGODB_URI;
+  if (customUri) {
+    await mongoose.connect(customUri);
+  } else {
+    try {
+      await mongoose.connect('mongodb://127.0.0.1:27017/jaiva_crm_test', { serverSelectionTimeoutMS: 1500 });
+    } catch {
+      mongoServer = await MongoMemoryServer.create();
+      await mongoose.connect(mongoServer.getUri());
+    }
+  }
 
-  // Clean test database
   await Promise.all([
     UserModel.deleteMany({ email: { $in: ['counsellor@test.com', 'student1@test.com', 'student2@test.com'] } }),
     LeadModel.deleteMany({ email: { $in: ['student1@test.com', 'student2@test.com'] } }),
   ]);
-  console.log('✓ Connected to local test database');
+  console.log('✓ Connected to test database');
 
   const app = createApp();
 
-  // Test setup: create users
-  // 1. Counsellor User
   const counsellor = await UserModel.create({
     name: 'Sarah Counsellor',
     email: 'counsellor@test.com',
@@ -33,7 +42,6 @@ async function runTests() {
     isActive: true,
   });
 
-  // 2. Student 1 User
   const student1 = await UserModel.create({
     name: 'Student One',
     email: 'student1@test.com',
@@ -43,7 +51,6 @@ async function runTests() {
     isActive: true,
   });
 
-  // 3. Student 2 User
   const student2 = await UserModel.create({
     name: 'Student Two',
     email: 'student2@test.com',
@@ -106,7 +113,7 @@ async function runTests() {
     const profileRes = await fetch(`${baseUrl}/leads/my-student-profile`, {
       headers: { Authorization: `Bearer ${student1Token}` },
     });
-    const profileJson = await profileRes.json();
+    const profileJson: any = await profileRes.json();
     if (profileRes.status !== 200 || profileJson.data?._id !== lead1._id.toString()) {
       throw new Error(`Profile retrieval failed: ${JSON.stringify(profileJson)}`);
     }
@@ -124,7 +131,7 @@ async function runTests() {
         isMandatory: true,
       }),
     });
-    const doc1 = (await req1Res.json()).data;
+    const doc1 = ((await req1Res.json()) as any).data;
 
     const req2Res = await fetch(`${baseUrl}/documents/lead/${lead1._id}/request`, {
       method: 'POST',
@@ -136,7 +143,7 @@ async function runTests() {
         isMandatory: true,
       }),
     });
-    const doc2 = (await req2Res.json()).data;
+    const doc2 = ((await req2Res.json()) as any).data;
 
     if (!doc1?._id || !doc2?._id) {
       throw new Error('Failed to create multiple document requests');
@@ -148,7 +155,7 @@ async function runTests() {
     const studentDocsRes = await fetch(`${baseUrl}/documents/lead/${lead1._id}`, {
       headers: { Authorization: `Bearer ${student1Token}` },
     });
-    const studentDocsJson = await studentDocsRes.json();
+    const studentDocsJson: any = await studentDocsRes.json();
     const studentDocs = studentDocsJson.data;
 
     if (studentDocs.length !== 2) {
@@ -173,7 +180,7 @@ async function runTests() {
         mimeType: 'application/pdf',
       }),
     });
-    const uploadJson = await uploadRes.json();
+    const uploadJson: any = await uploadRes.json();
     if (uploadRes.status !== 200 || uploadJson.data.status !== DocumentStatus.PENDING || uploadJson.data.fileUrl !== '/uploads/passport_scanned_copy.pdf') {
       throw new Error(`Upload failed: ${JSON.stringify(uploadJson)}`);
     }
@@ -193,11 +200,11 @@ async function runTests() {
         status: DocumentStatus.APPROVED,
       }),
     });
-    const approveJson = await approveRes.json();
-    if (approveRes.status !== 200 || (approveJson.data.status !== DocumentStatus.SUCCESSFUL && approveJson.data.status !== DocumentStatus.APPROVED)) {
+    const approveJson: any = await approveRes.json();
+    if (approveRes.status !== 200 || approveJson.data.status !== DocumentStatus.APPROVED) {
       throw new Error(`Approval failed: ${JSON.stringify(approveJson)}`);
     }
-    console.log('✅ TEST 5 PASSED: Counselor approved Passport Copy (normalized to SUCCESSFUL/APPROVED)');
+    console.log('✅ TEST 5 PASSED: Counselor approved Passport Copy (canonical DocumentStatus.APPROVED)');
 
     // TEST 6: Counselor reviews: Rejects IELTS with mandatory reason
     console.log('\n--- TEST 6: Counselor Rejection with Reason ---');
@@ -219,7 +226,7 @@ async function runTests() {
         rejectionReason: 'Scan is blurry and candidate number is not legible. Please upload high resolution PDF.',
       }),
     });
-    const rejectJson = await rejectRes.json();
+    const rejectJson: any = await rejectRes.json();
     if (rejectRes.status !== 200 || !rejectJson.data.rejectionReason) {
       throw new Error(`Rejection failed: ${JSON.stringify(rejectJson)}`);
     }
@@ -230,7 +237,7 @@ async function runTests() {
     const studentCheckAfterReject = await fetch(`${baseUrl}/documents/lead/${lead1._id}`, {
       headers: { Authorization: `Bearer ${student1Token}` },
     });
-    const rejectedDocs = (await studentCheckAfterReject.json()).data;
+    const rejectedDocs = ((await studentCheckAfterReject.json()) as any).data;
     const rejectedIelts = rejectedDocs.find((d: any) => d._id === doc2._id);
     if (!rejectedIelts || !rejectedIelts.rejectionReason.includes('blurry')) {
       throw new Error('Rejection reason not visible to student');
@@ -245,7 +252,7 @@ async function runTests() {
         originalFileName: 'ielts_clear_official.pdf',
       }),
     });
-    const reuploadedDoc = (await reuploadRes.json()).data;
+    const reuploadedDoc = ((await reuploadRes.json()) as any).data;
     if (reuploadedDoc.status !== DocumentStatus.PENDING || reuploadedDoc.rejectionReason) {
       throw new Error('Re-upload did not return document to awaiting-review state');
     }
@@ -278,7 +285,7 @@ async function runTests() {
       leadId: lead1._id,
       title: 'Submit Academic Transcripts',
       description: 'Your counselor needs sem 1-8 marksheets',
-      type: TaskType.DOCUMENT_COLLECTION,
+      type: TaskType.DOCUMENT_REVIEW,
       priority: TaskPriority.HIGH,
       status: TaskStatus.PENDING,
       dueDate: new Date(Date.now() + 86400000),
@@ -291,7 +298,7 @@ async function runTests() {
     const tasksRes = await fetch(`${baseUrl}/tasks`, {
       headers: { Authorization: `Bearer ${student1Token}` },
     });
-    const tasksJson = await tasksRes.json();
+    const tasksJson: any = await tasksRes.json();
     if (tasksRes.status !== 200 || !tasksJson.data || tasksJson.data.length === 0) {
       throw new Error(`Student failed to fetch their tasks: ${JSON.stringify(tasksJson)}`);
     }
@@ -300,7 +307,6 @@ async function runTests() {
     console.log('\n🎉 ALL 9 VERIFICATION TESTS PASSED SUCCESSFULLY! 🎉\n');
   } finally {
     server.close();
-    // Clean test records
     await Promise.all([
       UserModel.deleteMany({ email: { $in: ['counsellor@test.com', 'student1@test.com', 'student2@test.com'] } }),
       LeadModel.deleteMany({ email: { $in: ['student1@test.com', 'student2@test.com'] } }),
@@ -308,6 +314,9 @@ async function runTests() {
       TaskModel.deleteMany({ title: 'Submit Academic Transcripts' }),
     ]);
     await mongoose.disconnect();
+    if (mongoServer) {
+      await mongoServer.stop();
+    }
   }
 }
 

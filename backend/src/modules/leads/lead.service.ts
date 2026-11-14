@@ -352,6 +352,27 @@ export class LeadService {
     return contactAttempt;
   }
 
+  static async getAllCounsellingSessions(query?: {
+    counsellorId?: string;
+    leadId?: string;
+    status?: string;
+    attendance?: string;
+    date?: string;
+  }): Promise<any[]> {
+    const filter: Record<string, any> = {};
+    if (query?.counsellorId) filter.counsellorId = new Types.ObjectId(query.counsellorId);
+    if (query?.leadId) filter.leadId = new Types.ObjectId(query.leadId);
+    if (query?.status) filter.status = query.status;
+    if (query?.attendance) filter.attendance = query.attendance;
+    if (query?.date) filter.scheduledDate = query.date;
+
+    return CounsellingSessionModel.find(filter)
+      .populate('leadId', 'name email phone targetCountry targetCourse studentId avatar city')
+      .populate('counsellorId', 'name email avatar')
+      .sort({ scheduledDate: -1, scheduledTime: -1, createdAt: -1 })
+      .lean();
+  }
+
   static async scheduleCounselling(
     leadId: string,
     data: {
@@ -575,13 +596,7 @@ export class LeadService {
       portalPassword: temporaryPassword || 'Use your existing account password',
     };
 
-    void AutomationService.triggerWorkflows('student.created', portalPayload as any)
-      .then(async (wfResult) => {
-        if (!wfResult || wfResult.executedCount === 0) {
-          await EmailService.sendLifecycleEmail('student.created', portalPayload);
-        }
-      })
-      .catch(() => undefined);
+    void AutomationService.triggerWorkflows('student.created', portalPayload as any).catch(() => undefined);
 
     return { lead, studentUser };
   }

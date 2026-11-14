@@ -7,7 +7,8 @@
     "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed": "ts-node-dev --transpile-only src/database/seeders/seed.ts"
+    "seed": "ts-node-dev --transpile-only src/database/seeders/seed.ts",
+    "test": "ts-node src/tests/student-portal-sync.test.ts && ts-node src/tests/email-automation.test.ts"
   },
   "dependencies": {
     "@vercel/node": "^15.0.0",

@@ -112,13 +112,15 @@ export const DocumentsPage: React.FC = () => {
     }
   };
 
-  // Stats
+  const isApprovedDoc = (status: DocumentStatus) => status === DocumentStatus.APPROVED || (status as string) === 'SUCCESSFUL';
+  const isRejectedDoc = (status: DocumentStatus) => status === DocumentStatus.REJECTED || (status as string) === 'FAILED';
+
   const stats = useMemo(() => {
     const pending = docs.filter(
       (d) => d.status === DocumentStatus.PENDING || d.status === DocumentStatus.REQUESTED
     ).length;
-    const approved = docs.filter((d) => d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL).length;
-    const rejected = docs.filter((d) => d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED).length;
+    const approved = docs.filter((d) => isApprovedDoc(d.status)).length;
+    const rejected = docs.filter((d) => isRejectedDoc(d.status)).length;
     const mandatory = docs.filter((d) => d.isMandatory).length;
     return {
       total: docs.length,
@@ -129,10 +131,8 @@ export const DocumentsPage: React.FC = () => {
     };
   }, [docs]);
 
-  // Filtered Docs
   const filteredDocs = useMemo(() => {
     return docs.filter((d) => {
-      // Search query
       const matchesSearch =
         !searchQuery ||
         d.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -141,7 +141,6 @@ export const DocumentsPage: React.FC = () => {
 
       if (!matchesSearch) return false;
 
-      // Filter tab
       if (activeFilter === 'pending') {
         return (
           d.status === DocumentStatus.PENDING ||
@@ -149,10 +148,10 @@ export const DocumentsPage: React.FC = () => {
         );
       }
       if (activeFilter === 'approved') {
-        return d.status === DocumentStatus.APPROVED || d.status === DocumentStatus.SUCCESSFUL;
+        return isApprovedDoc(d.status);
       }
       if (activeFilter === 'rejected') {
-        return d.status === DocumentStatus.REJECTED || d.status === DocumentStatus.FAILED;
+        return isRejectedDoc(d.status);
       }
       if (activeFilter === 'mandatory') {
         return d.isMandatory;

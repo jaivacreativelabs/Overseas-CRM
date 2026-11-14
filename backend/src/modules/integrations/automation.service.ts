@@ -441,6 +441,13 @@ export class AutomationService {
     });
 
     if (activeWorkflows.length === 0) {
+      if (trigger === 'student.created') {
+        try {
+          await EmailService.sendLifecycleEmail('student.created', payload);
+        } catch {
+          // Fallback lifecycle email error swallowed so main flow is unaffected
+        }
+      }
       return { executedCount: 0, logs: [] };
     }
 

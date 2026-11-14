@@ -93,6 +93,15 @@ export class LeadController {
     }
   }
 
+  static async getAllCounsellingSessions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const sessions = await LeadService.getAllCounsellingSessions(req.query as any);
+      return ApiResponse.success(res, 'Counselling sessions retrieved successfully', sessions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async scheduleCounselling(req: Request, res: Response, next: NextFunction) {
     try {
       const session = await LeadService.scheduleCounselling(

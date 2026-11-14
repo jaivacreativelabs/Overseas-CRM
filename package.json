@@ -27,6 +27,7 @@
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build",
     "seed": "npm --prefix backend run seed",
+    "test": "npm --prefix backend run test",
     "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install"
   },
   "devDependencies": {
