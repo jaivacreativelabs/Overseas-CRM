@@ -42,6 +42,7 @@ import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import {
+  AdminType,
   Lead,
   LeadSource,
   User as UserType,
@@ -120,6 +121,9 @@ export const LeadDetailPage: React.FC = () => {
   const isStudentRoute = location.pathname.startsWith('/students');
   const { success, error } = useToast();
   const { user, isStaff, isAdmin } = useAuth();
+  // Owner Admin does not message students directly (notes and call logs only).
+  const isOwnerAdmin =
+    user?.role === UserRole.ADMIN && (user?.adminType === AdminType.OWNER_ADMIN || !user?.adminType);
 
   const [lead, setLead] = useState<Lead | null>(null);
 
@@ -279,7 +283,7 @@ export const LeadDetailPage: React.FC = () => {
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
   // Overview "Activity" hub: one composer (message / internal note / call) + one merged feed
-  const [composerMode, setComposerMode] = useState<'message' | 'note' | 'call'>('message');
+  const [composerMode, setComposerMode] = useState<'message' | 'note' | 'call'>(isOwnerAdmin ? 'note' : 'message');
   const [activityFilter, setActivityFilter] = useState<'all' | 'call' | 'message' | 'note' | 'update'>('all');
 
   // University shortlist curation: counsellor picks which universities/courses the student sees.
@@ -357,7 +361,7 @@ export const LeadDetailPage: React.FC = () => {
   });
 
   const [newMessage, setNewMessage] = useState('');
-  const [isInternalNote, setIsInternalNote] = useState(false);
+  const [isInternalNote, setIsInternalNote] = useState(isOwnerAdmin);
 
   // Full-page loader only on the first load of a record; refreshes after an action update in place.
   const loadedLeadIdRef = useRef<string | null>(null);
@@ -1358,18 +1362,20 @@ export const LeadDetailPage: React.FC = () => {
             {/* Composer */}
             <div className="ov-composer">
               <div className="ov-seg" role="tablist" aria-label="What to add">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={composerMode === 'message'}
-                  className={composerMode === 'message' ? 'is-active' : ''}
-                  onClick={() => {
-                    setComposerMode('message');
-                    setIsInternalNote(false);
-                  }}
-                >
-                  <MessageSquare size={14} /> Message student
-                </button>
+                {!isOwnerAdmin && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={composerMode === 'message'}
+                    className={composerMode === 'message' ? 'is-active' : ''}
+                    onClick={() => {
+                      setComposerMode('message');
+                      setIsInternalNote(false);
+                    }}
+                  >
+                    <MessageSquare size={14} /> Message student
+                  </button>
+                )}
                 <button
                   type="button"
                   role="tab"
