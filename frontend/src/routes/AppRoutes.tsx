@@ -37,7 +37,9 @@ const ProtectedRoute: React.FC<{
   children: React.ReactElement;
   allowedRoles?: UserRole[];
   requireOwnerAdmin?: boolean;
-}> = ({ children, allowedRoles, requireOwnerAdmin }) => {
+  /** Send the Owner Admin to the dashboard instead of rendering this route. */
+  blockOwnerAdmin?: boolean;
+}> = ({ children, allowedRoles, requireOwnerAdmin, blockOwnerAdmin }) => {
   const { user, token, isLoading } = useAuth();
 
   if (isLoading) {
@@ -55,13 +57,16 @@ const ProtectedRoute: React.FC<{
     return <Navigate to="/dashboard" replace />;
   }
 
-  if (requireOwnerAdmin) {
-    const isOwnerAdmin =
-      user.role === UserRole.ADMIN &&
-      (user.adminType === AdminType.OWNER_ADMIN || !user.adminType);
-    if (!isOwnerAdmin) {
-      return <Navigate to="/dashboard" replace />;
-    }
+  const isOwnerAdmin =
+    user.role === UserRole.ADMIN &&
+    (user.adminType === AdminType.OWNER_ADMIN || !user.adminType);
+
+  if (requireOwnerAdmin && !isOwnerAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (blockOwnerAdmin && isOwnerAdmin) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -122,7 +127,14 @@ export const AppRoutes: React.FC = () => {
         <Route path="/travel" element={<TravelPage />} />
         <Route path="/orientation" element={<OrientationPage />} />
         <Route path="/tasks" element={<TasksPage />} />
-        <Route path="/messages" element={<MessagesPage />} />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.COUNSELLOR]} blockOwnerAdmin={true}>
+              <MessagesPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/masters" element={<MastersPage />} />
 
         {/* Admin Exclusive Routes */}

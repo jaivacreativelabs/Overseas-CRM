@@ -29,6 +29,8 @@ export interface NavItem {
   roles: UserRole[];
   badge?: string;
   isOwnerAdminOnly?: boolean;
+  /** Hide this item from the Owner Admin (other roles in `roles` still see it). */
+  hiddenForOwnerAdmin?: boolean;
 }
 
 export interface NavSection {
@@ -104,6 +106,7 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         path: '/messages',
         icon: MessageSquare,
         roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
+        hiddenForOwnerAdmin: true,
       },
     ],
   },
