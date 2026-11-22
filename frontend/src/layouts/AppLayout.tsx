@@ -165,6 +165,9 @@ export const AppLayout: React.FC = () => {
       if (item.isOwnerAdminOnly) {
         return isOwnerAdmin;
       }
+      if (item.hiddenForOwnerAdmin && isOwnerAdmin) {
+        return false;
+      }
       return item.roles.includes(user.role);
     }),
   })).filter((section) => section.items.length > 0);
