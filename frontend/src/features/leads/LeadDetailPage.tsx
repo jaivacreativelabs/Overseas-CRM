@@ -1308,7 +1308,6 @@ export const LeadDetailPage: React.FC = () => {
               <h4 className="ov-section-title">Tracking</h4>
               <dl className="ov-dl">
                 <div><dt>Lead source</dt><dd>{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}</dd></div>
-                <div><dt>Advisor access</dt><dd>All counsellors</dd></div>
                 <div>
                   <dt>Added</dt>
                   <dd>{lead.createdAt ? new Date(lead.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</dd>
