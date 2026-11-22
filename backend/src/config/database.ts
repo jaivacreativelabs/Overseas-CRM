@@ -3,8 +3,15 @@ import dns from 'dns';
 import { env } from './env';
 import { logger } from '../utils/logger';
 
-// Ensure standard public DNS servers are used for resolving MongoDB SRV records on Windows local development
-if (process.platform === 'win32' && env.NODE_ENV !== 'production') {
+// Prefer IPv4 first to avoid unreachable NAT64 IPv6 socket timeouts
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  // Ignore in older node runtimes
+}
+
+// Ensure standard public DNS servers are used for resolving MongoDB SRV records in development
+if (env.NODE_ENV !== 'production') {
   try {
     dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
   } catch {
@@ -27,6 +34,10 @@ export const connectDatabase = async (): Promise<void> => {
     // Set a 5-second serverSelectionTimeoutMS so if local/remote MongoDB is unreachable, it fails quickly to memory fallback in dev
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      socketTimeoutMS: 20000,
+      connectTimeoutMS: 5000,
     });
 
     isConnected = true;

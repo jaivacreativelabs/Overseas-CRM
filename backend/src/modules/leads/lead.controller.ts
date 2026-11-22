@@ -93,6 +93,15 @@ export class LeadController {
     }
   }
 
+  static async getAllCounsellingSessions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const sessions = await LeadService.getAllCounsellingSessions(req.query as any);
+      return ApiResponse.success(res, 'Counselling sessions retrieved successfully', sessions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async scheduleCounselling(req: Request, res: Response, next: NextFunction) {
     try {
       const session = await LeadService.scheduleCounselling(
@@ -533,6 +542,21 @@ export class LeadController {
     } catch (error) {
       // Always return 200 to prevent Meta webhook retry loop
       return res.status(200).send('EVENT_RECEIVED');
+    }
+  }
+
+  static async getMyStudentProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) {
+        return ApiResponse.error(res, 'Unauthenticated', 401);
+      }
+      const studentProfile = await LeadService.getStudentProfileForUser(
+        req.user.userId,
+        req.user.email
+      );
+      return ApiResponse.success(res, 'Student profile retrieved successfully', studentProfile);
+    } catch (error) {
+      next(error);
     }
   }
 }

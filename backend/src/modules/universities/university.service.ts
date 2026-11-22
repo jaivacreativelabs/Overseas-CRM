@@ -15,6 +15,9 @@ import { ApplicationStatus, StudentStage, UserRole } from '../../config/constant
 import { NotFoundError, ValidationError, StageLockedError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
+import { NotificationService } from '../notifications/notification.service';
+import { env } from '../../config/env';
 
 export class UniversityService {
   // Masters: Countries
@@ -150,6 +153,19 @@ export class UniversityService {
       description: `Shortlisted: ${course.title} at ${university.name} (${data.intake})`,
     });
 
+    void AutomationService.triggerWorkflows('shortlist.updated', {
+      _id: item._id.toString(),
+      shortlistId: item._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      studentEmail: lead.email,
+      universityName: item.universityName,
+      courseTitle: item.courseTitle,
+      intake: item.intake,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
+
     return item;
   }
 
@@ -276,6 +292,17 @@ export class UniversityService {
       title: 'University Choice Confirmed',
       description: `Student selected ${selectedItem.courseTitle} at ${selectedItem.universityName} (${selectedItem.intake})`,
     });
+
+    if (lead.counsellorId) {
+      const frontendUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+      void NotificationService.createNotification({
+        userId: lead.counsellorId.toString(),
+        title: 'University Selected',
+        message: `${studentName} selected a university`,
+        type: 'INFO',
+        actionUrl: `${frontendUrl}/leads/${lead._id}`,
+      }).catch(() => undefined);
+    }
 
     return selectedItem;
   }

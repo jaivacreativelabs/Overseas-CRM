@@ -4,6 +4,7 @@ import { LeadModel, ILead } from './lead.model';
 import { ContactAttemptModel, IContactAttempt } from './contact-attempt.model';
 import { CounsellingSessionModel, ICounsellingSession } from './counselling-session.model';
 import { UserModel } from '../users/user.model';
+import '../branches/branch.model';
 import { TaskModel } from '../tasks/task.model';
 import { ProfileEvaluationModel } from '../profile-evaluation/profile-evaluation.model';
 import {
@@ -24,6 +25,9 @@ import {
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
 import { AutomationService } from '../integrations/automation.service';
+import { EmailService } from '../integrations/email.service';
+import { NotificationService } from '../notifications/notification.service';
+import { env } from '../../config/env';
 
 export class LeadService {
   static async createLead(data: {
@@ -89,19 +93,49 @@ export class LeadService {
       });
     }
 
-    void AutomationService.triggerWorkflows('lead.created', {
-      _id: lead._id.toString(),
-      leadId: lead._id.toString(),
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      studentEmail: lead.email,
-      targetCourse: lead.targetCourse,
-      targetCountry: lead.targetCountry,
-      counsellorId: data.counsellorId,
-    } as any).catch(() => undefined);
+    // Lead remains strictly in Leads tab (studentUserId: null, status: NEW).
+    // Student user account & portal credentials email are only generated when a counsellor
+    // approves/converts the lead to student via convertToInterested.
 
     return lead;
+  }
+
+  private static async ensureStudentUserForLead(
+    lead: ILead,
+    counsellorId?: Types.ObjectId
+  ): Promise<{ studentUser: any; temporaryPassword?: string }> {
+    let studentUser = lead.studentUserId ? await UserModel.findById(lead.studentUserId) : null;
+    if (!studentUser) {
+      studentUser = await UserModel.findOne({ email: lead.email.toLowerCase() });
+    }
+
+    let temporaryPassword: string | undefined = undefined;
+
+    if (!studentUser) {
+      temporaryPassword = 'Student@' + Math.floor(100000 + Math.random() * 900000);
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(temporaryPassword, salt);
+
+      studentUser = await UserModel.create({
+        name: lead.name,
+        email: lead.email.toLowerCase(),
+        passwordHash,
+        phone: lead.phone,
+        role: UserRole.STUDENT,
+        leadId: lead._id,
+        assignedCounsellorId: counsellorId || lead.counsellorId,
+        stage: lead.stage || StudentStage.LEAD_CAPTURED,
+        isActive: true,
+      });
+
+      lead.studentUserId = studentUser._id as Types.ObjectId;
+      await lead.save();
+    } else if (!lead.studentUserId) {
+      lead.studentUserId = studentUser._id as Types.ObjectId;
+      await lead.save();
+    }
+
+    return { studentUser, temporaryPassword };
   }
 
   static async getLeads(query: {
@@ -121,38 +155,55 @@ export class LeadService {
     const limit = Math.min(100, Math.max(1, query.limit || 25));
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, any> = {
-      isArchived: query.isArchived === true,
-    };
+    const conditions: any[] = [
+      { isArchived: query.isArchived === true },
+    ];
 
-    if (query.isStudent) {
-      // Students have stage beyond LEAD_CAPTURED / PRELIMINARY_COUNSELLING or status INTERESTED
-      filter.$or = [
-        { status: LeadStatus.INTERESTED },
-        { studentUserId: { $exists: true, $ne: null } },
-      ];
+    if (query.isStudent === true) {
+      // Students have status INTERESTED or provisioned studentUserId
+      conditions.push({
+        $or: [
+          { status: LeadStatus.INTERESTED },
+          { studentUserId: { $exists: true, $ne: null } },
+        ],
+      });
     } else if (query.isStudent === false) {
-      // Plain leads
-      filter.status = { $ne: LeadStatus.INTERESTED };
-      filter.studentUserId = null;
+      // Plain leads: not converted to interested and no student user account provisioned
+      conditions.push({
+        status: { $ne: LeadStatus.INTERESTED },
+        $or: [
+          { studentUserId: null },
+          { studentUserId: { $exists: false } },
+        ],
+      });
     }
 
-    if (query.status) filter.status = query.status;
-    if (query.stage) filter.stage = query.stage;
-    if (query.source) filter.source = query.source;
-    if (query.counsellorId) filter.counsellorId = new Types.ObjectId(query.counsellorId);
-    if (query.targetCountry) filter.targetCountry = query.targetCountry;
-    if (query.branchId) filter.branchId = new Types.ObjectId(query.branchId);
+    if (query.status) conditions.push({ status: query.status });
+    if (query.stage) conditions.push({ stage: query.stage });
+    if (query.source) conditions.push({ source: query.source });
+    if (query.counsellorId) conditions.push({ counsellorId: new Types.ObjectId(query.counsellorId) });
+    if (query.targetCountry) conditions.push({ targetCountry: query.targetCountry });
+    if (query.branchId) conditions.push({ branchId: new Types.ObjectId(query.branchId) });
 
     if (query.search) {
-      filter.$or = [
-        { name: { $regex: query.search, $options: 'i' } },
-        { email: { $regex: query.search, $options: 'i' } },
-        { phone: { $regex: query.search, $options: 'i' } },
-        { city: { $regex: query.search, $options: 'i' } },
-        { targetCountry: { $regex: query.search, $options: 'i' } },
-      ];
+      const searchRegex = { $regex: query.search, $options: 'i' };
+      conditions.push({
+        $or: [
+          { name: searchRegex },
+          { email: searchRegex },
+          { phone: searchRegex },
+          { city: searchRegex },
+          { targetCountry: searchRegex },
+          { studentId: searchRegex },
+          { collegeName: searchRegex },
+          { department: searchRegex },
+          { targetCourse: searchRegex },
+          { course: searchRegex },
+        ],
+      });
     }
+
+    const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
 
     const [leads, total] = await Promise.all([
       LeadModel.find(filter)
@@ -301,6 +352,27 @@ export class LeadService {
     return contactAttempt;
   }
 
+  static async getAllCounsellingSessions(query?: {
+    counsellorId?: string;
+    leadId?: string;
+    status?: string;
+    attendance?: string;
+    date?: string;
+  }): Promise<any[]> {
+    const filter: Record<string, any> = {};
+    if (query?.counsellorId) filter.counsellorId = new Types.ObjectId(query.counsellorId);
+    if (query?.leadId) filter.leadId = new Types.ObjectId(query.leadId);
+    if (query?.status) filter.status = query.status;
+    if (query?.attendance) filter.attendance = query.attendance;
+    if (query?.date) filter.scheduledDate = query.date;
+
+    return CounsellingSessionModel.find(filter)
+      .populate('leadId', 'name email phone targetCountry targetCourse studentId avatar city')
+      .populate('counsellorId', 'name email avatar')
+      .sort({ scheduledDate: -1, scheduledTime: -1, createdAt: -1 })
+      .lean();
+  }
+
   static async scheduleCounselling(
     leadId: string,
     data: {
@@ -351,6 +423,32 @@ export class LeadService {
       title: 'Preliminary Counselling Scheduled',
       description: `Session scheduled on ${data.scheduledDate} at ${data.scheduledTime} with ${counsellorName}`,
     });
+
+    void AutomationService.triggerWorkflows('counselling.scheduled', {
+      _id: session._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      scheduledDate: session.scheduledDate,
+      scheduledTime: session.scheduledTime,
+      counsellorName: session.counsellorName,
+      counsellorId: session.counsellorId?.toString(),
+      googleMeetLink: session.googleMeetLink,
+    } as any).catch(() => undefined);
+
+    const targetStudentUserId = lead.studentUserId || (await UserModel.findOne({ email: lead.email.toLowerCase() }))?._id;
+    if (targetStudentUserId) {
+      const frontendUrl = (env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '');
+      void NotificationService.createNotification({
+        userId: targetStudentUserId.toString(),
+        title: 'Counselling Session Scheduled',
+        message: `Your counselling session with ${counsellorName} is scheduled on ${data.scheduledDate} at ${data.scheduledTime}.`,
+        type: 'INFO',
+        actionUrl: `${frontendUrl}/portal?tab=report`,
+      }).catch(() => undefined);
+    }
 
     return session;
   }
@@ -423,11 +521,12 @@ export class LeadService {
 
     // Check if student user already exists for this email
     let studentUser = await UserModel.findOne({ email: lead.email.toLowerCase() });
+    let temporaryPassword: string | undefined = undefined;
 
     if (!studentUser) {
-      const defaultPassword = 'Student@' + Math.floor(1000 + Math.random() * 9000);
+      temporaryPassword = 'Student@' + Math.floor(100000 + Math.random() * 900000);
       const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(defaultPassword, salt);
+      const passwordHash = await bcrypt.hash(temporaryPassword, salt);
 
       studentUser = await UserModel.create({
         name: lead.name,
@@ -479,6 +578,25 @@ export class LeadService {
       title: 'Converted to Student',
       description: 'Lead marked as Interested. Student Portal account provisioned.',
     });
+
+    // Send student portal credentials email now that counsellor approved the lead
+    const portalPayload = {
+      _id: lead._id.toString(),
+      leadId: lead._id.toString(),
+      studentId: studentUser._id.toString(),
+      name: lead.name,
+      studentName: lead.name,
+      email: lead.email,
+      studentEmail: lead.email,
+      phone: lead.phone,
+      targetCourse: lead.targetCourse,
+      targetCountry: lead.targetCountry,
+      counsellorName: actorName,
+      portalUsername: lead.email,
+      portalPassword: temporaryPassword || 'Use your existing account password',
+    };
+
+    void AutomationService.triggerWorkflows('student.created', portalPayload as any).catch(() => undefined);
 
     return { lead, studentUser };
   }
@@ -673,18 +791,7 @@ export class LeadService {
       description: `New lead from landing page: ${data.name} (${data.email})`,
     });
 
-    void AutomationService.triggerWorkflows('lead.created', {
-      _id: lead._id.toString(),
-      leadId: lead._id.toString(),
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      studentEmail: lead.email,
-      targetCourse: lead.targetCourse,
-      targetCountry: lead.targetCountry,
-      campaignName: data.campaignName,
-    } as any).catch(() => undefined);
-
+    // Ingested inquiries remain strictly as leads until approved by counsellor
     return { lead, isDuplicate: false };
   }
 
@@ -756,19 +863,52 @@ export class LeadService {
       description: `New Meta Ad Lead: ${data.name} (${data.email}) [Form: ${data.metaFormName || data.metaFormId || 'Default'}]`,
     });
 
-    void AutomationService.triggerWorkflows('lead.created', {
-      _id: lead._id.toString(),
-      leadId: lead._id.toString(),
-      name: lead.name,
-      email: lead.email,
-      phone: lead.phone,
-      studentEmail: lead.email,
-      targetCourse: lead.targetCourse,
-      targetCountry: lead.targetCountry,
-      campaignName: data.campaignName,
-      branchId: data.branchId ? data.branchId.toString() : undefined,
-    } as any).catch(() => undefined);
-
+    // Ingested Meta ad inquiries remain strictly as leads until approved by counsellor
     return { lead, isDuplicate: false };
+  }
+
+  static async getStudentProfileForUser(userId: string, userEmail?: string): Promise<any> {
+    const userObjectId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+    let query: any = {};
+
+    if (userObjectId && userEmail) {
+      query = {
+        $or: [
+          { studentUserId: userObjectId },
+          { email: userEmail.toLowerCase() },
+        ],
+      };
+    } else if (userObjectId) {
+      query = { studentUserId: userObjectId };
+    } else if (userEmail) {
+      query = { email: userEmail.toLowerCase() };
+    } else {
+      throw new NotFoundError('Invalid user parameters for student profile');
+    }
+
+    const lead = await LeadModel.findOne(query)
+      .populate('counsellorId', 'name email phone avatar')
+      .populate('studentUserId', 'name email isActive')
+      .lean();
+
+    if (!lead) {
+      throw new NotFoundError('No linked student record found for this account');
+    }
+
+    // Auto-heal link if missing
+    if (userObjectId && (!lead.studentUserId || lead.studentUserId.toString() !== userObjectId.toString())) {
+      await LeadModel.findByIdAndUpdate(lead._id, { studentUserId: userObjectId });
+    }
+
+    const [contactAttempts, counsellingSessions] = await Promise.all([
+      ContactAttemptModel.find({ leadId: lead._id }).sort({ attemptDate: -1 }).lean(),
+      CounsellingSessionModel.find({ leadId: lead._id }).sort({ createdAt: -1 }).lean(),
+    ]);
+
+    return {
+      ...lead,
+      contactAttempts,
+      counsellingSessions,
+    };
   }
 }

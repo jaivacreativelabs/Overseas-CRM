@@ -26,7 +26,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [token, setToken] = useState<string | null>(() => {
     return localStorage.getItem('jaiva_crm_token');
   });
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    const savedToken = typeof window !== 'undefined' ? localStorage.getItem('jaiva_crm_token') : null;
+    const savedUser = typeof window !== 'undefined' ? localStorage.getItem('jaiva_crm_user') : null;
+    return !(savedToken && savedUser);
+  });
 
   const login = (newToken: string, newUser: User) => {
     localStorage.setItem('jaiva_crm_token', newToken);

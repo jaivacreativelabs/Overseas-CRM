@@ -191,29 +191,14 @@ export const UniversityDetailsModal: React.FC<UniversityDetailsModalProps> = ({
             flexShrink: 0,
           }}
         >
-          {university.bannerUrl ? (
-            <img
-              src={university.bannerUrl}
-              alt={university.name}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Building2 size={64} color="rgba(255, 255, 255, 0.15)" />
-            </div>
-          )}
+          <img
+            src={university.bannerUrl && university.bannerUrl.trim() ? university.bannerUrl : 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80'}
+            alt={university.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80';
+            }}
+          />
 
           {/* Verified Partner Badge */}
           <div

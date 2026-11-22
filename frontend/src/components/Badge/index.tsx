@@ -16,11 +16,15 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 
   switch (status) {
     case 'NEW':
+    case 'UNDER_PROCESSING':
       variant = 'info';
       break;
     case 'CONTACTED':
     case 'UNDER_REVIEW':
     case 'PENDING':
+    case 'REQUESTED':
+    case 'DOCUMENTS_PENDING':
+    case 'ADDITIONAL_INFO_REQUIRED':
     case 'PROOF_SUBMITTED':
     case 'SIGNED_UPLOADED':
       variant = 'warning';
@@ -45,10 +49,14 @@ export const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       break;
     case 'COUNSELLING_SCHEDULED':
     case 'SUBMITTED':
+    case 'APPLICATION_SUBMITTED':
+    case 'INTERVIEW_SCHEDULED':
     case 'ISSUED':
     case 'OFFER_RECEIVED':
       variant = 'primary';
       break;
+    case 'NOT_STARTED':
+    case 'WITHDRAWN':
     default:
       variant = 'neutral';
   }

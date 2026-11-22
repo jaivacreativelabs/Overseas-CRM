@@ -7,6 +7,24 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Form';
 import { User, UserRole } from '../../types';
 
+export const STUDENT_CREDENTIALS = [
+  { id: 'STU-2026-0101', name: 'Aarav Sharma', email: 'aarav.sharma.dtu@gmail.com' },
+  { id: 'STU-2026-0102', name: 'Ananya Iyer', email: 'ananya.iyer.annauniv@gmail.com' },
+  { id: 'STU-2026-0103', name: 'Aditya Verma', email: 'aditya.verma.vjti@gmail.com' },
+  { id: 'STU-2026-0104', name: 'Diya Nambiar', email: 'diya.nambiar.nitc@gmail.com' },
+  { id: 'STU-2026-0105', name: 'Kavya Deshmukh', email: 'kavya.deshmukh.coep@gmail.com' },
+  { id: 'STU-2026-0106', name: 'Rohan Kulkarni', email: 'rohan.kulkarni.rvce@gmail.com' },
+  { id: 'STU-2026-0107', name: 'Meera Krishnan', email: 'meera.krishnan.psg@gmail.com' },
+  { id: 'STU-2026-0108', name: 'Nikhil Joshi', email: 'nikhil.joshi.manipal@gmail.com' },
+  { id: 'STU-2026-0109', name: 'Sneha Mukherjee', email: 'sneha.mukherjee.ju@gmail.com' },
+  { id: 'STU-2026-0110', name: 'Arjun Pillai', email: 'arjun.pillai.vit@gmail.com' },
+  { id: 'STU-2026-0111', name: 'Pooja Hegde', email: 'pooja.hegde.bmsce@gmail.com' },
+  { id: 'STU-2026-0112', name: 'Siddharth Rao', email: 'siddharth.rao.cbit@gmail.com' },
+  { id: 'STU-2026-0113', name: 'Tanvi Agarwal', email: 'tanvi.agarwal.thapar@gmail.com' },
+  { id: 'STU-2026-0114', name: 'Varun Nair', email: 'varun.nair.pes@gmail.com' },
+  { id: 'STU-2026-0115', name: 'Ishita Sen', email: 'ishita.sen.bits@gmail.com' },
+];
+
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -117,6 +135,36 @@ export const LoginPage: React.FC = () => {
               {demo.label}
             </button>
           ))}
+        </div>
+        <div style={{ marginTop: '10px' }}>
+          <select
+            aria-label="Quick Select Student"
+            onChange={(e) => {
+              if (e.target.value) {
+                setEmail(e.target.value);
+                setPassword('Password@123');
+              }
+            }}
+            value={STUDENT_CREDENTIALS.some((s) => s.email === email) ? email : ''}
+            style={{
+              width: '100%',
+              fontSize: '11px',
+              padding: '6px 8px',
+              backgroundColor: 'var(--bg-subtle)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="">🎓 Quick Fill: Any of the 15 Students...</option>
+            {STUDENT_CREDENTIALS.map((s) => (
+              <option key={s.email} value={s.email}>
+                {s.id}: {s.name} ({s.email})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </div>

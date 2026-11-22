@@ -32,12 +32,17 @@ import {
   TaskType,
 } from '../../config/constants';
 import { logger } from '../../utils/logger';
+import { connectDatabase } from '../../config/database';
+import { seedFifteenStudents } from './seed-15-students';
 
 export const seedDatabase = async () => {
   try {
+    // Always idempotently ensure the 15 students are present with working auth
+    await seedFifteenStudents();
+
     const userCount = await UserModel.countDocuments();
-    if (userCount > 0) {
-      logger.info('Database already contains records. Skipping seed.');
+    if (userCount > 15) {
+      logger.info('Database already contains base seed records.');
       return;
     }
 
@@ -110,6 +115,12 @@ export const seedDatabase = async () => {
       city: 'Oxford',
       website: 'https://ox.ac.uk',
       ranking: 1,
+      bannerUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const uofToronto = await UniversityModel.create({
@@ -118,6 +129,12 @@ export const seedDatabase = async () => {
       city: 'Toronto',
       website: 'https://utoronto.ca',
       ranking: 18,
+      bannerUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const uofMelbourne = await UniversityModel.create({
@@ -126,6 +143,12 @@ export const seedDatabase = async () => {
       city: 'Melbourne',
       website: 'https://unimelb.edu.au',
       ranking: 33,
+      bannerUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const tumGermany = await UniversityModel.create({
@@ -134,6 +157,12 @@ export const seedDatabase = async () => {
       city: 'Munich',
       website: 'https://tum.de',
       ranking: 49,
+      bannerUrl: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+      logoUrl: 'https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&w=200&q=80',
+      galleryPhotos: [
+        'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
+      ],
     });
 
     const courseOxfordCS = await CourseModel.create({
@@ -284,7 +313,7 @@ export const seedDatabase = async () => {
         title: 'Passport Copy (Front & Back)',
         category: 'IDENTITY',
         isMandatory: true,
-        status: DocumentStatus.SUCCESSFUL,
+        status: DocumentStatus.APPROVED,
         fileUrl: '/uploads/sample-passport.pdf',
         originalFileName: 'rohan_passport.pdf',
         reviewedById: counsellor._id,
@@ -298,7 +327,7 @@ export const seedDatabase = async () => {
         title: 'B.Tech Degree Transcripts',
         category: 'ACADEMIC',
         isMandatory: true,
-        status: DocumentStatus.SUCCESSFUL,
+        status: DocumentStatus.APPROVED,
         fileUrl: '/uploads/sample-transcripts.pdf',
         originalFileName: 'dtu_transcripts.pdf',
         reviewedById: counsellor._id,
@@ -312,7 +341,7 @@ export const seedDatabase = async () => {
         title: 'IELTS Official Test Report',
         category: 'LANGUAGE_TEST',
         isMandatory: true,
-        status: DocumentStatus.SUCCESSFUL,
+        status: DocumentStatus.APPROVED,
         fileUrl: '/uploads/sample-ielts.pdf',
         originalFileName: 'ielts_scorecard.pdf',
         reviewedById: counsellor._id,
@@ -326,7 +355,7 @@ export const seedDatabase = async () => {
         title: 'Statement of Purpose (SOP)',
         category: 'ACADEMIC',
         isMandatory: true,
-        status: DocumentStatus.SUCCESSFUL,
+        status: DocumentStatus.APPROVED,
         fileUrl: '/uploads/sample-sop.pdf',
         originalFileName: 'rohan_sop_oxford.pdf',
         reviewedById: counsellor._id,
@@ -495,3 +524,15 @@ export const seedDatabase = async () => {
     logger.error('Error during database seed:', error);
   }
 };
+
+if (require.main === module) {
+  connectDatabase()
+    .then(async () => {
+      await seedDatabase();
+      process.exit(0);
+    })
+    .catch((err) => {
+      logger.error('Seed execution error:', err);
+      process.exit(1);
+    });
+}

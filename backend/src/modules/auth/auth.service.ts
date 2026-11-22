@@ -12,7 +12,10 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<{ token: string; user: Partial<IUser> }> {
-    const user = await UserModel.findOne({ email: email.toLowerCase() });
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanPassword = typeof password === 'string' ? password.trim() : '';
+
+    const user = await UserModel.findOne({ email: cleanEmail });
     if (!user) {
       throw new UnauthorizedError('Invalid email or password');
     }
@@ -21,7 +24,10 @@ export class AuthService {
       throw new ForbiddenError('Your account has been deactivated or archived. Please contact administration.');
     }
 
-    const isMatch = await user.comparePassword(password);
+    let isMatch = await user.comparePassword(password);
+    if (!isMatch && cleanPassword !== password) {
+      isMatch = await user.comparePassword(cleanPassword);
+    }
     if (!isMatch) {
       throw new UnauthorizedError('Invalid email or password');
     }

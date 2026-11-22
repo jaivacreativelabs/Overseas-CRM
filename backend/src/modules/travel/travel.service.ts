@@ -5,6 +5,7 @@ import { TravelItemStatus, StudentStage, UserRole } from '../../config/constants
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { AutomationService } from '../integrations/automation.service';
 
 export class TravelService {
   static async getTravelForLead(leadId: string): Promise<ITravelSupport> {
@@ -66,6 +67,16 @@ export class TravelService {
       description: 'Pre-departure travel, accommodation, or insurance details were updated.',
     });
 
+    void AutomationService.triggerWorkflows('travel.updated', {
+      _id: travel._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
+
     return travel;
   }
 
@@ -97,6 +108,17 @@ export class TravelService {
       title: 'Student Departed',
       description: `Student departure recorded on ${new Date(departureDate).toLocaleDateString()}`,
     });
+
+    void AutomationService.triggerWorkflows('departure.recorded', {
+      _id: travel._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      departureDate: travel.departureDate,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
 
     return travel;
   }
@@ -130,6 +152,18 @@ export class TravelService {
       title: 'Arrival Confirmed',
       description: `Student arrival confirmed in destination country on ${new Date(data.arrivalDate).toLocaleDateString()}`,
     });
+
+    void AutomationService.triggerWorkflows('arrival.confirmed', {
+      _id: travel._id.toString(),
+      leadId: lead._id.toString(),
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      studentEmail: lead.email,
+      arrivalDate: travel.arrivalDate,
+      arrivalNotes: travel.arrivalNotes,
+      counsellorId: lead.counsellorId?.toString(),
+    } as any).catch(() => undefined);
 
     return travel;
   }

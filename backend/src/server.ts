@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { connectDatabase } from './config/database';
 import { env } from './config/env';
 import { logger } from './utils/logger';
+import { AutomationService } from './modules/integrations/automation.service';
 import { seedDatabase } from './database/seeders/seed';
 
 const startServer = async () => {
@@ -10,14 +11,17 @@ const startServer = async () => {
     const app = createApp();
 
     // 2. Start HTTP Server immediately
-    const server = app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, '127.0.0.1', () => {
       logger.info(`🚀 Overseas Education CRM Backend & Frontend running on http://localhost:${env.PORT}`);
       logger.info(`📡 API Base URL: http://localhost:${env.PORT}/api/v1`);
     });
 
     // 3. Connect to Database & Seed asynchronously
     connectDatabase()
-      .then(() => seedDatabase())
+      .then(async () => {
+        await seedDatabase();
+        await AutomationService.initializeDefaultWorkflows();
+      })
       .catch((err) => logger.error('Database connection error:', err));
 
     // Graceful shutdown handling

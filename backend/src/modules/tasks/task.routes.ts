@@ -5,10 +5,10 @@ import { requireStaff } from '../../middleware/rbac.middleware';
 
 const router = Router();
 
-router.use(authenticate, requireStaff);
+router.use(authenticate);
 
 router.get('/', TaskController.getTasks);
-router.post('/', TaskController.createTask);
-router.put('/:id/status', TaskController.updateStatus);
+router.post('/', requireStaff, TaskController.createTask);
+router.put('/:id/status', requireStaff, TaskController.updateStatus);
 
 export default router;
