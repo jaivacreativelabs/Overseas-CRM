@@ -7,27 +7,31 @@ import { AppLayout } from '../layouts/AppLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 
 import { LoginPage } from '../features/auth/LoginPage';
-import { DashboardPage } from '../features/dashboard/DashboardPage';
-import { LeadsPage } from '../features/leads/LeadsPage';
-import { LeadDetailPage } from '../features/leads/LeadDetailPage';
-import { CounsellingPage } from '../features/counselling/CounsellingPage';
-import { UniversitiesPage } from '../features/universities/UniversitiesPage';
-import { DocumentsPage } from '../features/documents/DocumentsPage';
-import { ApplicationsPage } from '../features/applications/ApplicationsPage';
-import { OffersPage } from '../features/offers/OffersPage';
-import { PaymentsPage } from '../features/payments/PaymentsPage';
-import { VisaPage } from '../features/visa/VisaPage';
-import { TravelPage } from '../features/travel/TravelPage';
-import { OrientationPage } from '../features/orientation/OrientationPage';
-import { TasksPage } from '../features/tasks/TasksPage';
-import { MessagesPage } from '../features/messages/MessagesPage';
-import { ReportsPage } from '../features/reports/ReportsPage';
-import { UsersPage } from '../features/users/UsersPage';
-import { MastersPage } from '../features/masters/MastersPage';
-import { AuditLogsPage } from '../features/audit-logs/AuditLogsPage';
-import { StudentPortalPage } from '../features/student-portal/StudentPortalPage';
-import { BranchesPage } from '../features/branches/BranchesPage';
-import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
+// Route-level code splitting: each page downloads only when first opened, so the initial
+// load ships just the shell + login instead of every page and the charts library.
+const lazyPage = <T extends Record<string, any>, K extends keyof T>(loader: () => Promise<T>, name: K) =>
+  React.lazy(() => loader().then((m) => ({ default: m[name] as React.ComponentType<any> })));
+
+const DashboardPage = lazyPage(() => import('../features/dashboard/DashboardPage'), 'DashboardPage');
+const LeadsPage = lazyPage(() => import('../features/leads/LeadsPage'), 'LeadsPage');
+const LeadDetailPage = lazyPage(() => import('../features/leads/LeadDetailPage'), 'LeadDetailPage');
+const CounsellingPage = lazyPage(() => import('../features/counselling/CounsellingPage'), 'CounsellingPage');
+const UniversitiesPage = lazyPage(() => import('../features/universities/UniversitiesPage'), 'UniversitiesPage');
+const DocumentsPage = lazyPage(() => import('../features/documents/DocumentsPage'), 'DocumentsPage');
+const ApplicationsPage = lazyPage(() => import('../features/applications/ApplicationsPage'), 'ApplicationsPage');
+const OffersPage = lazyPage(() => import('../features/offers/OffersPage'), 'OffersPage');
+const PaymentsPage = lazyPage(() => import('../features/payments/PaymentsPage'), 'PaymentsPage');
+const VisaPage = lazyPage(() => import('../features/visa/VisaPage'), 'VisaPage');
+const TravelPage = lazyPage(() => import('../features/travel/TravelPage'), 'TravelPage');
+const OrientationPage = lazyPage(() => import('../features/orientation/OrientationPage'), 'OrientationPage');
+const TasksPage = lazyPage(() => import('../features/tasks/TasksPage'), 'TasksPage');
+const MessagesPage = lazyPage(() => import('../features/messages/MessagesPage'), 'MessagesPage');
+const ReportsPage = lazyPage(() => import('../features/reports/ReportsPage'), 'ReportsPage');
+const UsersPage = lazyPage(() => import('../features/users/UsersPage'), 'UsersPage');
+const MastersPage = lazyPage(() => import('../features/masters/MastersPage'), 'MastersPage');
+const AuditLogsPage = lazyPage(() => import('../features/audit-logs/AuditLogsPage'), 'AuditLogsPage');
+const StudentPortalPage = lazyPage(() => import('../features/student-portal/StudentPortalPage'), 'StudentPortalPage');
+const BranchesPage = lazyPage(() => import('../features/branches/BranchesPage'), 'BranchesPage');
 
 const ProtectedRoute: React.FC<{
   children: React.ReactElement;
@@ -67,6 +71,7 @@ export const AppRoutes: React.FC = () => {
   const { user } = useAuth();
 
   return (
+    <React.Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}>Loading…</div>}>
     <Routes>
       {/* Public Auth Routes */}
       <Route element={<AuthLayout />}>
@@ -146,5 +151,6 @@ export const AppRoutes: React.FC = () => {
         element={<Navigate to={user?.role === UserRole.STUDENT ? '/portal' : '/dashboard'} replace />}
       />
     </Routes>
+    </React.Suspense>
   );
 };

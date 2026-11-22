@@ -126,6 +126,11 @@ export class UniversityService {
     const course = await CourseModel.findById(data.courseId);
     if (!course) throw new NotFoundError('Course not found');
 
+    const duplicate = await ShortlistModel.exists({ leadId: lead._id, courseId: course._id });
+    if (duplicate) {
+      throw new ValidationError(`${course.title} at ${university.name} is already on this student's shortlist.`);
+    }
+
     const item = await ShortlistModel.create({
       leadId: lead._id,
       studentId: lead.studentUserId,

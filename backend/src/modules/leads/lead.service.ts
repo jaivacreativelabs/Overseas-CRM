@@ -43,6 +43,7 @@ export class LeadService {
     budget?: string;
     source?: LeadSource;
     counsellorId?: string;
+    branchId?: string;
     notes?: string;
     actorUserId?: string;
     actorName?: string;
@@ -68,6 +69,8 @@ export class LeadService {
       status: LeadStatus.NEW,
       stage: StudentStage.LEAD_CAPTURED,
       counsellorId: data.counsellorId ? new Types.ObjectId(data.counsellorId) : undefined,
+      // Form sends '' when no branch is picked; only persist a real id.
+      branchId: data.branchId && Types.ObjectId.isValid(data.branchId) ? new Types.ObjectId(data.branchId) : undefined,
       notes: data.notes,
     });
 
@@ -232,6 +235,7 @@ export class LeadService {
     const lead = await LeadModel.findById(id)
       .populate('counsellorId', 'name email phone avatar')
       .populate('studentUserId', 'name email isActive')
+      .populate('branchId', 'name city state branchId')
       .lean();
 
     if (!lead) {

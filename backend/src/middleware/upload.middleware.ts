@@ -1,34 +1,13 @@
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
+import crypto from 'crypto';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { AppError } from '../utils/errors';
+import { saveFile } from '../utils/file-storage';
 
-import os from 'os';
-
-// Ensure uploads directory exists (use /tmp in serverless environments like Vercel)
-export const uploadDir =
-  process.env.VERCEL || process.env.NODE_ENV === 'production'
-    ? path.join(os.tmpdir(), 'uploads')
-    : path.resolve(process.cwd(), 'uploads');
-
-try {
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
-} catch {
-  // Ignore filesystem errors in read-only serverless environments
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
-  },
-});
+// Files are held in memory, then persisted to MongoDB GridFS (see utils/file-storage.ts).
+// Disk storage does not survive on Vercel's serverless filesystem.
+const storage = multer.memoryStorage();
 
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   // Allow common document and image types
@@ -48,10 +27,33 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
   }
 };
 
-export const upload = multer({
+const multerUpload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: 15 * 1024 * 1024, // 15MB limit
   },
 });
+
+/**
+ * After multer parses the file, store it in GridFS and set `req.file.filename` to the stored name,
+ * so controllers keep building `/uploads/${file.filename}` URLs exactly as before.
+ */
+const persistUploadedFile = async (req: Request, _res: Response, next: NextFunction) => {
+  const file = req.file;
+  if (!file || !file.buffer) return next();
+  try {
+    const ext = path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '');
+    // Random 128-bit token: stored file URLs cannot be guessed or enumerated.
+    const filename = `${file.fieldname}-${Date.now()}-${crypto.randomBytes(16).toString('hex')}${ext}`;
+    await saveFile(filename, file.buffer, file.mimetype, file.originalname);
+    file.filename = filename;
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const upload = {
+  single: (fieldName: string): RequestHandler[] => [multerUpload.single(fieldName), persistUploadedFile],
+};

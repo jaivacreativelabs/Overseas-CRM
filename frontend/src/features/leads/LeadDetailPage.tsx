@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -31,6 +31,7 @@ import {
   AlertCircle,
   X,
   MoreVertical,
+  EyeOff,
   Globe,
   GraduationCap,
   DollarSign,
@@ -48,6 +49,8 @@ import {
   LeadStatus,
   ProfileEvaluation,
   Shortlist,
+  University,
+  Course,
   DocumentItem,
   Application,
   Offer,
@@ -70,7 +73,6 @@ import { Badge, StatusBadge } from '../../components/Badge';
 import { Table } from '../../components/Table';
 import { Modal, Drawer, ConfirmDialog } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
-import { PinButton } from '../../components/PinButton';
 
 type ActiveSection =
   | 'overview'
@@ -275,6 +277,24 @@ export const LeadDetailPage: React.FC = () => {
 
   // Sub-modals
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+
+  // Overview "Activity" hub: one composer (message / internal note / call) + one merged feed
+  const [composerMode, setComposerMode] = useState<'message' | 'note' | 'call'>('message');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'call' | 'message' | 'note' | 'update'>('all');
+
+  // University shortlist curation: counsellor picks which universities/courses the student sees.
+  const [isShortlistModalOpen, setIsShortlistModalOpen] = useState(false);
+  const [shortlistUniversities, setShortlistUniversities] = useState<University[]>([]);
+  const [shortlistCourses, setShortlistCourses] = useState<Course[]>([]);
+  const [shortlistForm, setShortlistForm] = useState({
+    universityId: '',
+    courseId: '',
+    intake: '',
+    notes: '',
+    isVisibleToStudent: true,
+  });
+  const [shortlistSaving, setShortlistSaving] = useState(false);
+  const [visibilityUpdatingId, setVisibilityUpdatingId] = useState<string | null>(null);
   const [docTitle, setDocTitle] = useState('');
   const [docCategory, setDocCategory] = useState<'ACADEMIC' | 'IDENTITY' | 'FINANCIAL' | 'LANGUAGE_TEST' | 'EXPERIENCE' | 'OTHER'>('ACADEMIC');
   const [docMandatory, setDocMandatory] = useState(true);
@@ -330,24 +350,26 @@ export const LeadDetailPage: React.FC = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
     title: '',
-    purpose: 'TUITION_DEPOSIT' as const,
+    purpose: 'TUITION_DEPOSIT' as 'TUITION_DEPOSIT' | 'APPLICATION_FEE' | 'VISA_FEE' | 'INSURANCE' | 'OTHER',
     amount: 0,
-    currency: 'USD',
+    currency: 'INR',
     bankDetails: '',
   });
 
   const [newMessage, setNewMessage] = useState('');
   const [isInternalNote, setIsInternalNote] = useState(false);
 
+  // Full-page loader only on the first load of a record; refreshes after an action update in place.
+  const loadedLeadIdRef = useRef<string | null>(null);
+
   const fetchLeadDetails = useCallback(async () => {
     if (!id) return;
-    setLoading(true);
+    const isFirstLoad = loadedLeadIdRef.current !== id;
+    if (isFirstLoad) setLoading(true);
     try {
-      const res = await apiClient.get<Lead>(`/leads/${id}`);
-      setLead(res.data);
-
-      // Concurrently fetch tab details
-      const [profRes, shortRes, docRes, appRes, offRes, payRes, visRes, travRes, msgRes, actRes] = await Promise.all([
+      // The lead and all tab data are requested together (one round trip instead of two).
+      const [res, profRes, shortRes, docRes, appRes, offRes, payRes, visRes, travRes, msgRes, actRes] = await Promise.all([
+        apiClient.get<Lead>(`/leads/${id}`),
         apiClient.get<ProfileEvaluation>(`/profile-evaluations/${id}`).catch(() => ({ data: null })),
         apiClient.get<Shortlist[]>(`/universities/shortlists/${id}`).catch(() => ({ data: [] })),
         apiClient.get<DocumentItem[]>(`/documents/lead/${id}`).catch(() => ({ data: [] })),
@@ -360,6 +382,8 @@ export const LeadDetailPage: React.FC = () => {
         apiClient.get<Activity[]>(`/activities/${id}`).catch(() => ({ data: [] })),
       ]);
 
+      setLead(res.data);
+      loadedLeadIdRef.current = id;
       setProfile(profRes.data);
       setShortlist(shortRes.data || []);
       setDocuments(docRes.data || []);
@@ -373,7 +397,7 @@ export const LeadDetailPage: React.FC = () => {
     } catch (err: any) {
       error(err.message || 'Failed to fetch lead details');
     } finally {
-      setLoading(false);
+      if (isFirstLoad) setLoading(false);
     }
   }, [id, error]);
 
@@ -638,6 +662,10 @@ export const LeadDetailPage: React.FC = () => {
   const handleCreatePaymentRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
+    if (!paymentForm.title.trim() || !(paymentForm.amount > 0)) {
+      error('Enter a fee title and an amount greater than 0.');
+      return;
+    }
     try {
       await apiClient.post(`/payments/lead/${id}/request`, paymentForm);
       success('Payment request generated.');
@@ -652,7 +680,7 @@ export const LeadDetailPage: React.FC = () => {
   const handleVerifyPayment = async (paymentId: string) => {
     try {
       await apiClient.put(`/payments/${paymentId}/verify`, { status: PaymentStatus.VERIFIED });
-      success('Payment verified! Visa Filing stage is now unlocked.');
+      success('Payment verified.');
       fetchLeadDetails();
     } catch (err: any) {
       error(err.message || 'Failed to verify payment');
@@ -804,202 +832,349 @@ export const LeadDetailPage: React.FC = () => {
   }
 
   const currentProcessInfo = getCurrentProcessInfo(lead.stage);
+  const headerBranch = typeof lead.branchId === 'object' && lead.branchId ? lead.branchId : null;
+
+  const openEditLeadModal = () => {
+    setEditForm({
+      name: lead.name || '',
+      email: lead.email || '',
+      phone: lead.phone || '',
+      city: lead.city || '',
+      targetCountry: lead.targetCountry || '',
+      targetCourse: lead.targetCourse || '',
+      targetIntake: lead.targetIntake || 'Fall 2026',
+      budget: lead.budget || '',
+      source: (lead.source as any) || LeadSource.WEBSITE,
+      counsellorId: lead.counsellorId?._id || '',
+      notes: lead.notes || '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // ---- Overview Activity feed: contact attempts + messages/notes + journey updates, newest first ----
+  type FeedKind = 'call' | 'message' | 'note' | 'update';
+  type FeedItem = { id: string; kind: FeedKind; at: string; title: string; tag?: string; tagTone?: string; body?: string; by?: string };
+  const contactMethodLabel: Record<string, string> = { PHONE: 'Phone call', CALL: 'Phone call', WHATSAPP: 'WhatsApp', EMAIL: 'Email', SMS: 'SMS' };
+  const feedItems: FeedItem[] = [
+    ...(((lead as any).contactAttempts || []) as any[]).map((ca) => ({
+      id: `ca-${ca._id}`,
+      kind: 'call' as const,
+      at: ca.attemptDate || ca.createdAt,
+      title: contactMethodLabel[ca.method] || (ca.method ? String(ca.method).replace(/_/g, ' ') : 'Contact attempt'),
+      tag: ca.outcome ? String(ca.outcome).replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c: string) => c.toUpperCase()) : undefined,
+      tagTone: ca.outcome === 'CONNECTED' ? 'good' : ca.outcome === 'CALLBACK_REQUESTED' ? 'info' : 'warn',
+      body: ca.notes,
+      by: ca.recordedByName || 'Advisor',
+    })),
+    ...messages.map((m) => ({
+      id: `msg-${m._id}`,
+      kind: (m.isInternalNote ? 'note' : 'message') as FeedKind,
+      at: m.createdAt,
+      title: m.isInternalNote ? 'Internal note' : m.senderRole === UserRole.STUDENT ? 'Message from student' : 'Message to student',
+      tag: m.isInternalNote ? 'Staff only' : undefined,
+      tagTone: 'note',
+      body: m.content,
+      by: m.senderName,
+    })),
+    // Messages and contact attempts already appear above; skip their duplicate journey events.
+    ...activities
+      .filter((act) => act.action !== 'MESSAGE_SENT' && !/CONTACT_ATTEMPT/.test(act.action || ''))
+      .map((act) => ({
+        id: `act-${act._id}`,
+        kind: 'update' as const,
+        at: act.createdAt,
+        title: act.title,
+        body: act.description,
+        by: act.actorName || 'System',
+      })),
+  ]
+    .filter((item) => item.at)
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  const feedCounts = {
+    all: feedItems.length,
+    call: feedItems.filter((i) => i.kind === 'call').length,
+    message: feedItems.filter((i) => i.kind === 'message').length,
+    note: feedItems.filter((i) => i.kind === 'note').length,
+    update: feedItems.filter((i) => i.kind === 'update').length,
+  };
+  const visibleFeed = activityFilter === 'all' ? feedItems : feedItems.filter((i) => i.kind === activityFilter);
+  const isToday = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
+  const formatFeedTime = (iso: string) =>
+    isToday(iso)
+      ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+      : new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const academicMissing = profile?.missingFields?.length || 0;
+
+  const refreshShortlist = async () => {
+    const res = await apiClient.get<Shortlist[]>(`/universities/shortlists/${id}`);
+    setShortlist(res.data || []);
+  };
+
+  const openAddShortlist = async () => {
+    setShortlistForm({ universityId: '', courseId: '', intake: lead.targetIntake || '', notes: '', isVisibleToStudent: true });
+    setShortlistCourses([]);
+    setIsShortlistModalOpen(true);
+    if (shortlistUniversities.length === 0) {
+      try {
+        const res = await apiClient.get<University[]>('/universities/list');
+        setShortlistUniversities(res.data || []);
+      } catch (err: any) {
+        error(err.message || 'Could not load universities');
+      }
+    }
+  };
+
+  const handleShortlistUniversityChange = async (universityId: string) => {
+    setShortlistForm((prev) => ({ ...prev, universityId, courseId: '' }));
+    setShortlistCourses([]);
+    if (!universityId) return;
+    try {
+      const res = await apiClient.get<Course[]>('/universities/courses', { universityId });
+      setShortlistCourses(res.data || []);
+    } catch (err: any) {
+      error(err.message || 'Could not load courses');
+    }
+  };
+
+  const handleAddShortlist = async () => {
+    if (!shortlistForm.universityId || !shortlistForm.courseId || !shortlistForm.intake.trim()) {
+      error('Choose a university, a course and an intake.');
+      return;
+    }
+    setShortlistSaving(true);
+    try {
+      await apiClient.post(`/universities/shortlists/${id}`, {
+        ...shortlistForm,
+        intake: shortlistForm.intake.trim(),
+      });
+      success(shortlistForm.isVisibleToStudent ? 'University added and shown to the student' : 'University added (hidden from student)');
+      setIsShortlistModalOpen(false);
+      await refreshShortlist();
+    } catch (err: any) {
+      error(err.message || 'Failed to add university');
+    } finally {
+      setShortlistSaving(false);
+    }
+  };
+
+  const handleToggleShortlistVisibility = async (item: Shortlist) => {
+    const nextVisible = !item.isVisibleToStudent;
+    setVisibilityUpdatingId(item._id);
+    try {
+      await apiClient.put(`/universities/shortlists/item/${item._id}/visibility`, { isVisible: nextVisible });
+      setShortlist((prev) => prev.map((s) => (s._id === item._id ? { ...s, isVisibleToStudent: nextVisible } : s)));
+      success(nextVisible ? `${item.universityName} is now shown to the student` : `${item.universityName} is now hidden from the student`);
+    } catch (err: any) {
+      error(err.message || 'Failed to update visibility');
+    } finally {
+      setVisibilityUpdatingId(null);
+    }
+  };
+
+  const selectedShortlistCourse = shortlistCourses.find((c) => c._id === shortlistForm.courseId);
   const isOverview = activeSection === 'overview';
   const isDocuments = activeSection === 'documents';
   const isCurrentProcess = activeSection === 'currentProcess' || activeSection === currentProcessInfo.key;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Redesigned Student & Lead Record Header (Swiss Minimalism & Action Hierarchy) */}
-      <div className="lead-record-header">
-        <div className="lead-identity-group">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<ArrowLeft size={16} />}
-            onClick={() => navigate(isStudentRoute ? '/students' : '/leads')}
-          >
-            Back
-          </Button>
-          <div className="lead-avatar-badge">
-            {lead.name ? lead.name.charAt(0).toUpperCase() : 'S'}
-          </div>
+      {/* Lead / Student record header: identity + actions on top, labelled contact facts below */}
+      <div className="lead-header-wrap">
+        <button
+          type="button"
+          className="lead-back-link"
+          onClick={() => navigate(isStudentRoute ? '/students' : '/leads')}
+        >
+          <ArrowLeft size={16} />
+          {isStudentRoute ? 'Back to Students' : 'Back to Leads'}
+        </button>
 
-          <div className="lead-identity-meta">
-            <div className="lead-title-row">
-              <h1 className="lead-name-text">{lead.name}</h1>
-              {lead.studentId && (
-                <span
-                  style={{
-                    fontSize: '11.5px',
-                    fontWeight: 600,
-                    color: '#0057F8',
-                    backgroundColor: '#EFF6FF',
-                    border: '1px solid #BFDBFE',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  ID: {lead.studentId}
-                </span>
-              )}
-              <PinButton
-                item={{
-                  id: lead._id,
-                  category: 'student',
-                  title: lead.name,
-                  subtitle: `${lead.email} • ${lead.phone || ''}`,
-                  path: isStudentRoute ? `/students/${lead._id}` : `/leads/${lead._id}`,
-                  pinnedAt: new Date().toISOString(),
+        <section className="lead-record-header" aria-label={isStudentRoute ? 'Student summary' : 'Lead summary'}>
+          <div className="lead-header-top">
+            <div className="lead-identity-group">
+              <div className="lead-avatar-badge" aria-hidden="true">
+                {(lead.name || 'S')
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part: string) => part.charAt(0).toUpperCase())
+                  .join('')}
+              </div>
+              <div className="lead-identity-meta">
+                <div className="lead-title-row">
+                  <h1 className="lead-name-text">{lead.name}</h1>
+                  <StatusBadge status={lead.status} />
+                </div>
+                <p className="lead-subline">
+                  Stage: {lead.stage.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                  {lead.studentId && <> · ID {lead.studentId}</>}
+                  {lead.createdAt && (
+                    <> · Added {new Date(lead.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions: 2 secondary + 1 primary, then icon-only Pin and "..." menu */}
+            <div className="lead-header-actions-bar" ref={moreMenuRef}>
+              <Button
+                variant="secondary"
+                className="lead-action-btn"
+                icon={<PhoneCall size={16} />}
+                onClick={() => setIsContactModalOpen(true)}
+              >
+                Log contact
+              </Button>
+
+              <Button
+                variant="secondary"
+                className="lead-action-btn"
+                icon={<Calendar size={16} />}
+                onClick={() => {
+                  setCounsellingForm({
+                    scheduledDate: new Date().toISOString().split('T')[0],
+                    scheduledTime: '11:00',
+                    googleMeetLink: '',
+                    notes: '',
+                    counsellorId: lead.counsellorId?._id || user?._id || '',
+                  });
+                  setIsCounsellingModalOpen(true);
                 }}
-              />
-              <StatusBadge status={lead.status} />
-              <Badge variant="primary">{lead.stage.replace(/_/g, ' ')}</Badge>
-            </div>
-            <div className="lead-contact-strip">
-              <span className="lead-contact-item">
-                <Mail size={13} style={{ flexShrink: 0 }} />
-                {lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : 'No email'}
-              </span>
-              <span className="lead-contact-item">
-                <Phone size={13} style={{ flexShrink: 0 }} />
-                {lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : 'No phone'}
-              </span>
-              <span className="lead-contact-item">
-                <MapPin size={13} style={{ flexShrink: 0 }} />
-                {[lead.city, lead.country].filter(Boolean).join(', ') || 'India'}
-              </span>
-              <span className="lead-contact-item">
-                <strong>Source:</strong>{' '}
-                <Badge variant="neutral">{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}</Badge>
-              </span>
-            </div>
-          </div>
-        </div>
+              >
+                Schedule Counselling
+              </Button>
 
-        {/* Clean Action Hierarchy: 1 Primary CTA + 2 Fast Contact Triggers + 1 "..." Menu */}
-        <div className="lead-header-actions-bar" ref={moreMenuRef}>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<PhoneCall size={14} />}
-            onClick={() => setIsContactModalOpen(true)}
-          >
-            Call / Contact
-          </Button>
+              {lead.status !== LeadStatus.INTERESTED && lead.status !== LeadStatus.CLOSED_LOST && (
+                <Button
+                  variant="primary"
+                  className="lead-action-btn"
+                  icon={<CheckCircle2 size={16} />}
+                  onClick={handleConvertToStudent}
+                  loading={actionLoading}
+                >
+                  Convert to Student
+                </Button>
+              )}
 
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Calendar size={14} />}
-            onClick={() => {
-              setCounsellingForm({
-                scheduledDate: new Date().toISOString().split('T')[0],
-                scheduledTime: '11:00',
-                googleMeetLink: '',
-                notes: '',
-                counsellorId: lead.counsellorId?._id || user?._id || '',
-              });
-              setIsCounsellingModalOpen(true);
-            }}
-          >
-            Schedule Counselling
-          </Button>
+              {lead.status === LeadStatus.CLOSED_LOST && (
+                <Button
+                  variant="secondary"
+                  className="lead-action-btn"
+                  icon={<RotateCcw size={16} color="var(--primary)" />}
+                  onClick={handleReopen}
+                  loading={actionLoading}
+                >
+                  Reopen Lead
+                </Button>
+              )}
 
-          {lead.status !== LeadStatus.INTERESTED && lead.status !== LeadStatus.CLOSED_LOST && (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<CheckCircle2 size={14} />}
-              onClick={handleConvertToStudent}
-              loading={actionLoading}
-            >
-              Convert to Student
-            </Button>
-          )}
-
-          {lead.status === LeadStatus.CLOSED_LOST && (
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<RotateCcw size={14} color="var(--primary)" />}
-              onClick={handleReopen}
-              loading={actionLoading}
-            >
-              Reopen Lead
-            </Button>
-          )}
-
-          {/* More Actions Popover */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              className="lead-more-btn"
-              title="More Actions"
-              aria-label="More options"
-              onClick={() => setIsMoreMenuOpen(prev => !prev)}
-            >
-              <MoreVertical size={16} />
-            </button>
-
-            {isMoreMenuOpen && (
-              <div className="lead-more-dropdown">
+              {/* More Actions Popover */}
+              <div style={{ position: 'relative' }}>
                 <button
                   type="button"
-                  className="lead-more-dropdown-item"
-                  onClick={() => {
-                    setIsMoreMenuOpen(false);
-                    setEditForm({
-                      name: lead.name || '',
-                      email: lead.email || '',
-                      phone: lead.phone || '',
-                      city: lead.city || '',
-                      targetCountry: lead.targetCountry || '',
-                      targetCourse: lead.targetCourse || '',
-                      targetIntake: lead.targetIntake || 'Fall 2026',
-                      budget: lead.budget || '',
-                      source: (lead.source as any) || LeadSource.WEBSITE,
-                      counsellorId: lead.counsellorId?._id || '',
-                      notes: lead.notes || '',
-                    });
-                    setIsEditModalOpen(true);
-                  }}
+                  className="lead-icon-btn"
+                  title="More actions"
+                  aria-label="More actions"
+                  aria-haspopup="menu"
+                  aria-expanded={isMoreMenuOpen}
+                  onClick={() => setIsMoreMenuOpen(prev => !prev)}
                 >
-                  <Edit3 size={14} />
-                  <span>Edit Lead Info</span>
+                  <MoreVertical size={16} />
                 </button>
 
-                {lead.status !== LeadStatus.CLOSED_LOST && (
-                  <button
-                    type="button"
-                    className="lead-more-dropdown-item"
-                    onClick={() => {
-                      setIsMoreMenuOpen(false);
-                      setIsClosedLostModalOpen(true);
-                    }}
-                  >
-                    <XCircle size={14} color="var(--danger)" />
-                    <span>Mark Closed Lost</span>
-                  </button>
-                )}
+                {isMoreMenuOpen && (
+                  <div className="lead-more-dropdown">
+                    <button
+                      type="button"
+                      className="lead-more-dropdown-item"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        setEditForm({
+                          name: lead.name || '',
+                          email: lead.email || '',
+                          phone: lead.phone || '',
+                          city: lead.city || '',
+                          targetCountry: lead.targetCountry || '',
+                          targetCourse: lead.targetCourse || '',
+                          targetIntake: lead.targetIntake || 'Fall 2026',
+                          budget: lead.budget || '',
+                          source: (lead.source as any) || LeadSource.WEBSITE,
+                          counsellorId: lead.counsellorId?._id || '',
+                          notes: lead.notes || '',
+                        });
+                        setIsEditModalOpen(true);
+                      }}
+                    >
+                      <Edit3 size={14} />
+                      <span>Edit Lead Info</span>
+                    </button>
 
-                {isAdmin && (
-                  <button
-                    type="button"
-                    className="lead-more-dropdown-item danger"
-                    onClick={() => {
-                      setIsMoreMenuOpen(false);
-                      setIsDeleteConfirmOpen(true);
-                    }}
-                  >
-                    <Trash2 size={14} />
-                    <span>{isStudentRoute ? 'Delete Student' : 'Delete Lead'}</span>
-                  </button>
+                    {lead.status !== LeadStatus.CLOSED_LOST && (
+                      <button
+                        type="button"
+                        className="lead-more-dropdown-item"
+                        onClick={() => {
+                          setIsMoreMenuOpen(false);
+                          setIsClosedLostModalOpen(true);
+                        }}
+                      >
+                        <XCircle size={14} color="var(--danger)" />
+                        <span>Mark Closed Lost</span>
+                      </button>
+                    )}
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="lead-more-dropdown-item danger"
+                        onClick={() => {
+                          setIsMoreMenuOpen(false);
+                          setIsDeleteConfirmOpen(true);
+                        }}
+                      >
+                        <Trash2 size={14} />
+                        <span>{isStudentRoute ? 'Delete Student' : 'Delete Lead'}</span>
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+
+            <div className="lead-header-divider" aria-hidden="true" />
+
+            <dl className="lead-facts">
+              <div className="lead-fact">
+                <dt><Mail size={13} /> Email</dt>
+                <dd>{lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : <span className="lead-fact-empty">Not provided</span>}</dd>
+              </div>
+              <div className="lead-fact">
+                <dt><Phone size={13} /> Phone</dt>
+                <dd>{lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : <span className="lead-fact-empty">Not provided</span>}</dd>
+              </div>
+              <div className="lead-fact">
+                <dt><MapPin size={13} /> Location</dt>
+                <dd>{[lead.city, lead.country].filter(Boolean).join(', ') || <span className="lead-fact-empty">Not provided</span>}</dd>
+              </div>
+              <div className="lead-fact">
+                <dt><Globe size={13} /> Source</dt>
+                <dd>{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}</dd>
+              </div>
+              <div className="lead-fact">
+                <dt><Building2 size={13} /> Branch</dt>
+                <dd>
+                  {headerBranch ? (
+                    `${headerBranch.name}${headerBranch.city ? ` (${headerBranch.city})` : ''}`
+                  ) : (
+                    <span className="lead-fact-empty">Not assigned</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+        </section>
       </div>
 
       {/* 12-Stage Student Journey Stepper */}
@@ -1040,376 +1215,258 @@ export const LeadDetailPage: React.FC = () => {
         >
           Documents
         </button>
+
+        {/* Fees are available at every stage; at the Fee Payment stage the process tab already shows them */}
+        {currentProcessInfo.key !== 'payments' && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSection === 'payments'}
+            className={`tab-btn ${activeSection === 'payments' ? 'active' : ''}`}
+            onClick={() => handleSectionChange('payments')}
+          >
+            Fees
+          </button>
+        )}
       </div>
 
       {/* --- NAVIGATION CONTENT --- */}
 
       {/* 1. Overview Section: 2-Column Responsive Workspace */}
       {isOverview && (
-        <div className="lead-overview-workspace">
-          {/* LEFT COLUMN: Profile & Preferences */}
-          <div className="lead-overview-sidebar">
-            {/* Card 1: Study Preferences (2x2 Matrix) */}
-            <div className="card">
-              <div className="card-header" style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 className="card-title">Study Preferences</h3>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {lead.studentId ? <strong>Student ID: <span style={{ color: '#0057F8' }}>{lead.studentId}</span> • </strong> : ''}ID: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-secondary)' }}>{lead._id?.slice(-8)}</span>
-                </span>
-              </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                Target study destination, degree level, intake, and budget
-              </p>
+        <div className="ov-workspace">
+          {/* LEFT: one Student profile card (study plan · academics · tracking) */}
+          <section className="ov-card" aria-labelledby="ov-profile-h">
+            <div className="ov-card-head">
+              <h3 id="ov-profile-h" className="ov-card-title">{isStudentRoute ? 'Student profile' : 'Lead profile'}</h3>
+              <button type="button" className="ov-mini-btn" onClick={openEditLeadModal}>
+                <Edit3 size={13} />
+                Edit
+              </button>
+            </div>
 
-              <div className="lead-pref-matrix">
-                <div className="lead-pref-tile">
-                  <div className="lead-pref-tile-label">
-                    <Globe size={13} color="var(--primary)" />
-                    <span>Target Country</span>
-                  </div>
-                  <div className="lead-pref-tile-value">
-                    {lead.targetCountry || 'Not provided'}
-                  </div>
-                </div>
-
-                <div className="lead-pref-tile">
-                  <div className="lead-pref-tile-label">
-                    <GraduationCap size={13} color="var(--primary)" />
-                    <span>Course / Program</span>
-                  </div>
-                  <div className="lead-pref-tile-value">
-                    {lead.targetCourse || 'Not provided'}
-                  </div>
-                </div>
-
-                <div className="lead-pref-tile">
-                  <div className="lead-pref-tile-label">
-                    <Calendar size={13} color="var(--primary)" />
-                    <span>Target Intake</span>
-                  </div>
-                  <div className="lead-pref-tile-value">
-                    {lead.targetIntake || 'Not provided'}
-                  </div>
-                </div>
-
-                <div className="lead-pref-tile">
-                  <div className="lead-pref-tile-label">
-                    <DollarSign size={13} color="var(--primary)" />
-                    <span>Budget Range</span>
-                  </div>
-                  <div className="lead-pref-tile-value">
-                    {lead.budget || 'Not provided'}
-                  </div>
-                </div>
-              </div>
-
+            <div className="ov-section">
+              <h4 className="ov-section-title">Study plan</h4>
+              <dl className="ov-dl">
+                <div><dt>Destination</dt><dd className={lead.targetCountry ? '' : 'is-empty'}>{lead.targetCountry || 'Not added'}</dd></div>
+                <div><dt>Course</dt><dd className={lead.targetCourse ? '' : 'is-empty'}>{lead.targetCourse || 'Not added'}</dd></div>
+                <div><dt>Intake</dt><dd className={lead.targetIntake ? '' : 'is-empty'}>{lead.targetIntake || 'Not added'}</dd></div>
+                <div><dt>Budget</dt><dd className={lead.budget ? '' : 'is-empty'}>{lead.budget || 'Not added'}</dd></div>
+              </dl>
               {lead.status === LeadStatus.CLOSED_LOST && lead.closedLostReason && (
-                <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius-md)' }}>
-                  <span style={{ color: 'var(--danger)', fontSize: '11px', fontWeight: 700, display: 'block', textTransform: 'uppercase' }}>Closed Lost Reason</span>
-                  <div style={{ fontSize: '12px', color: '#991B1B', marginTop: '3px' }}>{lead.closedLostReason}</div>
+                <div className="ov-callout is-danger">
+                  <strong>Closed lost reason</strong>
+                  <span>{lead.closedLostReason}</span>
                 </div>
               )}
             </div>
 
-            {/* Card 2: Academic Readiness & Eligibility */}
-            <div className="card">
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h3 className="card-title">Academic Profile</h3>
+            <div className="ov-section">
+              <div className="ov-section-head">
+                <h4 className="ov-section-title">Academics</h4>
                 {profile?.isComplete ? (
-                  <Badge variant="success">✓ Evaluated</Badge>
+                  <span className="ov-pill is-good">Evaluated</span>
+                ) : academicMissing > 0 ? (
+                  <span className="ov-pill is-warn">{academicMissing} detail{academicMissing === 1 ? '' : 's'} missing</span>
                 ) : (
-                  <Badge variant="warning">
-                    Evaluation Pending {profile?.missingFields && profile.missingFields.length > 0 ? `(${profile.missingFields.length} missing)` : ''}
-                  </Badge>
+                  <span className="ov-pill is-warn">Not evaluated</span>
                 )}
               </div>
-
-              <div className="lead-attr-list">
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Highest Qualification</span>
-                  <span className="lead-attr-row-value">{profile?.highestQualification || 'Not evaluated yet'}</span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Institution / University</span>
-                  <span className="lead-attr-row-value">{profile?.institution || 'Not specified'}</span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">GPA / Percentage</span>
-                  <span className="lead-attr-row-value">{profile?.percentageGpa || 'N/A'}</span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">English Test Score</span>
-                  <span className="lead-attr-row-value">
+              <dl className="ov-dl">
+                <div><dt>Highest qualification</dt><dd className={profile?.highestQualification ? '' : 'is-empty'}>{profile?.highestQualification || 'Not added'}</dd></div>
+                <div><dt>Institution</dt><dd className={profile?.institution ? '' : 'is-empty'}>{profile?.institution || 'Not added'}</dd></div>
+                <div><dt>GPA / percentage</dt><dd className={profile?.percentageGpa ? '' : 'is-empty'}>{profile?.percentageGpa || 'Not added'}</dd></div>
+                <div>
+                  <dt>English test</dt>
+                  <dd className={profile?.testScore?.testType && profile.testScore.testType !== 'NONE' ? '' : 'is-empty'}>
                     {profile?.testScore?.testType && profile.testScore.testType !== 'NONE'
                       ? `${profile.testScore.testType}: ${profile.testScore.overall || 'Pending'}`
-                      : 'Waiver / None'}
-                  </span>
+                      : 'Not added'}
+                  </dd>
                 </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">GRE / GMAT</span>
-                  <span className="lead-attr-row-value">{profile?.greGmatScore || 'N/A'}</span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Passport</span>
-                  <span className="lead-attr-row-value">{lead.passportNumber || 'Not provided'}</span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Active Documents</span>
-                  <span className="lead-attr-row-value">
-                    {documents.length} uploaded ({documents.filter(d => d.status === DocumentStatus.APPROVED).length} approved)
-                  </span>
-                </div>
-              </div>
-
-              {profile?.counsellorRemarks && (
-                <div style={{ marginTop: '12px', padding: '10px 12px', backgroundColor: '#F0FDF4', borderRadius: 'var(--radius-sm)', border: '1px solid #BBF7D0', fontSize: '12px' }}>
-                  <strong style={{ color: '#166534' }}>Counsellor Remarks: </strong>
-                  <span style={{ color: '#14532D' }}>{profile.counsellorRemarks}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Card 3: Assigned Advisor & Tracking */}
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '12px' }}>Advisor & Tracking</h3>
-              <div className="lead-attr-list">
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Advisory Access</span>
-                  <span className="lead-attr-row-value" style={{ color: 'var(--success)', fontWeight: 600 }}>
-                    ✓ Open to All Counsellors
-                  </span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Acquisition Source</span>
-                  <span className="lead-attr-row-value">
-                    {lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}
-                  </span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Lead Captured</span>
-                  <span className="lead-attr-row-value">
-                    {lead.createdAt ? new Date(lead.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
-                  </span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Last Contacted</span>
-                  <span className="lead-attr-row-value">
-                    {lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleString() : 'Not contacted yet'}
-                  </span>
-                </div>
-                <div className="lead-attr-row">
-                  <span className="lead-attr-row-label">Location</span>
-                  <span className="lead-attr-row-value">
-                    {[lead.city, lead.state, lead.country].filter(Boolean).join(', ') || 'Not provided'}
-                  </span>
-                </div>
-              </div>
-
-              {lead.notes && (
-                <div style={{ marginTop: '14px', padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Inquiry Notes:</span>
-                  <p style={{ fontSize: '12px', marginTop: '4px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{lead.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN: Engagement Hub & Timelines */}
-          <div className="lead-overview-main">
-            {/* Card 4: Activity & Touchpoints Timeline with Direct Quick Action */}
-            <div className="card">
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <div><dt>GRE / GMAT</dt><dd className={profile?.greGmatScore ? '' : 'is-empty'}>{profile?.greGmatScore || 'Not added'}</dd></div>
+                <div><dt>Passport</dt><dd className={lead.passportNumber ? '' : 'is-empty'}>{lead.passportNumber || 'Not added'}</dd></div>
                 <div>
-                  <h3 className="card-title">Contact Attempts & Touchpoints</h3>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                    Record of phone calls, WhatsApp check-ins, and scheduled interactions
-                  </p>
+                  <dt>Documents</dt>
+                  <dd>{documents.length} uploaded · {documents.filter((d) => d.status === DocumentStatus.APPROVED).length} approved</dd>
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<PhoneCall size={13} />}
-                  onClick={() => setIsContactModalOpen(true)}
+              </dl>
+              {profile?.counsellorRemarks && (
+                <div className="ov-callout is-good">
+                  <strong>Counsellor remarks</strong>
+                  <span>{profile.counsellorRemarks}</span>
+                </div>
+              )}
+              {!profile?.isComplete && (
+                <button type="button" className="ov-dashed-btn" onClick={() => handleSectionChange('profile')}>
+                  + Add academic details
+                </button>
+              )}
+            </div>
+
+            <div className="ov-section">
+              <h4 className="ov-section-title">Tracking</h4>
+              <dl className="ov-dl">
+                <div><dt>Lead source</dt><dd>{lead.source ? String(lead.source).replace(/_/g, ' ') : 'Website'}</dd></div>
+                <div><dt>Advisor access</dt><dd>All counsellors</dd></div>
+                <div>
+                  <dt>Added</dt>
+                  <dd>{lead.createdAt ? new Date(lead.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</dd>
+                </div>
+                <div>
+                  <dt>Last contacted</dt>
+                  <dd className={lead.lastContactedAt ? '' : 'is-warn'}>
+                    {lead.lastContactedAt ? new Date(lead.lastContactedAt).toLocaleString() : 'Never'}
+                  </dd>
+                </div>
+              </dl>
+              {lead.notes && (
+                <div className="ov-callout">
+                  <strong>Inquiry notes</strong>
+                  <span>{lead.notes}</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* RIGHT: one Activity hub (composer + merged feed) */}
+          <section className="ov-card" aria-labelledby="ov-activity-h">
+            <div className="ov-card-head is-wrap">
+              <h3 id="ov-activity-h" className="ov-card-title">Activity</h3>
+              <div className="ov-filters" role="group" aria-label="Filter activity">
+                {(
+                  [
+                    ['all', 'All'],
+                    ['call', 'Calls'],
+                    ['message', 'Messages'],
+                    ['note', 'Notes'],
+                    ['update', 'Updates'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={activityFilter === key}
+                    className={`ov-filter ${activityFilter === key ? 'is-active' : ''}`}
+                    onClick={() => setActivityFilter(key)}
+                  >
+                    {label} · {feedCounts[key]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Composer */}
+            <div className="ov-composer">
+              <div className="ov-seg" role="tablist" aria-label="What to add">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={composerMode === 'message'}
+                  className={composerMode === 'message' ? 'is-active' : ''}
+                  onClick={() => {
+                    setComposerMode('message');
+                    setIsInternalNote(false);
+                  }}
                 >
-                  Log Touchpoint
-                </Button>
+                  <MessageSquare size={14} /> Message student
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={composerMode === 'note'}
+                  className={composerMode === 'note' ? 'is-active' : ''}
+                  onClick={() => {
+                    setComposerMode('note');
+                    setIsInternalNote(true);
+                  }}
+                >
+                  <Lock size={14} /> Internal note
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={composerMode === 'call'}
+                  className={composerMode === 'call' ? 'is-active' : ''}
+                  onClick={() => setComposerMode('call')}
+                >
+                  <PhoneCall size={14} /> Log call
+                </button>
               </div>
 
-              {((lead as any).contactAttempts || []).length === 0 ? (
-                <div className="lead-timeline-empty-card">
-                  <div className="lead-timeline-empty-icon">
-                    <PhoneCall size={18} />
-                  </div>
-                  <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
-                    No contact touchpoints logged yet
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '320px', margin: 0 }}>
-                    Keep your engagement record complete by logging calls, WhatsApp outreach, or email consultations.
-                  </p>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<PhoneCall size={13} />}
-                    onClick={() => setIsContactModalOpen(true)}
-                    style={{ marginTop: '8px' }}
-                  >
-                    Log First Contact
+              {composerMode === 'call' ? (
+                <div className="ov-composer-call">
+                  <span>Record a call, WhatsApp or email attempt with its outcome.</span>
+                  <Button variant="primary" size="sm" icon={<PhoneCall size={14} />} onClick={() => setIsContactModalOpen(true)}>
+                    Log contact attempt
                   </Button>
                 </div>
               ) : (
-                <div className="lead-timeline-container">
-                  {((lead as any).contactAttempts || []).map((ca: any) => (
-                    <div key={ca._id} className="lead-timeline-entry">
-                      <div className="lead-timeline-entry-dot">
-                        {ca.method === 'WHATSAPP' ? (
-                          <MessageSquare size={14} />
-                        ) : ca.method === 'EMAIL' ? (
-                          <Mail size={14} />
-                        ) : (
-                          <PhoneCall size={14} />
-                        )}
-                      </div>
-                      <div className="lead-timeline-entry-body">
-                        <div className="lead-timeline-entry-header">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <strong style={{ color: 'var(--text-primary)' }}>{ca.method}</strong>
-                            <Badge
-                              variant={
-                                ca.outcome === 'CONNECTED'
-                                  ? 'success'
-                                  : ca.outcome === 'CALLBACK_REQUESTED'
-                                  ? 'primary'
-                                  : ca.outcome === 'NO_ANSWER' || ca.outcome === 'BUSY'
-                                  ? 'warning'
-                                  : 'danger'
-                              }
-                            >
-                              {ca.outcome ? ca.outcome.replace(/_/g, ' ') : 'COMPLETED'}
-                            </Badge>
-                          </div>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-                            {new Date(ca.attemptDate).toLocaleString()}
-                          </span>
-                        </div>
-                        {ca.notes && (
-                          <div style={{ color: 'var(--text-secondary)', marginTop: '4px', fontSize: '12px' }}>
-                            {ca.notes}
-                          </div>
-                        )}
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                          Recorded by: {ca.recordedByName || 'Advisor'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <form onSubmit={handleSendMessage}>
+                  <label className="ov-sr-only" htmlFor="ov-composer-text">
+                    {composerMode === 'note' ? 'Internal note' : 'Message to the student'}
+                  </label>
+                  <textarea
+                    id="ov-composer-text"
+                    className={`ov-textarea ${composerMode === 'note' ? 'is-note' : ''}`}
+                    rows={3}
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder={composerMode === 'note' ? 'Write a note only staff can see…' : 'Write a message to the student…'}
+                  />
+                  <div className="ov-composer-foot">
+                    <span>{composerMode === 'note' ? 'Only staff can see internal notes.' : 'The student sees this in their portal.'}</span>
+                    <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />} disabled={!newMessage.trim()}>
+                      {composerMode === 'note' ? 'Save note' : 'Send'}
+                    </Button>
+                  </div>
+                </form>
               )}
             </div>
 
-            {/* Card 5: Student Communications & Private Notes */}
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '16px' }}>Student Communications & Private Notes</h3>
-
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px',
-                  maxHeight: '280px',
-                  overflowY: 'auto',
-                  padding: '12px',
-                  backgroundColor: 'var(--bg-app)',
-                  borderRadius: 'var(--radius-md)',
-                  marginBottom: '16px',
-                }}
-              >
-                {messages.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '20px' }}>
-                    No messages exchanged yet.
-                  </div>
-                ) : (
-                  messages.map((m) => (
-                    <div
-                      key={m._id}
-                      style={{
-                        alignSelf: m.senderRole === UserRole.STUDENT ? 'flex-start' : 'flex-end',
-                        maxWidth: '80%',
-                        padding: '10px 14px',
-                        borderRadius: 'var(--radius-md)',
-                        backgroundColor: m.isInternalNote ? '#FFFBEB' : m.senderRole === UserRole.STUDENT ? '#FFFFFF' : 'var(--primary-light)',
-                        border: `1px solid ${m.isInternalNote ? 'var(--warning-border)' : 'var(--border-color)'}`,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 600, fontSize: '11px', color: m.isInternalNote ? 'var(--warning-text)' : 'var(--text-primary)' }}>
-                          {m.senderName} ({m.senderRole}) {m.isInternalNote && '🔒 [INTERNAL NOTE]'}
+            {/* Merged feed */}
+            {visibleFeed.length === 0 ? (
+              <div className="ov-feed-empty">
+                {activityFilter === 'all' ? 'No activity yet. Send a message, add a note or log a call to start the record.' : 'Nothing here yet.'}
+              </div>
+            ) : (
+              <ol className="ov-feed">
+                {visibleFeed.map((item, index) => {
+                  const showDay = index === 0 || isToday(visibleFeed[index - 1].at) !== isToday(item.at);
+                  return (
+                    <React.Fragment key={item.id}>
+                      {showDay && <li className="ov-feed-day">{isToday(item.at) ? 'Today' : 'Earlier'}</li>}
+                      <li className="ov-feed-item">
+                        <span className={`ov-feed-icon is-${item.kind}`} aria-hidden="true">
+                          {item.kind === 'call' ? (
+                            <PhoneCall size={15} />
+                          ) : item.kind === 'note' ? (
+                            <Lock size={15} />
+                          ) : item.kind === 'message' ? (
+                            <MessageSquare size={15} />
+                          ) : (
+                            <Clock size={15} />
+                          )}
                         </span>
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(m.createdAt).toLocaleTimeString()}</span>
-                      </div>
-                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <form onSubmit={handleSendMessage} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <Textarea
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message to the student or enter internal notes..."
-                  rows={2}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={isInternalNote}
-                      onChange={(e) => setIsInternalNote(e.target.checked)}
-                    />
-                    <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>
-                      Mark as Internal Note (Visible to Staff only)
-                    </span>
-                  </label>
-
-                  <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />}>
-                    Send
-                  </Button>
-                </div>
-              </form>
-            </div>
-
-            {/* Card 6: Student Journey Activity Timeline */}
-            <div className="card">
-              <h3 className="card-title" style={{ marginBottom: '16px' }}>Student Journey Activity Timeline</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '380px', overflowY: 'auto' }}>
-                {activities.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No recorded activities yet.</div>
-                ) : (
-                  activities.map((act) => (
-                    <div key={act._id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                      <div
-                        style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          backgroundColor: 'var(--primary)',
-                          marginTop: '6px',
-                          flexShrink: 0,
-                        }}
-                      />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{act.title}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{act.description}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          {new Date(act.createdAt).toLocaleString()} • {act.actorName || 'System'}
+                        <div className="ov-feed-body">
+                          <div className="ov-feed-top">
+                            <span className="ov-feed-title">
+                              {item.title}
+                              {item.tag && <span className={`ov-feed-tag is-${item.tagTone || 'note'}`}>{item.tag}</span>}
+                            </span>
+                            <span className="ov-feed-meta">
+                              {formatFeedTime(item.at)} · {item.by}
+                            </span>
+                          </div>
+                          {item.body && <p className="ov-feed-text">{item.body}</p>}
                         </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
+                      </li>
+                    </React.Fragment>
+                  );
+                })}
+              </ol>
+            )}
+          </section>
         </div>
       )}
 
@@ -1757,11 +1814,16 @@ export const LeadDetailPage: React.FC = () => {
       {/* Curated University Shortlist */}
       {((isCurrentProcess && currentProcessInfo.key === 'universities') || activeSection === 'universities') && (
         <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Curated University Shortlist</h3>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Student selects 1 approved choice to unlock document submission.
-            </span>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <h3 className="card-title">Curated University Shortlist</h3>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Only universities set to <strong>Shown</strong> appear in the student portal ({shortlist.filter((s) => s.isVisibleToStudent).length} of {shortlist.length} shown). The student selects 1 to unlock document submission.
+              </span>
+            </div>
+            <Button variant="primary" icon={<Plus size={16} />} onClick={openAddShortlist}>
+              Add university
+            </Button>
           </div>
 
           <Table
@@ -1775,11 +1837,36 @@ export const LeadDetailPage: React.FC = () => {
                 render: (s) => (s.annualFee ? `${s.currency || '$'} ${s.annualFee}` : '—'),
               },
               {
-                header: 'VISIBILITY',
+                header: 'SHOWN TO STUDENT',
                 render: (s) => (
-                  <Badge variant={s.isVisibleToStudent ? 'success' : 'neutral'}>
-                    {s.isVisibleToStudent ? 'Visible to Student' : 'Hidden'}
-                  </Badge>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={s.isVisibleToStudent}
+                    aria-label={`${s.isVisibleToStudent ? 'Hide' : 'Show'} ${s.universityName} – ${s.courseTitle} ${s.isVisibleToStudent ? 'from' : 'to'} the student`}
+                    disabled={visibilityUpdatingId === s._id}
+                    onClick={() => handleToggleShortlistVisibility(s)}
+                    title={s.isVisibleToStudent ? 'Click to hide from the student portal' : 'Click to show in the student portal'}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      minHeight: '32px',
+                      padding: '4px 12px',
+                      borderRadius: '999px',
+                      border: `1px solid ${s.isVisibleToStudent ? '#A7F3D0' : 'var(--border-color)'}`,
+                      backgroundColor: s.isVisibleToStudent ? '#ECFDF5' : 'var(--bg-surface)',
+                      color: s.isVisibleToStudent ? '#047857' : 'var(--text-secondary)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: visibilityUpdatingId === s._id ? 'wait' : 'pointer',
+                      opacity: visibilityUpdatingId === s._id ? 0.6 : 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {s.isVisibleToStudent ? <Eye size={14} /> : <EyeOff size={14} />}
+                    {s.isVisibleToStudent ? 'Shown' : 'Hidden'}
+                  </button>
                 ),
               },
               {
@@ -1788,7 +1875,7 @@ export const LeadDetailPage: React.FC = () => {
               },
             ]}
             data={shortlist}
-            emptyMessage="No universities shortlisted yet."
+            emptyMessage="No universities shortlisted yet. Use “Add university” to choose what this student sees."
           />
         </div>
       )}
@@ -2246,8 +2333,20 @@ export const LeadDetailPage: React.FC = () => {
           <div className="card-header">
             <h3 className="card-title">Tuition & Fee Payment Requests</h3>
             {isStaff && (
-              <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setIsPaymentModalOpen(true)}>
-                Generate Payment Request
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<Plus size={14} />}
+                onClick={() => {
+                  // Default fee type: the tuition deposit at the Fee Payment stage, an application fee before it.
+                  setPaymentForm((prev) => ({
+                    ...prev,
+                    purpose: currentProcessInfo.key === 'payments' ? 'TUITION_DEPOSIT' : 'APPLICATION_FEE',
+                  }));
+                  setIsPaymentModalOpen(true);
+                }}
+              >
+                Request Fee
               </Button>
             )}
           </div>
@@ -2955,23 +3054,47 @@ export const LeadDetailPage: React.FC = () => {
       >
         <form onSubmit={handleCreatePaymentRequest}>
           <Input
-            label="Payment Title *"
+            label="Fee Title *"
             value={paymentForm.title}
             onChange={(e) => setPaymentForm({ ...paymentForm, title: e.target.value })}
+            placeholder="e.g. University application fee"
             required
           />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          {/* Amount | Currency | Fee type on one row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
             <Input
               label="Amount *"
               type="number"
-              value={paymentForm.amount}
-              onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) })}
+              min={0}
+              value={paymentForm.amount || ''}
+              placeholder="0"
+              onChange={(e) => setPaymentForm({ ...paymentForm, amount: parseFloat(e.target.value) || 0 })}
               required
             />
-            <Input
+            <Select
               label="Currency"
               value={paymentForm.currency}
               onChange={(e) => setPaymentForm({ ...paymentForm, currency: e.target.value })}
+              options={[
+                { value: 'INR', label: 'INR (₹)' },
+                { value: 'USD', label: 'USD ($)' },
+                { value: 'GBP', label: 'GBP (£)' },
+                { value: 'EUR', label: 'EUR (€)' },
+                { value: 'AUD', label: 'AUD (A$)' },
+                { value: 'CAD', label: 'CAD (C$)' },
+              ]}
+            />
+            <Select
+              label="Fee type *"
+              value={paymentForm.purpose}
+              onChange={(e) => setPaymentForm({ ...paymentForm, purpose: e.target.value as typeof paymentForm.purpose })}
+              options={[
+                { value: 'APPLICATION_FEE', label: 'Application fee' },
+                { value: 'TUITION_DEPOSIT', label: 'Tuition deposit' },
+                { value: 'VISA_FEE', label: 'Visa fee' },
+                { value: 'INSURANCE', label: 'Insurance' },
+                { value: 'OTHER', label: 'Other / service fee' },
+              ]}
             />
           </div>
           <Textarea
@@ -2993,7 +3116,7 @@ export const LeadDetailPage: React.FC = () => {
               Cancel
             </Button>
             <Button variant="primary" onClick={handleRecordContact} loading={actionLoading}>
-              Save Attempt (Immutable)
+              Save Attempt
             </Button>
           </>
         }
@@ -3051,6 +3174,91 @@ export const LeadDetailPage: React.FC = () => {
             placeholder="Summary of student response..."
           />
         </form>
+      </Modal>
+
+      {/* --- Add University to Shortlist Modal --- */}
+      <Modal
+        isOpen={isShortlistModalOpen}
+        onClose={() => setIsShortlistModalOpen(false)}
+        title="Add university to shortlist"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsShortlistModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAddShortlist} loading={shortlistSaving}>
+              Add to shortlist
+            </Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <Select
+            label="University *"
+            value={shortlistForm.universityId}
+            onChange={(e) => handleShortlistUniversityChange(e.target.value)}
+            options={[
+              { value: '', label: shortlistUniversities.length ? '-- Select university --' : 'Loading universities…' },
+              ...shortlistUniversities.map((u) => ({ value: u._id, label: `${u.name} (${u.country})` })),
+            ]}
+          />
+          <Select
+            label="Course *"
+            value={shortlistForm.courseId}
+            disabled={!shortlistForm.universityId}
+            onChange={(e) => {
+              const course = shortlistCourses.find((c) => c._id === e.target.value);
+              setShortlistForm((prev) => ({
+                ...prev,
+                courseId: e.target.value,
+                intake: prev.intake || course?.intakes?.[0] || '',
+              }));
+            }}
+            options={[
+              {
+                value: '',
+                label: !shortlistForm.universityId
+                  ? 'Select a university first'
+                  : shortlistCourses.length
+                  ? '-- Select course --'
+                  : 'No courses listed for this university',
+              },
+              ...shortlistCourses.map((c) => ({
+                value: c._id,
+                label: `${c.title} · ${c.level}${c.annualFee ? ` · ${c.currency} ${c.annualFee}/yr` : ''}`,
+              })),
+            ]}
+          />
+          <Input
+            label="Intake *"
+            value={shortlistForm.intake}
+            onChange={(e) => setShortlistForm((prev) => ({ ...prev, intake: e.target.value }))}
+            placeholder="e.g. Fall 2026"
+            list="shortlist-intake-options"
+          />
+          {selectedShortlistCourse?.intakes?.length ? (
+            <datalist id="shortlist-intake-options">
+              {selectedShortlistCourse.intakes.map((intake) => (
+                <option key={intake} value={intake} />
+              ))}
+            </datalist>
+          ) : null}
+          <Textarea
+            label="Note for this option (optional)"
+            value={shortlistForm.notes}
+            onChange={(e) => setShortlistForm((prev) => ({ ...prev, notes: e.target.value }))}
+            placeholder="Why this university fits the student…"
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-primary)', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={shortlistForm.isVisibleToStudent}
+              onChange={(e) => setShortlistForm((prev) => ({ ...prev, isVisibleToStudent: e.target.checked }))}
+              style={{ width: '16px', height: '16px' }}
+            />
+            Show this university to the student now
+          </label>
+        </div>
       </Modal>
 
       {/* --- Schedule Counselling Modal --- */}

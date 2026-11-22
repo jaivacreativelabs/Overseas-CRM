@@ -491,7 +491,7 @@ export class EmailService {
 
       case 'payment.requested': {
         const title = escapeHtml(payload.title || 'Tuition Deposit');
-        const amount = payload.amount ? `${escapeHtml(payload.currency || 'USD')} ${escapeHtml(payload.amount)}` : 'Amount Pending';
+        const amount = payload.amount ? `${escapeHtml(payload.currency || 'INR')} ${escapeHtml(payload.amount)}` : 'Amount Pending';
         const dueDate = payload.dueDate ? escapeHtml(new Date(payload.dueDate).toLocaleDateString()) : 'Immediate';
 
         return {
@@ -516,7 +516,7 @@ export class EmailService {
       }
 
       case 'payment.success': {
-        const amount = payload.amount ? `${escapeHtml(payload.currency || 'USD')} ${escapeHtml(payload.amount)}` : '';
+        const amount = payload.amount ? `${escapeHtml(payload.currency || 'INR')} ${escapeHtml(payload.amount)}` : '';
         const title = escapeHtml(payload.title || 'Tuition Deposit');
         return {
           subject: 'Payment Confirmation & Official Receipt',

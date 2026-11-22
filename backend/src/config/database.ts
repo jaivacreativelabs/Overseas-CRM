@@ -47,7 +47,9 @@ export const connectDatabase = async (): Promise<void> => {
     
     if (env.NODE_ENV !== 'production' && !process.env.VERCEL) {
       try {
-        const { MongoMemoryServer } = await import('mongodb-memory-server');
+        // Lazy require: mongodb-memory-server is a devDependency and is not installed in production.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { MongoMemoryServer } = require('mongodb-memory-server') as typeof import('mongodb-memory-server');
         const mongod = await MongoMemoryServer.create();
         const uri = mongod.getUri();
         logger.info(`Starting in-memory MongoDB at: ${uri}`);

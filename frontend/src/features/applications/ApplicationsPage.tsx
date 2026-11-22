@@ -9,7 +9,6 @@ import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { Select, Textarea } from '../../components/Form';
 import { ApplicationStatus } from '../../types';
-import { PinButton } from '../../components/PinButton';
 
 export const ApplicationsPage: React.FC = () => {
   const [apps, setApps] = useState<any[]>([]);
@@ -170,16 +169,6 @@ export const ApplicationsPage: React.FC = () => {
             align: 'right',
             render: (a) => (
               <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <PinButton
-                  item={{
-                    id: a._id,
-                    category: 'application',
-                    title: `Application: ${a.universityName}`,
-                    subtitle: `${a.studentName} • ${a.courseTitle || ''}`,
-                    path: `/leads/${a.leadId}`,
-                    pinnedAt: new Date().toISOString(),
-                  }}
-                />
                 <Button
                   variant="secondary"
                   size="sm"

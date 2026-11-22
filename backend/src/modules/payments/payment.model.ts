@@ -41,7 +41,7 @@ const paymentSchema = new Schema<IPayment>(
       index: true,
     },
     amount: { type: Number, required: true },
-    currency: { type: String, default: 'USD' },
+    currency: { type: String, default: 'INR' },
     bankDetails: { type: String },
     dueDate: { type: Date },
     status: {

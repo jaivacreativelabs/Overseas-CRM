@@ -3,7 +3,7 @@ import { PaymentModel, IPayment } from './payment.model';
 import { LeadModel } from '../leads/lead.model';
 import { OfferModel } from '../offers/offer.model';
 import { PaymentStatus, StudentStage, UserRole, OfferStatus } from '../../config/constants';
-import { NotFoundError, ValidationError, StageLockedError } from '../../utils/errors';
+import { NotFoundError, ValidationError } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
 import { AutomationService } from '../integrations/automation.service';
@@ -20,21 +20,9 @@ export class PaymentService {
       .lean();
   }
 
-  static async getPaymentsForLead(leadId: string, userRole?: UserRole): Promise<any[]> {
-    // Stage Gate: Student access to fee payment is locked until the signed offer is accepted
-    if (userRole === UserRole.STUDENT) {
-      const acceptedOffer = await OfferModel.findOne({
-        leadId: new Types.ObjectId(leadId),
-        status: OfferStatus.ACCEPTED,
-      });
-
-      if (!acceptedOffer) {
-        throw new StageLockedError(
-          'Fee Payment is locked. Access to fee payment is enabled only after your signed offer letter has been approved by your counsellor.'
-        );
-      }
-    }
-
+  // Fee requests are available at any stage (application fees, counselling fees, deposits...),
+  // so students can always see the requests raised for them.
+  static async getPaymentsForLead(leadId: string, _userRole?: UserRole): Promise<any[]> {
     return PaymentModel.find({ leadId: new Types.ObjectId(leadId) })
       .sort({ createdAt: -1 })
       .lean();
@@ -58,26 +46,20 @@ export class PaymentService {
     const lead = await LeadModel.findById(leadId);
     if (!lead) throw new NotFoundError('Lead not found');
 
-    // Stage Gate: Fee Payment requires an ACCEPTED signed offer letter
+    // No stage gate: counsellors can raise a fee request at any stage. Link the accepted offer when one exists.
     const acceptedOffer = await OfferModel.findOne({
       leadId: lead._id,
       status: OfferStatus.ACCEPTED,
     });
 
-    if (!acceptedOffer) {
-      throw new StageLockedError(
-        'Fee Payment is locked. A signed offer letter must be reviewed and accepted by a counsellor before generating payment requests.'
-      );
-    }
-
     const payment = await PaymentModel.create({
       leadId: lead._id,
       studentId: lead.studentUserId,
-      offerId: data.offerId ? new Types.ObjectId(data.offerId) : acceptedOffer._id,
+      offerId: data.offerId ? new Types.ObjectId(data.offerId) : acceptedOffer?._id,
       title: data.title,
       purpose: data.purpose || 'TUITION_DEPOSIT',
       amount: data.amount,
-      currency: data.currency || 'USD',
+      currency: data.currency || 'INR',
       bankDetails: data.bankDetails,
       dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       status: PaymentStatus.REQUESTED,
@@ -129,18 +111,7 @@ export class PaymentService {
     const payment = await PaymentModel.findById(paymentId);
     if (!payment) throw new NotFoundError('Payment request not found');
 
-    // Stage Gate: Fee Payment requires an ACCEPTED signed offer letter
-    const acceptedOffer = await OfferModel.findOne({
-      leadId: payment.leadId,
-      status: OfferStatus.ACCEPTED,
-    });
-
-    if (!acceptedOffer) {
-      throw new StageLockedError(
-        'Fee Payment is locked. Payment proof cannot be submitted until a signed offer letter is officially accepted.'
-      );
-    }
-
+    // No stage gate: a student can pay any fee request raised for them, at any stage.
     payment.transactionReference = data.transactionReference;
     payment.paymentMode = data.paymentMode;
     payment.paidDate = data.paidDate ? new Date(data.paidDate) : new Date();
@@ -204,10 +175,15 @@ export class PaymentService {
 
     await payment.save();
 
+    // A verified tuition deposit moves the student on to Visa only when it is the post-offer deposit
+    // (fees can now be requested at any stage, so an early fee must not skip the journey ahead).
     const lead = await LeadModel.findById(payment.leadId);
     if (lead && data.status === PaymentStatus.VERIFIED && payment.purpose === 'TUITION_DEPOSIT') {
-      lead.stage = StudentStage.VISA_PROCESSING;
-      await lead.save();
+      const hasAcceptedOffer = await OfferModel.exists({ leadId: lead._id, status: OfferStatus.ACCEPTED });
+      if (hasAcceptedOffer) {
+        lead.stage = StudentStage.VISA_PROCESSING;
+        await lead.save();
+      }
     }
 
     await AuditService.log({

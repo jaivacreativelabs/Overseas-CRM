@@ -5,6 +5,10 @@
       "destination": "https://overseas-crm-m7dg.vercel.app/api/$1"
     },
     {
+      "source": "/uploads/(.*)",
+      "destination": "https://overseas-crm-m7dg.vercel.app/uploads/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
