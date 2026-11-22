@@ -1,16 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  Calendar,
-  FileCheck,
-  Award,
-  CreditCard,
-  Stamp,
-  Plane,
-  Compass,
-  Eye,
-  Pin,
-} from 'lucide-react';
+import { Eye, Pin } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { ContextMenu } from '../../components/ContextMenu';
 import {
@@ -28,15 +18,9 @@ import { VisaPage } from '../visa/VisaPage';
 import { TravelPage } from '../travel/TravelPage';
 import { OrientationPage } from '../orientation/OrientationPage';
 
-export const REPORT_TABS = [
-  { id: 'counselling', label: 'Counselling', icon: Calendar },
-  { id: 'applications', label: 'Applications', icon: FileCheck },
-  { id: 'offers', label: 'Offers', icon: Award },
-  { id: 'payments', label: 'Payments', icon: CreditCard },
-  { id: 'visa', label: 'Visa Tracking', icon: Stamp },
-  { id: 'travel', label: 'Travel & Departure', icon: Plane },
-  { id: 'orientation', label: 'Orientation & Onboarding', icon: Compass },
-];
+import { REPORT_TABS } from './reportTabs';
+
+export { REPORT_TABS };
 
 export const ReportsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();

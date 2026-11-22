@@ -8,6 +8,7 @@ import fs from 'fs';
 
 import { errorHandler } from './middleware/error.middleware';
 import { ApiResponse } from './utils/api-response';
+import { serveStoredFile } from './utils/file-storage';
 
 // Feature Route Modules
 import { authRoutes } from './modules/auth';
@@ -71,7 +72,9 @@ export const createApp = (): Express => {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(morgan('dev'));
 
-  // Static uploads directory — only serve locally (Vercel serverless filesystem is read-only)
+  // Uploaded files: stored in MongoDB GridFS so they persist on Vercel (see utils/file-storage.ts).
+  app.get('/uploads/:filename', serveStoredFile);
+  // Local development fallback for files saved to disk before GridFS storage was added.
   if (process.env.NODE_ENV !== 'production') {
     app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
   }

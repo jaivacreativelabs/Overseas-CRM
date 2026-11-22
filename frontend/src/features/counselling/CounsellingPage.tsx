@@ -25,7 +25,6 @@ import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { ContextMenu } from '../../components/ContextMenu';
 import { getPinnedModules, togglePinModule } from '../../utils/pinnedModules';
-import { PinButton } from '../../components/PinButton';
 import { Modal } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
 
@@ -535,16 +534,6 @@ export const CounsellingPage: React.FC = () => {
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                         Status: <strong>{s.status}</strong>
                       </span>
-                      <PinButton
-                        item={{
-                          id: s._id || s.leadId,
-                          category: 'counselling',
-                          title: `Counselling: ${s.studentName}`,
-                          subtitle: `${s.scheduledDate} at ${s.scheduledTime}`,
-                          path: `/leads/${s.leadId}`,
-                          pinnedAt: new Date().toISOString(),
-                        }}
-                      />
                     </div>
                   )}
                 </div>
@@ -614,16 +603,6 @@ export const CounsellingPage: React.FC = () => {
               align: 'right',
               render: (s: any) => (
                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  <PinButton
-                    item={{
-                      id: s._id || s.leadId,
-                      category: 'counselling',
-                      title: `Counselling Session: ${s.studentName}`,
-                      subtitle: `${s.scheduledDate} at ${s.scheduledTime}`,
-                      path: `/leads/${s.leadId}`,
-                      pinnedAt: new Date().toISOString(),
-                    }}
-                  />
                   {s.attendance === 'PENDING' && (
                     <>
                       <Button

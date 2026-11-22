@@ -32,7 +32,6 @@ import { StatusBadge, Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Modal, Drawer, ConfirmDialog } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
-import { PinButton } from '../../components/PinButton';
 import {
   VisaRecord,
   VisaStatus,
@@ -782,16 +781,6 @@ export const VisaPage: React.FC = () => {
               align: 'right',
               render: (v: VisaRecord) => (
                 <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                  <PinButton
-                    item={{
-                      id: v._id,
-                      category: 'visa',
-                      title: `Visa: ${v.studentName || 'Student'}`,
-                      subtitle: `${v.country} • ${v.status.replace(/_/g, ' ')}`,
-                      path: `/reports?tab=visa`,
-                      pinnedAt: new Date().toISOString(),
-                    }}
-                  />
 
                   <Button
                     variant="secondary"

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { TaskService } from './task.service';
+import { LeadService } from '../leads/lead.service';
 import { ApiResponse } from '../../utils/api-response';
 import { TaskPriority, TaskStatus, TaskType } from '../../config/constants';
 
@@ -18,9 +19,7 @@ export class TaskController {
 
       // If requested by a student, enforce leadId isolation
       if (req.user?.role === 'STUDENT') {
-        const studentProfile = await import('../leads/lead.service').then(m =>
-          m.LeadService.getStudentProfileForUser(req.user!.userId, req.user!.email)
-        );
+        const studentProfile = await LeadService.getStudentProfileForUser(req.user!.userId, req.user!.email);
         leadId = studentProfile._id.toString();
       }
 

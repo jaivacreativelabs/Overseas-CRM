@@ -7,7 +7,6 @@ import { Table } from '../../components/Table';
 import { StatusBadge, Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { OfferStatus } from '../../types';
-import { PinButton } from '../../components/PinButton';
 
 export const OffersPage: React.FC = () => {
   const [offers, setOffers] = useState<any[]>([]);
@@ -239,16 +238,6 @@ export const OffersPage: React.FC = () => {
             align: 'right',
             render: (o) => (
               <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <PinButton
-                  item={{
-                    id: o._id,
-                    category: 'offer',
-                    title: `Offer: ${o.universityName}`,
-                    subtitle: `${o.studentName} • ${o.offerType}`,
-                    path: `/leads/${o.leadId}`,
-                    pinnedAt: new Date().toISOString(),
-                  }}
-                />
                 {o.status === OfferStatus.SIGNED_UPLOADED && (
                   <Button variant="primary" size="sm" icon={<Check size={14} />} onClick={() => handleAccept(o._id)}>
                     Accept Signed Offer

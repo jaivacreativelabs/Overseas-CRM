@@ -17,6 +17,8 @@ import {
   X,
   UserCheck,
   Download,
+  MoreHorizontal,
+  Power,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useAuth } from '../../context/AuthContext';
@@ -105,7 +107,6 @@ export const BranchesPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
   const [expandedStates, setExpandedStates] = useState<Record<string, boolean>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -146,6 +147,24 @@ export const BranchesPage: React.FC = () => {
   const [allUsers, setAllUsers] = useState<UserType[]>([]);
   const [selectedStaffUserIds, setSelectedStaffUserIds] = useState<string[]>([]);
   const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
+
+  // Branch card "⋯" menu (Edit / Deactivate / Delete)
+  const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!openCardMenuId) return;
+    const close = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement)?.closest?.('[data-branch-card-menu]')) setOpenCardMenuId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenCardMenuId(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openCardMenuId]);
 
   // Meta Lead Form Connection State
   const [metaForms, setMetaForms] = useState<MetaFormMapping[]>([]);
@@ -478,7 +497,7 @@ export const BranchesPage: React.FC = () => {
         studentLeadId: selectedStudentToAssign,
         branchId: assignStudentModal._id,
       });
-      setSuccessMsg(`Student assigned to ${assignStudentModal.name} successfully.`);
+      setSuccessMsg(`Student added to ${assignStudentModal.name}.`);
       setAssignStudentModal(null);
       fetchBranches();
       if (selectedBranchDetails) {
@@ -486,7 +505,7 @@ export const BranchesPage: React.FC = () => {
       }
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
-      setError(err.message || 'Failed to assign student');
+      setError(err.message || 'Failed to add student');
     } finally {
       setIsSubmittingAssign(false);
     }
@@ -561,7 +580,7 @@ export const BranchesPage: React.FC = () => {
                 Branch Management
               </h1>
               <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>
-                Manage branches, assign students and staff, and track performance.
+                Manage branches, add students and staff, and track performance.
               </p>
             </div>
           </div>
@@ -706,12 +725,6 @@ export const BranchesPage: React.FC = () => {
           <div style={{ fontSize: '24px', fontWeight: 700, color: '#D97706', marginTop: '4px' }}>{summary.totalAssignedStudents}</div>
           <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Across All Branches</div>
         </div>
-
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>STATES COVERED</div>
-          <div style={{ fontSize: '24px', fontWeight: 700, color: '#7C3AED', marginTop: '4px' }}>{summary.statesCovered}</div>
-          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>Indian Regions</div>
-        </div>
       </div>
 
       <div
@@ -792,37 +805,6 @@ export const BranchesPage: React.FC = () => {
           </select>
         </div>
 
-        <div style={{ display: 'flex', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-          <button
-            onClick={() => setViewMode('grouped')}
-            style={{
-              padding: '7px 12px',
-              backgroundColor: viewMode === 'grouped' ? 'var(--primary-light)' : '#FFFFFF',
-              color: viewMode === 'grouped' ? 'var(--primary)' : 'var(--text-secondary)',
-              border: 'none',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            State-Wise Grouped
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            style={{
-              padding: '7px 12px',
-              backgroundColor: viewMode === 'list' ? 'var(--primary-light)' : '#FFFFFF',
-              color: viewMode === 'list' ? 'var(--primary)' : 'var(--text-secondary)',
-              border: 'none',
-              borderLeft: '1px solid var(--border-color)',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Data Table
-          </button>
-        </div>
       </div>
 
       {isLoading ? (
@@ -865,522 +847,148 @@ export const BranchesPage: React.FC = () => {
             </button>
           )}
         </div>
-      ) : viewMode === 'grouped' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {stateSummaries.map((st) => {
-            const stateBranches = branches.filter((b) => b.state.toUpperCase() === st.state.toUpperCase());
-            const isExpanded = expandedStates[st.state.toUpperCase()] !== false;
-
-            if (stateBranches.length === 0 && (searchQuery || selectedState !== 'ALL')) {
-              return null;
-            }
-
-            return (
-              <div
-                key={st.state}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  onClick={() => toggleStateGroup(st.state)}
-                  style={{
-                    padding: '16px 20px',
-                    backgroundColor: 'var(--bg-subtle, #F9FAFB)',
-                    borderBottom: isExpanded ? '1px solid var(--border-color)' : 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                    <div>
-                      <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {st.state.toUpperCase()}
-                      </span>
-                      <span
-                        style={{
-                          marginLeft: '10px',
-                          fontSize: '11.5px',
-                          fontWeight: 600,
-                          backgroundColor: 'var(--primary-light)',
-                          color: 'var(--primary)',
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                        }}
-                      >
-                        {st.branchCount} Branch{st.branchCount > 1 ? 'es' : ''}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '13px' }}>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Branches: </span>
-                      <strong style={{ color: 'var(--text-primary)' }}>{st.branchCount}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Students: </span>
-                      <strong style={{ color: '#D97706' }}>{st.assignedStudents}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
-                    {stateBranches.map((b) => (
-                      <div
-                        key={b._id}
-                        style={{
-                          border: '1px solid var(--border-color)',
-                          borderRadius: 'var(--radius-md)',
-                          padding: '16px',
-                          backgroundColor: '#FFFFFF',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <div>
-                              <span
-                                style={{
-                                  fontSize: '11px',
-                                  fontWeight: 700,
-                                  color: 'var(--primary)',
-                                  backgroundColor: 'var(--primary-light)',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  letterSpacing: '0.04em',
-                                }}
-                              >
-                                {b.branchId}
-                              </span>
-                              <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: '4px 0 0' }}>
-                                {b.name}
-                              </h4>
-                            </div>
-
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                padding: '3px 8px',
-                                borderRadius: '12px',
-                                backgroundColor: b.status === 'ACTIVE' ? '#ECFDF5' : '#FEF2F2',
-                                color: b.status === 'ACTIVE' ? '#065F46' : '#991B1B',
-                              }}
-                            >
-                              {b.status}
-                            </span>
-                          </div>
-
-                          <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <MapPin size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                            <span>
-                              {b.address}, {b.city}, {b.state} {b.pinCode ? `- ${b.pinCode}` : ''}
-                            </span>
-                          </div>
-
-                          {b.managerName && (
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                              Manager: <strong style={{ color: 'var(--text-primary)' }}>{b.managerName}</strong>
-                            </div>
-                          )}
-
-                          <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
-                            <span style={{ fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</span>
-                            <span style={{ color: 'var(--text-muted)' }}> student(s) assigned</span>
-                          </div>
-
-                          {/* Meta Lead Forms Connection */}
-                          {(() => {
-                            const branchForms = metaForms.filter(
-                              (m) => ((m.branchId as any)?._id || (m.branchId as any)) === b._id
-                            );
-                            const unassignedForms = allKnownForms.filter(
-                              (kf) => !branchForms.some((bf) => bf.formId === kf.formId)
-                            );
-
-                            return (
-                              <div
-                                style={{
-                                  marginTop: '10px',
-                                  padding: '10px 12px',
-                                  backgroundColor: '#F8FAFC',
-                                  border: '1px solid #E2E8F0',
-                                  borderRadius: '8px',
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    marginBottom: '6px',
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <FacebookColorIcon size={14} />
-                                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#1E293B' }}>
-                                      Meta Lead Forms
-                                    </span>
-                                  </div>
-                                  {branchForms.length > 0 && (
-                                    <span
-                                      style={{
-                                        fontSize: '10px',
-                                        fontWeight: 700,
-                                        padding: '1px 6px',
-                                        borderRadius: '10px',
-                                        backgroundColor: '#DBEAFE',
-                                        color: '#1D4ED8',
-                                      }}
-                                    >
-                                      {branchForms.length} connected
-                                    </span>
-                                  )}
-                                </div>
-
-                                {branchForms.length > 0 ? (
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
-                                    {branchForms.map((m) => (
-                                      <div
-                                        key={m._id}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          fontSize: '11px',
-                                          backgroundColor: '#EFF6FF',
-                                          border: '1px solid #BFDBFE',
-                                          color: '#1E40AF',
-                                          borderRadius: '5px',
-                                          padding: '2px 6px',
-                                          fontWeight: 500,
-                                        }}
-                                        title={`Form ID: ${m.formId} | Leads: ${m.totalLeadsRouted || 0}`}
-                                      >
-                                        <span style={{ maxWidth: '175px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {m.formName}
-                                        </span>
-                                        {m.totalLeadsRouted !== undefined && m.totalLeadsRouted > 0 && (
-                                          <span style={{ fontSize: '9.5px', color: '#2563EB', fontWeight: 700 }}>
-                                            ({m.totalLeadsRouted})
-                                          </span>
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDisconnectForm(m._id, m.formName);
-                                          }}
-                                          style={{
-                                            border: 'none',
-                                            background: 'transparent',
-                                            color: '#94A3B8',
-                                            cursor: 'pointer',
-                                            padding: '0 2px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                          }}
-                                          title="Disconnect form"
-                                        >
-                                          <X size={11} />
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '6px' }}>
-                                    No Meta form connected yet.
-                                  </div>
-                                )}
-
-                                <select
-                                  value=""
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (!val) return;
-                                    if (val === '__custom__') {
-                                      setShowAddCustomFormModal(b._id);
-                                    } else {
-                                      handleConnectFormToBranch(b._id, val);
-                                    }
-                                  }}
-                                  disabled={connectingBranchId === b._id}
-                                  style={{
-                                    width: '100%',
-                                    padding: '5px 8px',
-                                    fontSize: '11.5px',
-                                    borderRadius: '5px',
-                                    border: '1px solid #CBD5E1',
-                                    backgroundColor: '#FFFFFF',
-                                    color: '#334155',
-                                    cursor: 'pointer',
-                                  }}
-                                >
-                                  <option value="">
-                                    {connectingBranchId === b._id ? 'Connecting...' : '+ Connect Existing Meta Form...'}
-                                  </option>
-                                  {unassignedForms.map((f) => (
-                                    <option key={f.formId} value={f.formId}>
-                                      {f.formName}
-                                    </option>
-                                  ))}
-                                  <option value="__custom__">+ Enter Custom Form ID...</option>
-                                </select>
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}>
-                          <button
-                            onClick={() => handleViewDetails(b)}
-                            style={{
-                              padding: '5px 10px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              color: 'var(--primary)',
-                              backgroundColor: 'var(--primary-light)',
-                              border: '1px solid var(--primary)',
-                              borderRadius: 'var(--radius-sm)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                            }}
-                          >
-                            <Eye size={14} />
-                            <span>Details</span>
-                          </button>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <button
-                              onClick={() => handleOpenAssignModal(b)}
-                              style={{
-                                padding: '5px 10px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#059669',
-                                backgroundColor: '#ECFDF5',
-                                border: '1px solid #A7F3D0',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                              title="Assign student to this branch"
-                            >
-                              <UserCheck size={14} />
-                              <span>Assign Student</span>
-                            </button>
-
-                            {isOwnerAdmin && (
-                              <>
-                                <button
-                                  onClick={() => handleOpenEditModal(b)}
-                                  style={{
-                                    padding: '5px 8px',
-                                    fontSize: '12px',
-                                    color: 'var(--text-secondary)',
-                                    background: 'none',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    cursor: 'pointer',
-                                  }}
-                                  title="Edit Branch"
-                                >
-                                  <Edit size={14} />
-                                </button>
-                                <button
-                                  onClick={() => handleToggleStatus(b)}
-                                  style={{
-                                    padding: '5px 8px',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    color: b.status === 'ACTIVE' ? '#991B1B' : '#065F46',
-                                    background: 'none',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    cursor: 'pointer',
-                                  }}
-                                  title={b.status === 'ACTIVE' ? 'Deactivate Branch' : 'Activate Branch'}
-                                >
-                                  {b.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                                </button>
-                                <button
-                                  onClick={() => setDeletingBranch(b)}
-                                  style={{
-                                    padding: '5px 8px',
-                                    fontSize: '12px',
-                                    color: '#DC2626',
-                                    background: 'none',
-                                    border: '1px solid #FECACA',
-                                    borderRadius: 'var(--radius-sm)',
-                                    cursor: 'pointer',
-                                  }}
-                                  title="Delete Branch"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       ) : (
-        <div style={{ backgroundColor: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ backgroundColor: 'var(--bg-subtle, #F9FAFB)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch ID</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch Name</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>State</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>City</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Branch Manager</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Students</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Meta Forms</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600 }}>Status</th>
-                <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {branches.map((b) => (
-                <tr key={b._id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                  <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--primary)' }}>{b.branchId}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{b.name}</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{b.state}</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{b.city}</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{b.managerName || '-'}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 600, color: '#D97706' }}>{b.assignedStudentsCount}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    {(() => {
-                      const bForms = metaForms.filter(
-                        (m) => ((m.branchId as any)?._id || (m.branchId as any)) === b._id
-                      );
-                      const unassigned = allKnownForms.filter(
-                        (kf) => !bForms.some((bf) => bf.formId === kf.formId)
-                      );
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '170px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                            {bForms.length === 0 ? (
-                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>None</span>
-                            ) : (
-                              bForms.map((m) => (
-                                <span
-                                  key={m._id}
-                                  style={{
-                                    fontSize: '10.5px',
-                                    backgroundColor: '#EFF6FF',
-                                    border: '1px solid #BFDBFE',
-                                    color: '#1E40AF',
-                                    padding: '1px 6px',
-                                    borderRadius: '8px',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '3px',
-                                  }}
-                                  title={`Leads: ${m.totalLeadsRouted || 0}`}
-                                >
-                                  {m.formName}
-                                  <button
-                                    onClick={() => handleDisconnectForm(m._id, m.formName)}
-                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#64748B' }}
-                                  >
-                                    <X size={10} />
-                                  </button>
-                                </span>
-                              ))
-                            )}
-                          </div>
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (!val) return;
-                              if (val === '__custom__') setShowAddCustomFormModal(b._id);
-                              else handleConnectFormToBranch(b._id, val);
-                            }}
-                            disabled={connectingBranchId === b._id}
-                            style={{ fontSize: '11px', padding: '3px 6px', borderRadius: '4px', border: '1px solid #CBD5E1', color: '#475569' }}
-                          >
-                            <option value="">+ Connect Form...</option>
-                            {unassigned.map((f) => (
-                              <option key={f.formId} value={f.formId}>{f.formName}</option>
-                            ))}
-                            <option value="__custom__">+ Enter Form ID...</option>
-                          </select>
-                        </div>
-                      );
-                    })()}
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '16px' }}>
+          {branches.map((b) => (
+            <div
+              key={b._id}
+              style={{
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md)',
+                padding: '16px',
+                backgroundColor: '#FFFFFF',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div>
                     <span
                       style={{
                         fontSize: '11px',
                         fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        backgroundColor: b.status === 'ACTIVE' ? '#ECFDF5' : '#FEF2F2',
-                        color: b.status === 'ACTIVE' ? '#065F46' : '#991B1B',
+                        color: 'var(--primary)',
+                        backgroundColor: 'var(--primary-light)',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        letterSpacing: '0.04em',
                       }}
                     >
-                      {b.status}
+                      {b.branchId}
                     </span>
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                      <button
-                        onClick={() => handleViewDetails(b)}
-                        style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--primary)', background: 'none', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}
-                      >
-                        Details
-                      </button>
-                      <button
-                        onClick={() => handleOpenAssignModal(b)}
-                        style={{ padding: '4px 8px', fontSize: '12px', color: '#059669', background: 'none', border: '1px solid #A7F3D0', borderRadius: '4px', cursor: 'pointer' }}
-                      >
-                        Assign
-                      </button>
-                      {isOwnerAdmin && (
-                        <>
-                          <button
-                            onClick={() => handleOpenEditModal(b)}
-                            style={{ padding: '4px 6px', color: 'var(--text-secondary)', background: 'none', border: '1px solid var(--border-color)', borderRadius: '4px', cursor: 'pointer' }}
-                          >
-                            <Edit size={14} />
-                          </button>
-                          <button
-                            onClick={() => setDeletingBranch(b)}
-                            style={{ padding: '4px 6px', color: '#DC2626', background: 'none', border: '1px solid #FECACA', borderRadius: '4px', cursor: 'pointer' }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: '4px 0 0' }}>
+                      {b.name}
+                    </h4>
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '3px 8px',
+                      borderRadius: '12px',
+                      backgroundColor: b.status === 'ACTIVE' ? '#ECFDF5' : '#FEF2F2',
+                      color: b.status === 'ACTIVE' ? '#065F46' : '#991B1B',
+                    }}
+                  >
+                    {b.status}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <MapPin size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span>
+                    {b.address}, {b.city}, {b.state} {b.pinCode ? `- ${b.pinCode}` : ''}
+                  </span>
+                </div>
+
+                {(() => {
+                  const formCount = metaForms.filter(
+                    (m) => ((m.branchId as any)?._id || (m.branchId as any)) === b._id
+                  ).length;
+                  return (
+                    <dl className="branch-card-stats">
+                      <div>
+                        <dt>Students</dt>
+                        <dd>{b.assignedStudentsCount || 0}</dd>
+                      </div>
+                      <div>
+                        <dt>Manager</dt>
+                        <dd className={b.managerName ? 'is-text' : 'is-empty'} title={b.managerName || undefined}>
+                          {b.managerName || 'Not set'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Lead forms</dt>
+                        <dd>{formCount}</dd>
+                      </div>
+                    </dl>
+                  );
+                })()}
+              </div>
+
+              {/* Everything else (students, assign, Meta lead forms, applications, history) lives in the View branch popup */}
+              <div className="branch-card-footer">
+                <button type="button" className="branch-view-btn" onClick={() => handleViewDetails(b)}>
+                  <Eye size={16} />
+                  <span>View branch</span>
+                </button>
+
+                {isOwnerAdmin && (
+                  <div className="branch-card-menu-wrap" data-branch-card-menu>
+                    <button
+                      type="button"
+                      className={`branch-card-more ${openCardMenuId === b._id ? 'is-open' : ''}`}
+                      aria-label={`More actions for ${b.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={openCardMenuId === b._id}
+                      onClick={() => setOpenCardMenuId((cur) => (cur === b._id ? null : b._id))}
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
+                    {openCardMenuId === b._id && (
+                      <div className="branch-card-menu" role="menu" aria-label={`Actions for ${b.name}`}>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setOpenCardMenuId(null);
+                            handleOpenEditModal(b);
+                          }}
+                        >
+                          <Edit size={15} /> Edit branch
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setOpenCardMenuId(null);
+                            handleToggleStatus(b);
+                          }}
+                        >
+                          <Power size={15} /> {b.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <div className="branch-card-menu-divider" aria-hidden="true" />
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="is-danger"
+                          onClick={() => {
+                            setOpenCardMenuId(null);
+                            setDeletingBranch(b);
+                          }}
+                        >
+                          <Trash2 size={15} /> Delete branch
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1711,22 +1319,33 @@ export const BranchesPage: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
             backdropFilter: 'blur(3px)',
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '16px',
             zIndex: 1200,
+          }}
+          onMouseDown={(e) => {
+            // Click on the dimmed backdrop closes the popup
+            if (e.target === e.currentTarget) setSelectedBranchDetails(null);
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Branch: ${selectedBranchDetails.branch.name}`}
             style={{
               backgroundColor: '#FFFFFF',
-              width: '640px',
-              maxWidth: '100vw',
-              height: '100%',
+              width: '760px',
+              maxWidth: '100%',
+              maxHeight: 'calc(100vh - 32px)',
+              borderRadius: '14px',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
+              boxShadow: '0 24px 60px -12px rgba(15, 23, 42, 0.35)',
             }}
           >
             <div
@@ -1743,16 +1362,34 @@ export const BranchesPage: React.FC = () => {
                 <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '2px 6px', borderRadius: '4px' }}>
                   {selectedBranchDetails.branch.branchId}
                 </span>
-                <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', margin: '4px 0 0' }}>
+                <h3 style={{ fontSize: '19px', fontWeight: 700, color: 'var(--text-primary)', margin: '6px 0 2px' }}>
                   {selectedBranchDetails.branch.name}
                 </h3>
+                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <MapPin size={13} style={{ flexShrink: 0 }} />
+                  {selectedBranchDetails.branch.city}, {selectedBranchDetails.branch.state}
+                  {selectedBranchDetails.branch.managerName ? ` · Manager: ${selectedBranchDetails.branch.managerName}` : ''}
+                </div>
               </div>
-              <button
-                onClick={() => setSelectedBranchDetails(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                <button
+                  type="button"
+                  className="branch-view-btn"
+                  style={{ height: '38px', padding: '0 14px' }}
+                  onClick={() => handleOpenAssignModal(selectedBranchDetails.branch)}
+                >
+                  <UserCheck size={16} />
+                  <span>Add student</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={() => setSelectedBranchDetails(null)}
+                  style={{ width: '38px', height: '38px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: '#FFFFFF', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', backgroundColor: '#FFFFFF', overflowX: 'auto' }}>
@@ -1825,10 +1462,57 @@ export const BranchesPage: React.FC = () => {
                         (m) => ((m.branchId as any)?._id || (m.branchId as any)) === selectedBranchDetails.branch._id
                       );
 
+                      const branchIdForForms = selectedBranchDetails.branch._id;
+                      const unconnectedForms = allKnownForms.filter(
+                        (kf) => !bForms.some((bf) => bf.formId === kf.formId)
+                      );
+                      const connectPicker = (
+                        <select
+                          value=""
+                          aria-label="Connect a Meta lead form to this branch"
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) return;
+                            if (val === '__custom__') {
+                              setShowAddCustomFormModal(branchIdForForms);
+                            } else {
+                              handleConnectFormToBranch(branchIdForForms, val);
+                            }
+                          }}
+                          disabled={connectingBranchId === branchIdForForms}
+                          style={{
+                            width: '100%',
+                            height: '40px',
+                            marginTop: '10px',
+                            padding: '0 12px',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            borderRadius: '8px',
+                            border: '1px dashed #94A3B8',
+                            backgroundColor: '#FFFFFF',
+                            color: 'var(--primary)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <option value="">
+                            {connectingBranchId === branchIdForForms ? 'Connecting…' : '+ Connect a Meta lead form…'}
+                          </option>
+                          {unconnectedForms.map((f) => (
+                            <option key={f.formId} value={f.formId}>
+                              {f.formName}
+                            </option>
+                          ))}
+                          <option value="__custom__">+ Enter custom form ID…</option>
+                        </select>
+                      );
+
                       if (bForms.length === 0) {
                         return (
-                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                            No Meta Ads lead form connected to this branch yet. You can connect forms directly from the branch card dropdown.
+                          <div>
+                            <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                              No Meta lead form is connected to this branch yet. New leads from a connected form are routed to this branch automatically.
+                            </div>
+                            {connectPicker}
                           </div>
                         );
                       }
@@ -1869,6 +1553,7 @@ export const BranchesPage: React.FC = () => {
                               </div>
                             </div>
                           ))}
+                          {connectPicker}
                         </div>
                       );
                     })()}
@@ -1886,7 +1571,7 @@ export const BranchesPage: React.FC = () => {
                       onClick={() => handleOpenAssignModal(selectedBranchDetails.branch)}
                       style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 600, color: '#059669', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '4px', cursor: 'pointer' }}
                     >
-                      + Assign Student
+                      + Add Student
                     </button>
                   </div>
 
@@ -2052,14 +1737,14 @@ export const BranchesPage: React.FC = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1250, padding: '16px' }}>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--radius-lg)', maxWidth: '480px', width: '100%', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Assign Student to Branch</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Add Student to Branch</h3>
               <button onClick={() => setAssignStudentModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              Assigning student to <strong>{assignStudentModal.name}</strong>.
+              Adding a student to <strong>{assignStudentModal.name}</strong>.
             </p>
 
             <form onSubmit={handleAssignStudentSubmit}>
@@ -2084,7 +1769,7 @@ export const BranchesPage: React.FC = () => {
                   Cancel
                 </button>
                 <button type="submit" disabled={!selectedStudentToAssign || isSubmittingAssign} style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#FFF', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
-                  {isSubmittingAssign ? 'Assigning...' : 'Assign Student'}
+                  {isSubmittingAssign ? 'Adding...' : 'Add Student'}
                 </button>
               </div>
             </form>

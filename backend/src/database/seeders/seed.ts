@@ -37,7 +37,16 @@ import { seedFifteenStudents } from './seed-15-students';
 
 export const seedDatabase = async () => {
   try {
-    // Always idempotently ensure the 15 students are present with working auth
+    // Seeding used to run on every server start / serverless cold start: ~75 sequential writes that
+    // slowed every first request and reset the 15 demo students' passwords and stages each time.
+    // Now: seed only an empty database, or when SEED_DEMO_STUDENTS=true is set explicitly.
+    const existingUsers = await UserModel.countDocuments();
+    const forceDemoStudents = process.env.SEED_DEMO_STUDENTS === 'true';
+    if (existingUsers > 0 && !forceDemoStudents) {
+      logger.info('Database already seeded; skipping startup seed.');
+      return;
+    }
+
     await seedFifteenStudents();
 
     const userCount = await UserModel.countDocuments();
