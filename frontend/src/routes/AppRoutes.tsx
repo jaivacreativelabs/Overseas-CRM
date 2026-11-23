@@ -29,6 +29,7 @@ const MessagesPage = lazyPage(() => import('../features/messages/MessagesPage'),
 const ReportsPage = lazyPage(() => import('../features/reports/ReportsPage'), 'ReportsPage');
 const UsersPage = lazyPage(() => import('../features/users/UsersPage'), 'UsersPage');
 const MastersPage = lazyPage(() => import('../features/masters/MastersPage'), 'MastersPage');
+const NotFoundPage = lazyPage(() => import('../features/not-found/NotFoundPage'), 'NotFoundPage');
 const AuditLogsPage = lazyPage(() => import('../features/audit-logs/AuditLogsPage'), 'AuditLogsPage');
 const StudentPortalPage = lazyPage(() => import('../features/student-portal/StudentPortalPage'), 'StudentPortalPage');
 const BranchesPage = lazyPage(() => import('../features/branches/BranchesPage'), 'BranchesPage');
@@ -164,11 +165,14 @@ export const AppRoutes: React.FC = () => {
         />
       </Route>
 
-      {/* Fallback route */}
+      {/* The bare root goes to the user's home page */}
       <Route
-        path="*"
+        path="/"
         element={<Navigate to={user?.role === UserRole.STUDENT ? '/portal' : '/dashboard'} replace />}
       />
+
+      {/* Anything else is a real 404 */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
     </React.Suspense>
   );
