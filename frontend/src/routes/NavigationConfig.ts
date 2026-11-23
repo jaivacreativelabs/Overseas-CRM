@@ -49,7 +49,7 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
       },
       {
-        label: 'Leads',
+        label: 'New Lead',
         path: '/leads',
         icon: Users,
         roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
@@ -123,7 +123,7 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         label: 'Masters Config',
         path: '/masters',
         icon: Sliders,
-        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
+        roles: [UserRole.ADMIN],
       },
       {
         label: 'Audit Logs',

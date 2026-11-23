@@ -135,7 +135,14 @@ export const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
-        <Route path="/masters" element={<MastersPage />} />
+        <Route
+          path="/masters"
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+              <MastersPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Admin Exclusive Routes */}
         <Route path="/reports" element={<ReportsPage />} />

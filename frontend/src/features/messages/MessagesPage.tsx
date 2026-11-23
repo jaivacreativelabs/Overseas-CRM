@@ -12,7 +12,6 @@ export const MessagesPage: React.FC = () => {
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [isInternalNote, setIsInternalNote] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const { success, error } = useToast();
@@ -52,7 +51,7 @@ export const MessagesPage: React.FC = () => {
       await apiClient.post('/messages', {
         leadId: selectedLead._id,
         content: newMessage,
-        isInternalNote,
+        isInternalNote: false,
       });
       setNewMessage('');
       const res = await apiClient.get<any[]>(`/messages/lead/${selectedLead._id}`);
@@ -67,10 +66,10 @@ export const MessagesPage: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div>
         <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-          Student Communications & Internal Notes
+          Messages
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-          Direct student portal chat and private staff-only internal notes.
+          Direct chat with students through the student portal.
         </p>
       </div>
 
@@ -160,14 +159,10 @@ export const MessagesPage: React.FC = () => {
                 <Textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message or internal note..."
+                  placeholder="Type a message..."
                   rows={2}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={isInternalNote} onChange={(e) => setIsInternalNote(e.target.checked)} />
-                    <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>🔒 Mark as Internal Note (Staff only)</span>
-                  </label>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '6px' }}>
                   <Button type="submit" variant="primary" size="sm" icon={<Send size={14} />}>
                     Send
                   </Button>
