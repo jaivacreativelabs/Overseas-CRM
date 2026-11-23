@@ -8,6 +8,7 @@ import {
   Clock,
   User,
   ArrowRight,
+  MapPin,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -49,7 +50,7 @@ const StudentAvatar: React.FC<{ name?: string }> = ({ name }) => {
         width: '36px',
         height: '36px',
         flexShrink: 0,
-        borderRadius: '50%',
+        borderRadius: '8px',
         backgroundColor: color.bg,
         color: color.fg,
         fontSize: '13px',
@@ -62,6 +63,131 @@ const StudentAvatar: React.FC<{ name?: string }> = ({ name }) => {
       {initials}
     </div>
   );
+};
+
+// Same rule the backend uses for the Students list: Interested, or a student portal account exists.
+const isConvertedLead = (l: Lead) => !!l.studentUserId || l.status === LeadStatus.INTERESTED;
+
+type Journey = 'lead' | 'converted' | 'closed';
+
+// Mirrors JOURNEY_CONDITIONS in the backend lead service.
+const getJourney = (l: Lead): Journey => {
+  if (isConvertedLead(l)) return 'converted';
+  if (l.status === LeadStatus.CLOSED_LOST || l.status === LeadStatus.NOT_INTERESTED) return 'closed';
+  return 'lead';
+};
+
+const JOURNEY_STYLES: Record<Journey, { text: string; fg: string; bg: string; dot: string; bar: string }> = {
+  lead: { text: 'Still a lead', fg: '#92400E', bg: '#FFF7E6', dot: '#D97706', bar: '#D97706' },
+  converted: { text: 'Converted to student', fg: '#065F46', bg: '#E7F8F0', dot: '#059669', bar: '#059669' },
+  closed: { text: 'Closed', fg: '#991B1B', bg: '#FDECEC', dot: '#DC2626', bar: '#9CA3AF' },
+};
+
+const STAGE_ORDER = Object.values(StudentStage);
+
+const toTitle = (s?: string) =>
+  (s || '')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase());
+
+/** Lead Logs "Journey" cell: journey pill, status, stage name and a stage progress bar. */
+const JourneyCell: React.FC<{ lead: Lead }> = ({ lead }) => {
+  const journey = getJourney(lead);
+  const s = JOURNEY_STYLES[journey];
+  const stepIndex = STAGE_ORDER.indexOf(lead.stage);
+  const step = stepIndex >= 0 ? stepIndex + 1 : 1;
+  const pct = Math.round((step / STAGE_ORDER.length) * 100);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
+        <span
+          style={{
+            fontSize: '11.5px',
+            fontWeight: 600,
+            padding: '2px 9px',
+            borderRadius: '999px',
+            backgroundColor: s.bg,
+            color: s.fg,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {s.text}
+        </span>
+        <span
+          style={{
+            fontSize: '10.5px',
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            color: '#4B5563',
+            border: '1px solid var(--border-color)',
+            borderRadius: '6px',
+            padding: '1px 6px',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {(lead.status || '').replace(/_/g, ' ')}
+        </span>
+      </div>
+      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{toTitle(lead.stage)}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div
+          role="progressbar"
+          aria-label="Pipeline progress"
+          aria-valuemin={1}
+          aria-valuemax={STAGE_ORDER.length}
+          aria-valuenow={step}
+          style={{ flex: 1, maxWidth: '140px', height: '6px', backgroundColor: '#EEF0F3', borderRadius: '999px', overflow: 'hidden' }}
+        >
+          <div style={{ width: `${pct}%`, height: '100%', backgroundColor: s.bar, borderRadius: '999px' }} />
+        </div>
+        <span style={{ fontSize: '11px', color: '#4B5563', whiteSpace: 'nowrap' }}>
+          Stage {step} of {STAGE_ORDER.length}
+        </span>
+      </div>
+      {journey === 'closed' && lead.closedLostReason && (
+        <span style={{ fontSize: '11px', color: '#4B5563' }}>Reason: {lead.closedLostReason}</span>
+      )}
+    </div>
+  );
+};
+
+/** Lead Logs "Latest activity" cell: what happened, who did it and when. */
+const ActivityCell: React.FC<{ lead: Lead }> = ({ lead }) => {
+  const a = lead.latestActivity;
+  if (!a) return <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No activity yet</span>;
+  return (
+    <div style={{ minWidth: 0, maxWidth: '280px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+        <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{a.title}</span>
+        {a.description && (
+          <span
+            title={a.description}
+            style={{ fontSize: '11.5px', color: '#4B5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {a.description}
+          </span>
+        )}
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          {a.actorName ? `${a.actorName} · ` : ''}
+          {timeAgo(a.createdAt)}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const timeAgo = (iso?: string) => {
+  if (!iso) return '';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
 export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly = false }) => {
@@ -83,6 +209,13 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   const [stageFilter, setStageFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [branches, setBranches] = useState<any[]>([]);
+  // Leads page tabs: 'new' (New Leads) shows only untouched leads (status NEW); 'logs' (Lead Logs) shows every lead.
+  const [leadTab, setLeadTab] = useState<'new' | 'logs'>('new');
+  const showNewOnly = !isStudentOnly && leadTab === 'new';
+  const showLogs = !isStudentOnly && leadTab === 'logs';
+  // Lead Logs summary cards: which journey is selected, and how many leads are in each.
+  const [journeyFilter, setJourneyFilter] = useState<'all' | Journey>('all');
+  const [journeyCounts, setJourneyCounts] = useState<Record<'all' | Journey, number> | null>(null);
 
   // Drawers & Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -126,20 +259,27 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         page,
         limit: 20,
         search,
-        status: statusFilter,
+        status: showNewOnly ? LeadStatus.NEW : statusFilter,
         source: sourceFilter,
         stage: stageFilter,
         branchId: branchFilter || undefined,
-        isStudent: isStudentOnly ? true : isStudentOnly === false ? false : undefined,
+        // Students page: converted only. New Leads: not converted. Lead Logs: every lead, converted or not.
+        isStudent: isStudentOnly ? true : showLogs ? undefined : false,
+        withLatestActivity: isStudentOnly ? undefined : true,
+        journey: showLogs && journeyFilter !== 'all' ? journeyFilter : undefined,
+        withJourneyCounts: showLogs ? true : undefined,
       });
       setLeads(res.data || []);
-      if (res.meta) setMeta(res.meta);
+      if (res.meta) {
+        setMeta(res.meta);
+        setJourneyCounts((res.meta as any).journeyCounts || null);
+      }
     } catch (err: any) {
       error(err.message || 'Failed to fetch leads');
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, sourceFilter, stageFilter, branchFilter, isStudentOnly, error]);
+  }, [page, search, statusFilter, sourceFilter, stageFilter, branchFilter, isStudentOnly, showNewOnly, showLogs, journeyFilter, error]);
 
   useEffect(() => {
     fetchLeads();
@@ -268,19 +408,22 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ))}
           </select>
 
-          <select
-            className="form-select"
-            style={{ width: '150px' }}
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {Object.values(LeadStatus).map((st) => (
-              <option key={st} value={st}>
-                {st.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
+          {/* The New Leads tab is always status NEW, so the status filter only applies on Lead Logs. */}
+          {!showNewOnly && (
+            <select
+              className="form-select"
+              style={{ width: '150px' }}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">All Statuses</option>
+              {Object.values(LeadStatus).map((st) => (
+                <option key={st} value={st}>
+                  {st.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
+          )}
 
           <select
             className="form-select"
@@ -296,7 +439,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             ))}
           </select>
 
-          {(searchInput || branchFilter || statusFilter || sourceFilter || stageFilter) && (
+          {(searchInput || branchFilter || (!showNewOnly && statusFilter) || sourceFilter || stageFilter) && (
             <Button
               variant="ghost"
               size="sm"
@@ -315,18 +458,105 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         </div>
       </div>
 
+      {!isStudentOnly && (
+        <div className="tabs-header" role="tablist" aria-label="Lead views" style={{ marginBottom: 0 }}>
+          {(
+            [
+              { key: 'new', label: 'New Leads' },
+              { key: 'logs', label: 'Lead Logs' },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={leadTab === tab.key}
+              className={`tab-btn ${leadTab === tab.key ? 'active' : ''}`}
+              style={{ fontSize: '14px' }}
+              onClick={() => {
+                setLeadTab(tab.key);
+                setPage(1);
+              }}
+            >
+              {tab.label}
+              {leadTab === tab.key && !loading ? ` (${meta.total ?? 0})` : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Lead Logs summary cards: click one to filter the table to that journey. */}
+      {showLogs && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+          {(
+            [
+              { key: 'all', label: 'All leads', hint: 'Everyone who has enquired', dot: '#6B7280' },
+              { key: 'lead', label: 'Still a lead', hint: 'Not converted yet', dot: JOURNEY_STYLES.lead.dot },
+              { key: 'converted', label: 'Converted', hint: 'Became students', dot: JOURNEY_STYLES.converted.dot },
+              { key: 'closed', label: 'Closed', hint: 'Lost or not interested', dot: JOURNEY_STYLES.closed.dot },
+            ] as const
+          ).map((card) => {
+            const selected = journeyFilter === card.key;
+            return (
+              <button
+                key={card.key}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => {
+                  setJourneyFilter(card.key);
+                  setPage(1);
+                }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  textAlign: 'left',
+                  padding: selected ? '15px 17px' : '16px 18px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  font: 'inherit',
+                  backgroundColor: 'var(--bg-surface, #FFFFFF)',
+                  border: selected ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    color: '#4B5563',
+                  }}
+                >
+                  <span style={{ width: '8px', height: '8px', borderRadius: '999px', backgroundColor: card.dot }} />
+                  {card.label}
+                </span>
+                <span style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>
+                  {journeyCounts ? journeyCounts[card.key] : '–'}
+                </span>
+                <span style={{ fontSize: '12px', color: '#4B5563' }}>{card.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Leads / students table */}
         <Table
           columns={[
             {
-              header: 'STUDENT NAME',
+              header: isStudentOnly ? 'STUDENT NAME' : 'LEAD',
               render: (l) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <StudentAvatar name={l.name} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                   <div
                     style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}
-                    onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
+                    onClick={() => navigate(isStudentOnly || isConvertedLead(l) ? `/students/${l._id}` : `/leads/${l._id}`)}
                   >
                     <span>{l.name}</span>
                     {l.studentId && (
@@ -352,7 +582,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
               ),
             },
             {
-              header: 'TARGET COUNTRY / COURSE',
+              header: isStudentOnly ? 'TARGET COUNTRY / COURSE' : 'INTEREST',
               render: (l) => (
                 <div>
                   <div style={{ fontWeight: 500 }}>{l.targetCountry || 'Any Country'}</div>
@@ -385,7 +615,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                           borderRadius: '12px',
                         }}
                       >
-                        📍 {b.name}
+                        <MapPin size={12} aria-hidden="true" /> {b.name}
                       </span>
                     ) : (
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Unassigned</span>
@@ -399,16 +629,31 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                 );
               },
             },
+            // Students page keeps Status + Current Stage; the Leads page merges them into Journey
+            // and adds the latest activity, as in the Lead Logs design.
+            ...(isStudentOnly
+              ? [
+                  {
+                    header: 'STATUS',
+                    render: (l: Lead) => <StatusBadge status={l.status} />,
+                  },
+                  {
+                    header: 'CURRENT STAGE',
+                    render: (l: Lead) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
+                  },
+                ]
+              : [
+                  {
+                    header: 'JOURNEY',
+                    render: (l: Lead) => <JourneyCell lead={l} />,
+                  },
+                  {
+                    header: 'LATEST ACTIVITY',
+                    render: (l: Lead) => <ActivityCell lead={l} />,
+                  },
+                ]),
             {
-              header: 'STATUS',
-              render: (l) => <StatusBadge status={l.status} />,
-            },
-            {
-              header: 'CURRENT STAGE',
-              render: (l) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
-            },
-            {
-              header: 'ACTIONS',
+              header: isStudentOnly ? 'ACTIONS' : 'ACTION',
               align: 'right',
               render: (l) => (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
@@ -418,10 +663,10 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                     icon={<Eye size={14} />}
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`);
+                      navigate(isStudentOnly || isConvertedLead(l) ? `/students/${l._id}` : `/leads/${l._id}`);
                     }}
                   >
-                    View Lead
+                    {isStudentOnly ? 'View Lead' : 'View'}
                   </Button>
                 </div>
               ),

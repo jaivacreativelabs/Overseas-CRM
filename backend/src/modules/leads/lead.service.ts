@@ -24,6 +24,27 @@ import {
 } from '../../utils/errors';
 import { AuditService } from '../audit-logs/audit.service';
 import { ActivityService } from '../activities/activity.service';
+import { ActivityModel } from '../activities/activity.model';
+
+// A lead counts as converted once it is Interested or has a student portal account
+// (the same rule the Students list uses).
+const CONVERTED_CONDITION = {
+  $or: [{ status: LeadStatus.INTERESTED }, { studentUserId: { $exists: true, $ne: null } }],
+};
+const NOT_CONVERTED_CONDITION = {
+  status: { $ne: LeadStatus.INTERESTED },
+  $or: [{ studentUserId: null }, { studentUserId: { $exists: false } }],
+};
+const CLOSED_STATUSES = [LeadStatus.CLOSED_LOST, LeadStatus.NOT_INTERESTED];
+
+export const LEAD_JOURNEYS = ['lead', 'converted', 'closed'] as const;
+export type LeadJourney = (typeof LEAD_JOURNEYS)[number];
+
+const JOURNEY_CONDITIONS: Record<LeadJourney, any> = {
+  converted: CONVERTED_CONDITION,
+  closed: { $and: [NOT_CONVERTED_CONDITION, { status: { $in: CLOSED_STATUSES } }] },
+  lead: { $and: [NOT_CONVERTED_CONDITION, { status: { $nin: CLOSED_STATUSES } }] },
+};
 import { AutomationService } from '../integrations/automation.service';
 import { EmailService } from '../integrations/email.service';
 import { NotificationService } from '../notifications/notification.service';
@@ -153,6 +174,11 @@ export class LeadService {
     branchId?: string;
     isArchived?: boolean;
     isStudent?: boolean;
+    withLatestActivity?: boolean;
+    /** Lead Logs journey filter: 'lead' (not converted, still open), 'converted', or 'closed'. */
+    journey?: LeadJourney;
+    /** Adds meta.journeyCounts: how many leads match the other filters in each journey. */
+    withJourneyCounts?: boolean;
   }) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(100, Math.max(1, query.limit || 25));
@@ -164,21 +190,10 @@ export class LeadService {
 
     if (query.isStudent === true) {
       // Students have status INTERESTED or provisioned studentUserId
-      conditions.push({
-        $or: [
-          { status: LeadStatus.INTERESTED },
-          { studentUserId: { $exists: true, $ne: null } },
-        ],
-      });
+      conditions.push(CONVERTED_CONDITION);
     } else if (query.isStudent === false) {
       // Plain leads: not converted to interested and no student user account provisioned
-      conditions.push({
-        status: { $ne: LeadStatus.INTERESTED },
-        $or: [
-          { studentUserId: null },
-          { studentUserId: { $exists: false } },
-        ],
-      });
+      conditions.push(NOT_CONVERTED_CONDITION);
     }
 
     if (query.status) conditions.push({ status: query.status });
@@ -206,9 +221,26 @@ export class LeadService {
       });
     }
 
-    const filter = conditions.length === 1 ? conditions[0] : { $and: conditions };
+    const toFilter = (conds: any[]) => (conds.length === 1 ? conds[0] : { $and: conds });
 
-    const [leads, total] = await Promise.all([
+    // Counts use every filter except the journey one, so each summary card shows its own total.
+    const journeyCountsPromise = query.withJourneyCounts
+      ? Promise.all([
+          LeadModel.countDocuments(toFilter(conditions)),
+          ...LEAD_JOURNEYS.map((j) => LeadModel.countDocuments(toFilter([...conditions, JOURNEY_CONDITIONS[j]]))),
+        ]).then(([all, ...perJourney]) => ({
+          all,
+          ...Object.fromEntries(LEAD_JOURNEYS.map((j, i) => [j, perJourney[i]])),
+        }))
+      : Promise.resolve(undefined);
+
+    if (query.journey && JOURNEY_CONDITIONS[query.journey]) {
+      conditions.push(JOURNEY_CONDITIONS[query.journey]);
+    }
+
+    const filter = toFilter(conditions);
+
+    const [leads, total, journeyCounts] = await Promise.all([
       LeadModel.find(filter)
         .populate('counsellorId', 'name email phone avatar')
         .populate('studentUserId', 'name email isActive')
@@ -218,7 +250,12 @@ export class LeadService {
         .limit(limit)
         .lean(),
       LeadModel.countDocuments(filter),
+      journeyCountsPromise,
     ]);
+
+    if (query.withLatestActivity && leads.length > 0) {
+      await this.attachLatestActivity(leads);
+    }
 
     return {
       leads,
@@ -227,8 +264,65 @@ export class LeadService {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        ...(journeyCounts ? { journeyCounts } : {}),
       },
     };
+  }
+
+  /**
+   * Sets `latestActivity` on each lead (one query for the whole page). An activity belongs to a
+   * lead through its leadId, or, after conversion, through the student's portal user id.
+   */
+  private static async attachLatestActivity(leads: any[]): Promise<void> {
+    const leadIds = leads.map((l) => l._id);
+    const leadIdByStudentUser = new Map<string, string>();
+    for (const l of leads) {
+      const studentUserId = l.studentUserId?._id || l.studentUserId;
+      if (studentUserId) leadIdByStudentUser.set(studentUserId.toString(), l._id.toString());
+    }
+    const studentUserIds = [...leadIdByStudentUser.keys()].map((id) => new Types.ObjectId(id));
+
+    const latest = await ActivityModel.aggregate([
+      {
+        $match: {
+          $or: [
+            { leadId: { $in: leadIds } },
+            { studentId: { $in: [...leadIds, ...studentUserIds] } },
+          ],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: { $ifNull: ['$leadId', '$studentId'] },
+          action: { $first: '$action' },
+          title: { $first: '$title' },
+          description: { $first: '$description' },
+          actorName: { $first: '$actorName' },
+          createdAt: { $first: '$createdAt' },
+        },
+      },
+    ]);
+
+    const byLead = new Map<string, any>();
+    for (const a of latest) {
+      const key = a._id.toString();
+      const leadId = leadIdByStudentUser.get(key) || key;
+      const current = byLead.get(leadId);
+      if (!current || new Date(a.createdAt) > new Date(current.createdAt)) {
+        byLead.set(leadId, {
+          action: a.action,
+          title: a.title,
+          description: a.description,
+          actorName: a.actorName,
+          createdAt: a.createdAt,
+        });
+      }
+    }
+
+    for (const l of leads) {
+      l.latestActivity = byLead.get(l._id.toString()) || null;
+    }
   }
 
   static async getLeadById(id: string): Promise<any> {

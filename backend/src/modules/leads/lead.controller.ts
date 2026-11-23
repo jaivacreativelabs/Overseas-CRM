@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { LeadService } from './lead.service';
+import { LeadService, LEAD_JOURNEYS, LeadJourney } from './lead.service';
 import { MetaAdsService } from '../integrations/meta-ads.service';
 import { ApiResponse } from '../../utils/api-response';
 import { LeadSource, LeadStatus, StudentStage, UserRole } from '../../config/constants';
@@ -19,6 +19,10 @@ export class LeadController {
       const branchId = (req.query.branchId as string) || (req.user?.role === UserRole.COUNSELLOR ? (req.user as any).branchId : undefined);
       const isArchived = req.query.isArchived === 'true';
       const isStudent = req.query.isStudent !== undefined ? req.query.isStudent === 'true' : undefined;
+      const withLatestActivity = req.query.withLatestActivity === 'true';
+      const withJourneyCounts = req.query.withJourneyCounts === 'true';
+      const journeyParam = req.query.journey as string;
+      const journey = (LEAD_JOURNEYS as readonly string[]).includes(journeyParam) ? (journeyParam as LeadJourney) : undefined;
 
       const result = await LeadService.getLeads({
         page,
@@ -32,6 +36,9 @@ export class LeadController {
         branchId,
         isArchived,
         isStudent,
+        withLatestActivity,
+        journey,
+        withJourneyCounts,
       });
 
       return ApiResponse.success(res, 'Leads retrieved successfully', result.leads, 200, result.meta);

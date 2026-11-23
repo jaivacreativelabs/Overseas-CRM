@@ -176,6 +176,14 @@ export interface Lead {
   closedLostReason?: string;
   notes?: string;
   lastContactedAt?: string;
+  /** Only present when the list is fetched with withLatestActivity=true (Lead Logs tab). */
+  latestActivity?: {
+    action: string;
+    title: string;
+    description: string;
+    actorName?: string;
+    createdAt: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
