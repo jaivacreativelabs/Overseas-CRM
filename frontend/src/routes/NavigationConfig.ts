@@ -18,7 +18,6 @@ import {
   MessageSquare,
   BarChart3,
   ShieldCheck,
-  Sliders,
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -117,12 +116,6 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         label: 'User Management',
         path: '/users',
         icon: ShieldCheck,
-        roles: [UserRole.ADMIN],
-      },
-      {
-        label: 'Masters Config',
-        path: '/masters',
-        icon: Sliders,
         roles: [UserRole.ADMIN],
       },
       {
