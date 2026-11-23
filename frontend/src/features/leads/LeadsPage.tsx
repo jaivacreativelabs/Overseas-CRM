@@ -13,128 +13,26 @@ import {
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
-import { Lead, LeadSource, LeadStatus, StudentStage, User as UserType } from '../../types';
+import { Lead, LeadSource, LeadStatus, User as UserType } from '../../types';
 import { Table, Pagination, SearchInput } from '../../components/Table';
 import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
 import { Drawer } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
-import { timeAgo } from '../../utils/timeAgo';
 import { StudentAvatar } from '../../components/StudentAvatar';
 
 
 // Same rule the backend uses for the Students list: Interested, or a student portal account exists.
 const isConvertedLead = (l: Lead) => !!l.studentUserId || l.status === LeadStatus.INTERESTED;
 
+// Lead Logs summary-card journeys (filtered on the server by JOURNEY_CONDITIONS in the lead service).
 type Journey = 'lead' | 'converted' | 'closed';
 
-// Mirrors JOURNEY_CONDITIONS in the backend lead service.
-const getJourney = (l: Lead): Journey => {
-  if (isConvertedLead(l)) return 'converted';
-  if (l.status === LeadStatus.CLOSED_LOST || l.status === LeadStatus.NOT_INTERESTED) return 'closed';
-  return 'lead';
+const JOURNEY_STYLES: Record<Journey, { dot: string }> = {
+  lead: { dot: '#D97706' },
+  converted: { dot: '#059669' },
+  closed: { dot: '#DC2626' },
 };
-
-const JOURNEY_STYLES: Record<Journey, { text: string; fg: string; bg: string; dot: string; bar: string }> = {
-  lead: { text: 'Still a lead', fg: '#92400E', bg: '#FFF7E6', dot: '#D97706', bar: '#D97706' },
-  converted: { text: 'Converted to student', fg: '#065F46', bg: '#E7F8F0', dot: '#059669', bar: '#059669' },
-  closed: { text: 'Closed', fg: '#991B1B', bg: '#FDECEC', dot: '#DC2626', bar: '#9CA3AF' },
-};
-
-const STAGE_ORDER = Object.values(StudentStage);
-
-const toTitle = (s?: string) =>
-  (s || '')
-    .toLowerCase()
-    .replace(/_/g, ' ')
-    .replace(/^\w/, (c) => c.toUpperCase());
-
-/** Lead Logs "Journey" cell: journey pill, status, stage name and a stage progress bar. */
-const JourneyCell: React.FC<{ lead: Lead }> = ({ lead }) => {
-  const journey = getJourney(lead);
-  const s = JOURNEY_STYLES[journey];
-  const stepIndex = STAGE_ORDER.indexOf(lead.stage);
-  const step = stepIndex >= 0 ? stepIndex + 1 : 1;
-  const pct = Math.round((step / STAGE_ORDER.length) * 100);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px' }}>
-        <span
-          style={{
-            fontSize: '11.5px',
-            fontWeight: 600,
-            padding: '2px 9px',
-            borderRadius: '999px',
-            backgroundColor: s.bg,
-            color: s.fg,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {s.text}
-        </span>
-        <span
-          style={{
-            fontSize: '10.5px',
-            fontWeight: 600,
-            letterSpacing: '0.04em',
-            color: '#4B5563',
-            border: '1px solid var(--border-color)',
-            borderRadius: '6px',
-            padding: '1px 6px',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {(lead.status || '').replace(/_/g, ' ')}
-        </span>
-      </div>
-      <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{toTitle(lead.stage)}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div
-          role="progressbar"
-          aria-label="Pipeline progress"
-          aria-valuemin={1}
-          aria-valuemax={STAGE_ORDER.length}
-          aria-valuenow={step}
-          style={{ flex: 1, maxWidth: '140px', height: '6px', backgroundColor: '#EEF0F3', borderRadius: '999px', overflow: 'hidden' }}
-        >
-          <div style={{ width: `${pct}%`, height: '100%', backgroundColor: s.bar, borderRadius: '999px' }} />
-        </div>
-        <span style={{ fontSize: '11px', color: '#4B5563', whiteSpace: 'nowrap' }}>
-          Stage {step} of {STAGE_ORDER.length}
-        </span>
-      </div>
-      {journey === 'closed' && lead.closedLostReason && (
-        <span style={{ fontSize: '11px', color: '#4B5563' }}>Reason: {lead.closedLostReason}</span>
-      )}
-    </div>
-  );
-};
-
-/** Lead Logs "Latest activity" cell: what happened, who did it and when. */
-const ActivityCell: React.FC<{ lead: Lead }> = ({ lead }) => {
-  const a = lead.latestActivity;
-  if (!a) return <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>No activity yet</span>;
-  return (
-    <div style={{ minWidth: 0, maxWidth: '280px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-        <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{a.title}</span>
-        {a.description && (
-          <span
-            title={a.description}
-            style={{ fontSize: '11.5px', color: '#4B5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {a.description}
-          </span>
-        )}
-        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {a.actorName ? `${a.actorName} · ` : ''}
-          {timeAgo(a.createdAt)}
-        </span>
-      </div>
-    </div>
-  );
-};
-
 
 export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly = false }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -211,7 +109,6 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         branchId: branchFilter || undefined,
         // Students page: converted only. New Leads: not converted. Lead Logs: every lead, converted or not.
         isStudent: isStudentOnly ? true : showLogs ? undefined : false,
-        withLatestActivity: isStudentOnly ? undefined : true,
         journey: showLogs && journeyFilter !== 'all' ? journeyFilter : undefined,
         withJourneyCounts: showLogs ? true : undefined,
       });
@@ -496,7 +393,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         <Table
           columns={[
             {
-              header: isStudentOnly ? 'STUDENT NAME' : 'LEAD',
+              header: 'STUDENT NAME',
               render: (l) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <StudentAvatar name={l.name} />
@@ -529,7 +426,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
               ),
             },
             {
-              header: isStudentOnly ? 'TARGET COUNTRY / COURSE' : 'INTEREST',
+              header: 'TARGET COUNTRY / COURSE',
               render: (l) => (
                 <div>
                   <div style={{ fontWeight: 500 }}>{l.targetCountry || 'Any Country'}</div>
@@ -576,31 +473,16 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                 );
               },
             },
-            // Students page keeps Status + Current Stage; the Leads page merges them into Journey
-            // and adds the latest activity, as in the Lead Logs design.
-            ...(isStudentOnly
-              ? [
-                  {
-                    header: 'STATUS',
-                    render: (l: Lead) => <StatusBadge status={l.status} />,
-                  },
-                  {
-                    header: 'CURRENT STAGE',
-                    render: (l: Lead) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
-                  },
-                ]
-              : [
-                  {
-                    header: 'JOURNEY',
-                    render: (l: Lead) => <JourneyCell lead={l} />,
-                  },
-                  {
-                    header: 'LATEST ACTIVITY',
-                    render: (l: Lead) => <ActivityCell lead={l} />,
-                  },
-                ]),
             {
-              header: isStudentOnly ? 'ACTIONS' : 'ACTION',
+              header: 'STATUS',
+              render: (l: Lead) => <StatusBadge status={l.status} />,
+            },
+            {
+              header: 'CURRENT STAGE',
+              render: (l: Lead) => <Badge variant="primary">{l.stage.replace(/_/g, ' ')}</Badge>,
+            },
+            {
+              header: 'ACTIONS',
               align: 'right',
               render: (l) => (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
@@ -613,7 +495,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                       navigate(isStudentOnly || isConvertedLead(l) ? `/students/${l._id}` : `/leads/${l._id}`);
                     }}
                   >
-                    {isStudentOnly ? 'View Lead' : 'View'}
+                    View Lead
                   </Button>
                 </div>
               ),
