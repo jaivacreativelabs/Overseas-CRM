@@ -11,8 +11,9 @@ export class UserController {
       const role = req.query.role as UserRole;
       const search = req.query.search as string;
       const isActive = req.query.isActive !== undefined ? req.query.isActive === 'true' : undefined;
+      const staffOnly = req.query.staffOnly === 'true';
 
-      const result = await UserService.getUsers({ page, limit, role, search, isActive });
+      const result = await UserService.getUsers({ page, limit, role, search, isActive, staffOnly });
       return ApiResponse.success(res, 'Users fetched successfully', result.users, 200, result.meta);
     } catch (error) {
       next(error);

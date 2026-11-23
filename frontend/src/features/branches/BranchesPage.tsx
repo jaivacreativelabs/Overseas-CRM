@@ -558,7 +558,8 @@ export const BranchesPage: React.FC = () => {
     setAssignStaffModal(branch);
     setSelectedStaffUserIds((branch as any).assignedStaffIds?.map((s: any) => s._id || s) || []);
     try {
-      const res = await apiClient.get<UserType[]>('/users');
+      // Only staff can be assigned to a branch, so leave student accounts out of the picker.
+      const res = await apiClient.get<UserType[]>('/users', { staffOnly: true, limit: 100 });
       setAllUsers(res.data || []);
     } catch (err) { }
   };
