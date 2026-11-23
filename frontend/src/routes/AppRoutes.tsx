@@ -28,7 +28,6 @@ const TasksPage = lazyPage(() => import('../features/tasks/TasksPage'), 'TasksPa
 const MessagesPage = lazyPage(() => import('../features/messages/MessagesPage'), 'MessagesPage');
 const ReportsPage = lazyPage(() => import('../features/reports/ReportsPage'), 'ReportsPage');
 const UsersPage = lazyPage(() => import('../features/users/UsersPage'), 'UsersPage');
-const MastersPage = lazyPage(() => import('../features/masters/MastersPage'), 'MastersPage');
 const NotFoundPage = lazyPage(() => import('../features/not-found/NotFoundPage'), 'NotFoundPage');
 const AuditLogsPage = lazyPage(() => import('../features/audit-logs/AuditLogsPage'), 'AuditLogsPage');
 const StudentPortalPage = lazyPage(() => import('../features/student-portal/StudentPortalPage'), 'StudentPortalPage');
@@ -133,14 +132,6 @@ export const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.COUNSELLOR]} blockOwnerAdmin={true}>
               <MessagesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/masters"
-          element={
-            <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-              <MastersPage />
             </ProtectedRoute>
           }
         />
