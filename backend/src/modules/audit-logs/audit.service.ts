@@ -38,7 +38,13 @@ export class AuditService {
     const filter: Record<string, any> = {};
     if (query.entityType) filter.entityType = query.entityType;
     if (query.action) filter.action = query.action;
-    if (query.userId) filter.userId = new Types.ObjectId(query.userId);
+    if (query.userId) {
+      // An id that isn't valid can't match anyone: return nothing rather than everything.
+      if (!Types.ObjectId.isValid(query.userId)) {
+        return { logs: [], meta: { page, limit, total: 0, totalPages: 0 } };
+      }
+      filter.userId = new Types.ObjectId(query.userId);
+    }
 
     const [logs, total] = await Promise.all([
       AuditLogModel.find(filter)
@@ -59,5 +65,13 @@ export class AuditService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /** Distinct action names, optionally limited to one user's entries. */
+  static async getActions(userId?: string): Promise<string[]> {
+    if (userId && !Types.ObjectId.isValid(userId)) return [];
+    const filter = userId ? { userId: new Types.ObjectId(userId) } : {};
+    const actions = await AuditLogModel.distinct('action', filter);
+    return (actions as string[]).sort();
   }
 }

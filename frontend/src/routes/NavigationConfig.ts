@@ -129,7 +129,8 @@ export const NAVIGATION_SECTIONS: NavSection[] = [
         label: 'Audit Logs',
         path: '/audit-logs',
         icon: ShieldCheck,
-        roles: [UserRole.ADMIN],
+        // Counsellors and branch admins see only their own entries; Owner Admin sees everything.
+        roles: [UserRole.ADMIN, UserRole.COUNSELLOR],
       },
     ],
   },
