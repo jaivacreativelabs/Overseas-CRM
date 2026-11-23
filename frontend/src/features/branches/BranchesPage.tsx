@@ -16,7 +16,6 @@ import {
   MapPin,
   X,
   UserCheck,
-  Download,
   MoreHorizontal,
   Power,
   Landmark,
@@ -136,7 +135,6 @@ export const BranchesPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedState, setSelectedState] = useState('ALL');
@@ -361,30 +359,6 @@ export const BranchesPage: React.FC = () => {
   useEffect(() => {
     fetchBranches();
   }, [searchQuery, selectedState, selectedStatus, sortBy, sortOrder, currentPage]);
-
-  const handleExportCSV = async () => {
-    setIsExporting(true);
-    try {
-      const token = localStorage.getItem('jaiva_crm_token') || '';
-      const res = await fetch('/api/v1/branches/export', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `crm_branches_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setError(err.message || 'CSV export failed');
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   const handleOpenCreateModal = () => {
     setEditingBranch(null);
@@ -656,49 +630,6 @@ export const BranchesPage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button
-            onClick={handleExportCSV}
-            disabled={isExporting}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '13px',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-              opacity: isExporting ? 0.6 : 1,
-            }}
-          >
-            <Download size={15} />
-            <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
-          </button>
-
-          <button
-            onClick={() => fetchBranches(true)}
-            disabled={isRefreshing}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid var(--border-color)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '13px',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-            }}
-          >
-            <RefreshCw size={15} className={isRefreshing ? 'spin-animation' : ''} />
-            <span>Refresh</span>
-          </button>
-
           {isOwnerAdmin && (
             <button
               onClick={handleOpenCreateModal}
