@@ -18,6 +18,7 @@ import {
   UserCheck,
   MoreHorizontal,
   Power,
+  Landmark,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useAuth } from '../../context/AuthContext';
@@ -71,6 +72,41 @@ const INDIAN_STATES_AND_UTS = [
   'Lakshadweep',
   'Puducherry',
 ];
+
+type BankDetailsForm = {
+  accountHolderName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankBranch: string;
+  accountType: '' | 'SAVINGS' | 'CURRENT';
+  upiId: string;
+};
+
+const EMPTY_BANK_DETAILS: BankDetailsForm = {
+  accountHolderName: '',
+  bankName: '',
+  accountNumber: '',
+  ifscCode: '',
+  bankBranch: '',
+  accountType: '',
+  upiId: '',
+};
+
+const toBankDetailsForm = (branch: Branch): BankDetailsForm => ({
+  accountHolderName: branch.bankDetails?.accountHolderName || '',
+  bankName: branch.bankDetails?.bankName || '',
+  accountNumber: branch.bankDetails?.accountNumber || '',
+  ifscCode: branch.bankDetails?.ifscCode || '',
+  bankBranch: branch.bankDetails?.bankBranch || '',
+  accountType: branch.bankDetails?.accountType || '',
+  upiId: branch.bankDetails?.upiId || '',
+});
+
+const hasBankDetails = (bank: BankDetailsForm) => Object.values(bank).some((v) => v.trim() !== '');
+
+const maskAccountNumber = (accountNumber: string) =>
+  accountNumber.length <= 4 ? accountNumber : `${'•'.repeat(accountNumber.length - 4)}${accountNumber.slice(-4)}`;
 
 export interface ExtendedBranchSummary {
   totalBranches: number;
@@ -137,8 +173,13 @@ export const BranchesPage: React.FC = () => {
     managerEmail: '',
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
     notes: '',
+    bankDetails: EMPTY_BANK_DETAILS,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [showAccountNumber, setShowAccountNumber] = useState(false);
+
+  const setBankField = (field: keyof BankDetailsForm, value: string) =>
+    setFormData((prev) => ({ ...prev, bankDetails: { ...prev.bankDetails, [field]: value } }));
 
   const [unassignedStudents, setUnassignedStudents] = useState<Lead[]>([]);
   const [selectedStudentToAssign, setSelectedStudentToAssign] = useState('');
@@ -333,6 +374,7 @@ export const BranchesPage: React.FC = () => {
       managerEmail: '',
       status: 'ACTIVE',
       notes: '',
+      bankDetails: EMPTY_BANK_DETAILS,
     });
     setFormErrors({});
     setShowCreateModal(true);
@@ -352,6 +394,7 @@ export const BranchesPage: React.FC = () => {
       managerEmail: branch.managerEmail || '',
       status: branch.status,
       notes: branch.notes || '',
+      bankDetails: toBankDetailsForm(branch),
     });
     setFormErrors({});
     setShowCreateModal(true);
@@ -372,6 +415,20 @@ export const BranchesPage: React.FC = () => {
     if (formData.pinCode && !/^\d{6}$/.test(formData.pinCode.trim())) {
       errs.pinCode = 'PIN Code must be a 6-digit number';
     }
+    const bank = formData.bankDetails;
+    if (hasBankDetails(bank)) {
+      if (!bank.accountHolderName.trim()) errs.bankAccountHolderName = 'Account holder name is required';
+      if (!bank.bankName.trim()) errs.bankName = 'Bank name is required';
+      const accountNumber = bank.accountNumber.replace(/\s+/g, '');
+      if (!accountNumber) errs.bankAccountNumber = 'Account number is required';
+      else if (!/^\d{9,18}$/.test(accountNumber)) errs.bankAccountNumber = 'Account number must be 9 to 18 digits';
+      const ifsc = bank.ifscCode.trim().toUpperCase();
+      if (!ifsc) errs.bankIfscCode = 'IFSC code is required';
+      else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) errs.bankIfscCode = 'IFSC must be 11 characters, e.g. HDFC0001234';
+      if (bank.upiId.trim() && !/^[\w.-]{2,}@[a-zA-Z][a-zA-Z0-9.-]+$/.test(bank.upiId.trim())) {
+        errs.bankUpiId = 'UPI ID must look like name@bank';
+      }
+    }
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -380,12 +437,23 @@ export const BranchesPage: React.FC = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
+    // All-blank bank fields are sent as null so the branch is saved with no bank details.
+    const payload = {
+      ...formData,
+      bankDetails: hasBankDetails(formData.bankDetails) ? formData.bankDetails : null,
+    };
+
     try {
       if (editingBranch) {
-        await apiClient.put(`/branches/${editingBranch._id}`, formData);
+        await apiClient.put(`/branches/${editingBranch._id}`, payload);
         setSuccessMsg(`Branch '${formData.name}' updated successfully.`);
+        // Keep the details drawer in sync when the branch was edited from inside it.
+        if (selectedBranchDetails?.branch._id === editingBranch._id) {
+          const res = await apiClient.get<any>(`/branches/${editingBranch._id}`).catch(() => null);
+          if (res) setSelectedBranchDetails(res.data);
+        }
       } else {
-        await apiClient.post('/branches', formData);
+        await apiClient.post('/branches', payload);
         setSuccessMsg(`Branch '${formData.name}' created successfully.`);
       }
       setShowCreateModal(false);
@@ -426,6 +494,7 @@ export const BranchesPage: React.FC = () => {
       const res = await apiClient.get<any>(`/branches/${branch._id}`);
       setSelectedBranchDetails(res.data);
       setDrawerActiveTab('overview');
+      setShowAccountNumber(false);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch branch details');
     }
@@ -936,7 +1005,8 @@ export const BranchesPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1200,
+            // Above the branch details drawer (1200), since Edit can be opened from inside it.
+            zIndex: 1250,
             padding: '16px',
           }}
         >
@@ -1185,6 +1255,92 @@ export const BranchesPage: React.FC = () => {
                 </div>
               </div>
 
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.04em' }}>
+                Bank Account Details
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                Optional. Leave all fields blank if this branch has no bank account on file.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                {(
+                  [
+                    { field: 'accountHolderName', errKey: 'bankAccountHolderName', label: 'Account Holder Name', placeholder: 'e.g. IIEC Overseas Pvt Ltd' },
+                    { field: 'bankName', errKey: 'bankName', label: 'Bank Name', placeholder: 'e.g. HDFC Bank' },
+                    { field: 'accountNumber', errKey: 'bankAccountNumber', label: 'Account Number', placeholder: '9 to 18 digits', inputMode: 'numeric' },
+                    { field: 'ifscCode', errKey: 'bankIfscCode', label: 'IFSC Code', placeholder: 'e.g. HDFC0001234', uppercase: true },
+                    { field: 'bankBranch', errKey: 'bankBranch', label: 'Bank Branch', placeholder: 'e.g. MG Road, Bangalore' },
+                  ] as const
+                ).map((f) => (
+                  <div key={f.field}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                      {f.label}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={f.placeholder}
+                      inputMode={'inputMode' in f ? f.inputMode : undefined}
+                      autoComplete="off"
+                      value={formData.bankDetails[f.field]}
+                      onChange={(e) =>
+                        setBankField(f.field, 'uppercase' in f ? e.target.value.toUpperCase() : e.target.value)
+                      }
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: formErrors[f.errKey] ? '1px solid #EF4444' : '1px solid var(--border-color)',
+                        fontSize: '13.5px',
+                      }}
+                    />
+                    {formErrors[f.errKey] && <span style={{ fontSize: '11.5px', color: '#EF4444' }}>{formErrors[f.errKey]}</span>}
+                  </div>
+                ))}
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    Account Type
+                  </label>
+                  <select
+                    value={formData.bankDetails.accountType}
+                    onChange={(e) => setBankField('accountType', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                  >
+                    <option value="">Select type</option>
+                    <option value="CURRENT">Current</option>
+                    <option value="SAVINGS">Savings</option>
+                  </select>
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                    UPI ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. iiecbangalore@hdfcbank"
+                    autoComplete="off"
+                    value={formData.bankDetails.upiId}
+                    onChange={(e) => setBankField('upiId', e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: formErrors.bankUpiId ? '1px solid #EF4444' : '1px solid var(--border-color)',
+                      fontSize: '13.5px',
+                    }}
+                  />
+                  {formErrors.bankUpiId && <span style={{ fontSize: '11.5px', color: '#EF4444' }}>{formErrors.bankUpiId}</span>}
+                </div>
+              </div>
+
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
                   Branch Status
@@ -1372,6 +1528,54 @@ export const BranchesPage: React.FC = () => {
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Email: </strong>{selectedBranchDetails.branch.email || 'N/A'}</div>
                     <div><strong style={{ color: 'var(--text-muted)' }}>Branch Manager: </strong>{selectedBranchDetails.branch.managerName || 'Unassigned'} {selectedBranchDetails.branch.managerEmail ? `(${selectedBranchDetails.branch.managerEmail})` : ''}</div>
                   </div>
+
+                  {/* Bank Account Details */}
+                  {(() => {
+                    const bank = selectedBranchDetails.branch.bankDetails;
+                    return (
+                      <div style={{ marginTop: '20px', padding: '14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Landmark size={15} color="var(--primary)" />
+                            <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Bank Account Details</strong>
+                          </div>
+                          <button
+                            onClick={() => handleOpenEditModal(selectedBranchDetails.branch)}
+                            style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--primary)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            {bank?.accountNumber ? 'Edit' : '+ Add Bank Details'}
+                          </button>
+                        </div>
+                        {bank?.accountNumber ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                            <div><strong style={{ color: 'var(--text-muted)' }}>Account Holder: </strong>{bank.accountHolderName}</div>
+                            <div><strong style={{ color: 'var(--text-muted)' }}>Bank: </strong>{bank.bankName}{bank.bankBranch ? `, ${bank.bankBranch}` : ''}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>
+                                <strong style={{ color: 'var(--text-muted)' }}>Account Number: </strong>
+                                <span style={{ fontFamily: 'monospace', letterSpacing: '0.03em' }}>
+                                  {showAccountNumber ? bank.accountNumber : maskAccountNumber(bank.accountNumber)}
+                                </span>
+                              </span>
+                              <button
+                                onClick={() => setShowAccountNumber((v) => !v)}
+                                style={{ background: 'none', border: 'none', padding: 0, fontSize: '11.5px', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
+                              >
+                                {showAccountNumber ? 'Hide' : 'Show'}
+                              </button>
+                            </div>
+                            <div><strong style={{ color: 'var(--text-muted)' }}>IFSC Code: </strong><span style={{ fontFamily: 'monospace' }}>{bank.ifscCode}</span></div>
+                            {bank.accountType && (
+                              <div><strong style={{ color: 'var(--text-muted)' }}>Account Type: </strong>{bank.accountType === 'CURRENT' ? 'Current' : 'Savings'}</div>
+                            )}
+                            {bank.upiId && <div><strong style={{ color: 'var(--text-muted)' }}>UPI ID: </strong>{bank.upiId}</div>}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>No bank account added for this branch yet.</div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Connected Meta Lead Forms in Drawer */}
                   <div style={{ marginTop: '20px', padding: '14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px' }}>

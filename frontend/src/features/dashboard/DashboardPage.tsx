@@ -128,6 +128,7 @@ export const DashboardPage: React.FC = () => {
               fontSize: '13px',
               cursor: 'pointer',
               boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+              fieldSizing: 'content',
             }}
           >
             <option value="all">All Time</option>
@@ -135,32 +136,60 @@ export const DashboardPage: React.FC = () => {
             <option value="monthly">Monthly</option>
             <option value="yearly">Yearly</option>
           </select>
-          {branches.length > 0 && (
-            <select
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              aria-label="Filter dashboard by branch"
-              style={{
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                border: 'none',
-                backgroundColor: '#FFFFFF',
-                color: '#0057F8',
-                fontWeight: 600,
-                fontSize: '13px',
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                maxWidth: '220px',
-              }}
-            >
-              <option value="">All Branches</option>
-              {branches.map((b) => (
-                <option key={b._id} value={b._id}>
-                  {b.name}{b.city ? ` (${b.city})` : ''}
-                </option>
-              ))}
-            </select>
-          )}
+          {branches.length > 0 && (() => {
+            const branchLabel = (b: any) => `${b.name}${b.city ? ` (${b.city})` : ''}`;
+            const selectedBranch = branches.find((b) => b._id === branchId);
+            const selectedLabel = selectedBranch ? branchLabel(selectedBranch) : 'All Branches';
+            // A native <select> is as wide as its longest option. The hidden copy of the selected
+            // label sets the width, and the select is laid absolutely over it, so its options
+            // can't widen it.
+            return (
+              <div style={{ position: 'relative', display: 'inline-block', maxWidth: '220px' }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: 'block',
+                    visibility: 'hidden',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    padding: '8px 36px 8px 12px',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                  }}
+                >
+                  {selectedLabel}
+                </span>
+                <select
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  aria-label="Filter dashboard by branch"
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: 'none',
+                    backgroundColor: '#FFFFFF',
+                    color: '#0057F8',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {branches.map((b) => (
+                    <option key={b._id} value={b._id}>
+                      {branchLabel(b)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
