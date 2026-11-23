@@ -31,7 +31,8 @@ export const UsersPage: React.FC = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<User[]>('/users');
+      // Team management lists staff only; students have their own Students page.
+      const res = await apiClient.get<User[]>('/users', { staffOnly: true, limit: 100 });
       setUsers(res.data || []);
     } catch (err: any) {
       error(err.message || 'Failed to load team users');

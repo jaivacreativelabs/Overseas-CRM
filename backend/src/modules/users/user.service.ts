@@ -59,6 +59,8 @@ export class UserService {
     role?: UserRole;
     search?: string;
     isActive?: boolean;
+    /** Only admins and counsellors: leaves out student portal accounts. */
+    staffOnly?: boolean;
   }) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(100, Math.max(1, query.limit || 25));
@@ -66,6 +68,7 @@ export class UserService {
 
     const filter: Record<string, any> = { isArchived: false };
     if (query.role) filter.role = query.role;
+    else if (query.staffOnly) filter.role = { $in: [UserRole.ADMIN, UserRole.COUNSELLOR] };
     if (query.isActive !== undefined) filter.isActive = query.isActive;
     if (query.search) {
       filter.$or = [
