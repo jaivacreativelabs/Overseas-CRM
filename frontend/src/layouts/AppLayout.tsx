@@ -3,7 +3,6 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LogOut,
   Bell,
-  HelpCircle,
   Menu,
   ChevronDown,
   Globe,
@@ -23,7 +22,6 @@ import { useAuth } from '../context/AuthContext';
 import { NAVIGATION_SECTIONS } from '../routes/NavigationConfig';
 import { apiClient } from '../services/api-client';
 import { NotificationItem, UserRole, AdminType, Lead, StudentStage } from '../types';
-import { UserGuideModal } from '../components/UserGuide';
 import { VerticalStageStepper } from '../components/StageStepper';
 import { ContextMenu } from '../components/ContextMenu';
 import { getPinnedModules, togglePinModule } from '../utils/pinnedModules';
@@ -57,7 +55,6 @@ export const AppLayout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(getInitialSidebarState);
   const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [studentStage, setStudentStage] = useState<StudentStage>(StudentStage.PROFILE_EVALUATION);
@@ -510,7 +507,7 @@ export const AppLayout: React.FC = () => {
           )}
         </nav>
 
-        {/* Bottom Section: Help & Logout */}
+        {/* Bottom Section: Logout */}
         <div
           style={{
             padding: '12px 10px',
@@ -520,32 +517,6 @@ export const AppLayout: React.FC = () => {
             gap: '4px',
           }}
         >
-          {!isStudent && (
-            <button
-              onClick={() => {
-                setIsGuideOpen(true);
-                handleNavClick();
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '9px 12px',
-                justifyContent: 'flex-start',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--text-secondary)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '13.5px',
-                width: '100%',
-                textAlign: 'left',
-              }}
-            >
-              <HelpCircle size={18} />
-              <span>User Guide & FAQs</span>
-            </button>
-          )}
           <button
             onClick={() => {
               logout();
@@ -837,9 +808,6 @@ export const AppLayout: React.FC = () => {
           })}
         </nav>
       )}
-
-      {/* Interactive User Guide Modal */}
-      <UserGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
 
       {/* Sidebar Right-Click Context Menu for Pinned Modules */}
       {sidebarContextMenu && (

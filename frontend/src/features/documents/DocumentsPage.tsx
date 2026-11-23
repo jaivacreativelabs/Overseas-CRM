@@ -11,6 +11,8 @@ import {
   AlertCircle,
   FileCheck,
   Filter,
+  Eye,
+  Download,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
@@ -21,6 +23,32 @@ import { Modal } from '../../components/Modal';
 import { Select, Textarea } from '../../components/Form';
 import { DocumentStatus } from '../../types';
 
+type PreviewKind = 'image' | 'pdf' | 'other';
+
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
+
+const getPreviewKind = (doc: any): PreviewKind => {
+  const name = String(doc?.originalFileName || doc?.fileUrl || '').toLowerCase().split('?')[0];
+  const ext = name.includes('.') ? name.split('.').pop() || '' : '';
+  if (IMAGE_EXTENSIONS.includes(ext)) return 'image';
+  if (ext === 'pdf') return 'pdf';
+  return 'other';
+};
+
+const filePreviewLinkStyle: React.CSSProperties = {
+  color: 'var(--primary)',
+  fontWeight: 500,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '4px',
+  fontSize: '12px',
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  cursor: 'pointer',
+  textAlign: 'left',
+};
+
 export const DocumentsPage: React.FC = () => {
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +57,7 @@ export const DocumentsPage: React.FC = () => {
   const [decision, setDecision] = useState<DocumentStatus.APPROVED | DocumentStatus.REJECTED>(DocumentStatus.APPROVED);
   const [reason, setReason] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<any>(null);
 
   // Filters & Search
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'mandatory'>('all');
@@ -395,23 +424,16 @@ export const DocumentsPage: React.FC = () => {
             header: 'ATTACHMENT',
             render: (d) =>
               d.fileUrl ? (
-                <a
-                  href={d.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    color: 'var(--primary)',
-                    fontWeight: 500,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '12px',
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(d)}
+                  title="Preview document"
+                  style={filePreviewLinkStyle}
                 >
                   <FileText size={14} />
                   <span>{d.originalFileName || 'View Document'}</span>
-                  <ExternalLink size={12} />
-                </a>
+                  <Eye size={12} />
+                </button>
               ) : (
                 <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Not Uploaded</span>
               ),
@@ -496,14 +518,14 @@ export const DocumentsPage: React.FC = () => {
             {selectedDoc?.fileUrl && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '4px' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Uploaded File:</span>
-                <a
-                  href={selectedDoc.fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                <button
+                  type="button"
+                  onClick={() => setPreviewDoc(selectedDoc)}
+                  title="Preview document"
+                  style={{ ...filePreviewLinkStyle, fontWeight: 600 }}
                 >
-                  <FileText size={13} /> {selectedDoc.originalFileName || 'Open File'} <ExternalLink size={12} />
-                </a>
+                  <FileText size={13} /> {selectedDoc.originalFileName || 'Open File'} <Eye size={12} />
+                </button>
               </div>
             )}
           </div>
@@ -550,6 +572,75 @@ export const DocumentsPage: React.FC = () => {
             </div>
           )}
         </form>
+      </Modal>
+
+      {/* Document Preview Modal */}
+      <Modal
+        isOpen={!!previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        title={previewDoc?.originalFileName || previewDoc?.title || 'Document Preview'}
+        maxWidth="960px"
+        footer={
+          <>
+            <a
+              href={previewDoc?.fileUrl}
+              download={previewDoc?.originalFileName || true}
+              className="btn btn-secondary"
+              style={{ textDecoration: 'none' }}
+            >
+              <Download size={14} /> Download
+            </a>
+            <a
+              href={previewDoc?.fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-secondary"
+              style={{ textDecoration: 'none' }}
+            >
+              <ExternalLink size={14} /> Open in New Tab
+            </a>
+            <Button variant="primary" onClick={() => setPreviewDoc(null)}>
+              Close
+            </Button>
+          </>
+        }
+      >
+        {previewDoc?.fileUrl && (
+          <div
+            style={{
+              height: '70vh',
+              backgroundColor: 'var(--bg-subtle)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-color)',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {getPreviewKind(previewDoc) === 'image' ? (
+              <img
+                src={previewDoc.fileUrl}
+                alt={previewDoc.originalFileName || previewDoc.title || 'Document'}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              />
+            ) : getPreviewKind(previewDoc) === 'pdf' ? (
+              <iframe
+                src={previewDoc.fileUrl}
+                title={previewDoc.originalFileName || previewDoc.title || 'Document preview'}
+                style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#FFFFFF' }}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', padding: '20px' }}>
+                <FileText size={32} style={{ marginBottom: '8px', color: 'var(--text-muted)' }} />
+                <div>This file type can't be previewed here.</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Use Download or Open in New Tab to view it.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );

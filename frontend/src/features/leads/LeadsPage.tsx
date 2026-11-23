@@ -19,6 +19,51 @@ import { Badge, StatusBadge } from '../../components/Badge';
 import { Drawer } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
 
+// Background / text pairs; each student gets the same pair every time, picked from their name.
+const AVATAR_COLORS = [
+  { bg: '#EEF4FF', fg: '#0057F8' },
+  { bg: '#ECFDF5', fg: '#047857' },
+  { bg: '#FFF7ED', fg: '#C2410C' },
+  { bg: '#F5F3FF', fg: '#6D28D9' },
+  { bg: '#FDF2F8', fg: '#BE185D' },
+  { bg: '#F0F9FF', fg: '#0369A1' },
+];
+
+const StudentAvatar: React.FC<{ name?: string }> = ({ name }) => {
+  const clean = (name || '').trim();
+  const initials =
+    clean
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('') || 'S';
+  let hash = 0;
+  for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) | 0;
+  const color = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: '36px',
+        height: '36px',
+        flexShrink: 0,
+        borderRadius: '50%',
+        backgroundColor: color.bg,
+        color: color.fg,
+        fontSize: '13px',
+        fontWeight: 700,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {initials}
+    </div>
+  );
+};
+
 export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly = false }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -276,7 +321,9 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
             {
               header: 'STUDENT NAME',
               render: (l) => (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <StudentAvatar name={l.name} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                   <div
                     style={{ fontWeight: 600, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}
                     onClick={() => navigate(isStudentOnly ? `/students/${l._id}` : `/leads/${l._id}`)}
@@ -300,6 +347,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.email}</div>
                   {l.phone && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{l.phone}</div>}
+                </div>
                 </div>
               ),
             },

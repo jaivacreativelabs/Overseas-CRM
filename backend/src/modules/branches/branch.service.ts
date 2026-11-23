@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { BranchModel, IBranch } from './branch.model';
+import { BranchModel, IBranch, IBranchBankDetails } from './branch.model';
 import { LeadModel } from '../leads/lead.model';
 import { UserModel } from '../users/user.model';
 import { ApplicationModel } from '../applications/application.model';
@@ -32,6 +32,66 @@ const STATE_CODE_MAP: Record<string, string> = {
   'ASSAM': 'AS',
   'CHANDIGARH': 'CH',
   'PUDUCHERRY': 'PY',
+};
+
+const BANK_DETAIL_FIELDS: (keyof IBranchBankDetails)[] = [
+  'accountHolderName',
+  'bankName',
+  'accountNumber',
+  'ifscCode',
+  'bankBranch',
+  'accountType',
+  'upiId',
+];
+
+/**
+ * Trims and validates a branch's bank account details.
+ * Returns undefined when every field is blank, meaning the branch has no bank details on file.
+ */
+const normalizeBankDetails = (input: unknown): IBranchBankDetails | undefined => {
+  if (input === null || input === undefined) return undefined;
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new BadRequestError('Bank details must be an object');
+  }
+
+  const raw = input as Record<string, unknown>;
+  const details: IBranchBankDetails = {};
+  for (const field of BANK_DETAIL_FIELDS) {
+    const value = raw[field];
+    if (value === undefined || value === null) continue;
+    const text = String(value).trim();
+    if (text) (details as Record<string, string>)[field] = text;
+  }
+
+  if (Object.keys(details).length === 0) return undefined;
+
+  if (!details.accountHolderName || !details.bankName || !details.accountNumber || !details.ifscCode) {
+    throw new BadRequestError('Account holder name, bank name, account number, and IFSC code are required for bank details');
+  }
+
+  details.accountNumber = details.accountNumber.replace(/\s+/g, '');
+  if (!/^\d{9,18}$/.test(details.accountNumber)) {
+    throw new BadRequestError('Bank account number must be 9 to 18 digits');
+  }
+
+  details.ifscCode = details.ifscCode.toUpperCase();
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(details.ifscCode)) {
+    throw new BadRequestError('IFSC code must be 11 characters, e.g. HDFC0001234');
+  }
+
+  if (details.accountType) {
+    const accountType = details.accountType.toUpperCase();
+    if (accountType !== 'SAVINGS' && accountType !== 'CURRENT') {
+      throw new BadRequestError('Account type must be SAVINGS or CURRENT');
+    }
+    details.accountType = accountType;
+  }
+
+  if (details.upiId && !/^[\w.-]{2,}@[a-zA-Z][a-zA-Z0-9.-]+$/.test(details.upiId)) {
+    throw new BadRequestError('UPI ID must look like name@bank');
+  }
+
+  return details;
 };
 
 export class BranchService {
@@ -67,9 +127,12 @@ export class BranchService {
       openingDate?: string;
       notes?: string;
       status?: 'ACTIVE' | 'INACTIVE';
+      bankDetails?: IBranchBankDetails | null;
     },
     performedByUserId?: string
   ): Promise<IBranch> {
+    const bankDetails = normalizeBankDetails(data.bankDetails);
+
     if (!data.name || !data.state || !data.city || !data.address) {
       throw new BadRequestError('Branch name, state, city, and full address are mandatory');
     }
@@ -130,6 +193,7 @@ export class BranchService {
       openingDate: data.openingDate ? new Date(data.openingDate) : new Date(),
       status: data.status || 'ACTIVE',
       notes: data.notes?.trim() || '',
+      bankDetails,
     });
 
     await branch.save();
@@ -363,9 +427,13 @@ export class BranchService {
       managerEmail?: string;
       notes?: string;
       status?: 'ACTIVE' | 'INACTIVE';
+      bankDetails?: IBranchBankDetails | null;
     },
     performedByUserId?: string
   ): Promise<IBranch> {
+    // Validate before loading so a bad payload never partially updates the branch.
+    const bankDetails = data.bankDetails !== undefined ? normalizeBankDetails(data.bankDetails) : undefined;
+
     const branch = await BranchModel.findOne({ _id: id, isArchived: false });
     if (!branch) {
       throw new NotFoundError('Branch not found');
@@ -382,6 +450,11 @@ export class BranchService {
     if (data.managerEmail !== undefined) branch.managerEmail = data.managerEmail.toLowerCase().trim();
     if (data.notes !== undefined) branch.notes = data.notes.trim();
     if (data.status) branch.status = data.status;
+    // Sending bankDetails replaces them; sending all-blank fields (or null) clears them.
+    if (data.bankDetails !== undefined) {
+      branch.bankDetails = bankDetails;
+      branch.markModified('bankDetails');
+    }
 
     await branch.save();
 

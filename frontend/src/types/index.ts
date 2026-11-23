@@ -590,8 +590,19 @@ export interface Branch {
   status: 'ACTIVE' | 'INACTIVE';
   isArchived: boolean;
   notes?: string;
+  bankDetails?: BranchBankDetails;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BranchBankDetails {
+  accountHolderName?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  bankBranch?: string;
+  accountType?: 'SAVINGS' | 'CURRENT';
+  upiId?: string;
 }
 
 export interface BranchSummary {

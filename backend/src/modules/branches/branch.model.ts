@@ -1,5 +1,15 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
+export interface IBranchBankDetails {
+  accountHolderName?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  bankBranch?: string;
+  accountType?: 'SAVINGS' | 'CURRENT';
+  upiId?: string;
+}
+
 export interface IBranch extends Document {
   branchId: string; // Unique backend generated ID e.g. KA-BLR-A81F2C
   name: string;
@@ -18,9 +28,23 @@ export interface IBranch extends Document {
   status: 'ACTIVE' | 'INACTIVE';
   isArchived: boolean;
   notes?: string;
+  bankDetails?: IBranchBankDetails;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const bankDetailsSchema = new Schema<IBranchBankDetails>(
+  {
+    accountHolderName: { type: String, trim: true },
+    bankName: { type: String, trim: true },
+    accountNumber: { type: String, trim: true },
+    ifscCode: { type: String, uppercase: true, trim: true },
+    bankBranch: { type: String, trim: true },
+    accountType: { type: String, enum: ['SAVINGS', 'CURRENT'] },
+    upiId: { type: String, trim: true },
+  },
+  { _id: false }
+);
 
 const branchSchema = new Schema<IBranch>(
   {
@@ -110,6 +134,10 @@ const branchSchema = new Schema<IBranch>(
     notes: {
       type: String,
       trim: true,
+    },
+    bankDetails: {
+      type: bankDetailsSchema,
+      default: undefined,
     },
   },
   {
