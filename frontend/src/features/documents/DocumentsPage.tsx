@@ -1,33 +1,50 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  FileText,
-  ExternalLink,
-  Check,
-  X,
-  Search,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  FileCheck,
-  Filter,
-  Eye,
-  Download,
-} from 'lucide-react';
+import { FileText, ExternalLink, Search, Download } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
 import { useToast } from '../../context/ToastContext';
-import { Table } from '../../components/Table';
-import { StatusBadge, Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
-import { Select, Textarea } from '../../components/Form';
+import { Textarea } from '../../components/Form';
+import { StudentAvatar } from '../../components/StudentAvatar';
 import { DocumentStatus } from '../../types';
+import { timeAgo } from '../../utils/timeAgo';
 
-type PreviewKind = 'image' | 'pdf' | 'other';
+/**
+ * The four states a reviewer cares about. The backend stores more raw values (PENDING with or
+ * without a file, REQUESTED, APPROVED/SUCCESSFUL, REJECTED/FAILED); this folds them together.
+ */
+type ReviewState = 'pending' | 'rejected' | 'awaiting' | 'approved';
+type Tab = ReviewState | 'all';
+
+const getReviewState = (d: any): ReviewState => {
+  const s = d.status as string;
+  if (s === DocumentStatus.APPROVED || s === 'SUCCESSFUL') return 'approved';
+  if (s === DocumentStatus.REJECTED || s === 'FAILED') return 'rejected';
+  // Requested documents are stored as PENDING (or REQUESTED) until a file arrives.
+  return d.fileUrl ? 'pending' : 'awaiting';
+};
+
+const STATE_INFO: Record<ReviewState, { text: string; dot: string }> = {
+  pending: { text: 'Pending review', dot: '#D97706' },
+  approved: { text: 'Approved', dot: '#059669' },
+  rejected: { text: 'Re-upload needed', dot: '#DC2626' },
+  awaiting: { text: 'Awaiting upload', dot: '#9CA3AF' },
+};
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'pending', label: 'To review' },
+  { key: 'rejected', label: 'Re-upload' },
+  { key: 'awaiting', label: 'Not uploaded' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'all', label: 'All' },
+];
+
+const REJECT_PRESETS = ['Blurry scan', 'Expired document', 'Missing signature', 'Incorrect format'];
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
 
-const getPreviewKind = (doc: any): PreviewKind => {
+const getPreviewKind = (doc: any): 'image' | 'pdf' | 'other' => {
   const name = String(doc?.originalFileName || doc?.fileUrl || '').toLowerCase().split('?')[0];
   const ext = name.includes('.') ? name.split('.').pop() || '' : '';
   if (IMAGE_EXTENSIONS.includes(ext)) return 'image';
@@ -35,71 +52,71 @@ const getPreviewKind = (doc: any): PreviewKind => {
   return 'other';
 };
 
-const filePreviewLinkStyle: React.CSSProperties = {
-  color: 'var(--primary)',
-  fontWeight: 500,
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '4px',
-  fontSize: '12px',
-  background: 'none',
-  border: 'none',
-  padding: 0,
-  cursor: 'pointer',
-  textAlign: 'left',
+const toTitle = (s?: string) =>
+  (s || 'General')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase());
+
+const StatusLabel: React.FC<{ state: ReviewState }> = ({ state }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', fontWeight: 500, color: '#374151' }}>
+    <span style={{ width: '8px', height: '8px', borderRadius: '999px', flexShrink: 0, backgroundColor: STATE_INFO[state].dot }} />
+    {STATE_INFO[state].text}
+  </span>
+);
+
+/** The file shown inside the detail panel: images and PDFs inline, anything else as a placeholder. */
+const InlinePreview: React.FC<{ doc: any; height: string }> = ({ doc, height }) => {
+  const kind = getPreviewKind(doc);
+  const name = doc.originalFileName || doc.title || 'Document';
+  return (
+    <div
+      style={{
+        height,
+        borderRadius: '10px',
+        border: '1px solid var(--border-color)',
+        backgroundColor: 'var(--bg-subtle)',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {kind === 'image' ? (
+        <img src={doc.fileUrl} alt={name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+      ) : kind === 'pdf' ? (
+        <iframe src={doc.fileUrl} title={name} style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#FFFFFF' }} />
+      ) : (
+        <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px', padding: '16px' }}>
+          <FileText size={28} style={{ color: 'var(--text-muted)', marginBottom: '6px' }} />
+          <div>This file type can't be previewed here.</div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const DocumentsPage: React.FC = () => {
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDoc, setSelectedDoc] = useState<any>(null);
-  const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [decision, setDecision] = useState<DocumentStatus.APPROVED | DocumentStatus.REJECTED>(DocumentStatus.APPROVED);
-  const [reason, setReason] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<any>(null);
-
-  // Filters & Search
-  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'mandatory'>('all');
+  const [tab, setTab] = useState<Tab>('pending');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Panel action mode: 'rejecting' shows the reason box; 'changing' re-opens a reviewed document's decision.
+  const [panelMode, setPanelMode] = useState<'idle' | 'rejecting' | 'changing'>('idle');
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<any>(null);
 
   const { success, error } = useToast();
   const navigate = useNavigate();
 
   const fetchDocs = async () => {
-    setLoading(true);
     try {
-      // Try fast single endpoint first
       const res = await apiClient.get<any[]>('/documents');
-      if (Array.isArray(res.data)) {
-        setDocs(res.data);
-      } else {
-        // Fallback to leads loop if needed
-        const leadsRes = await apiClient.get<any[]>('/leads', { limit: 50 });
-        const allDocs: any[] = [];
-        for (const lead of leadsRes.data || []) {
-          const leadDocs = await apiClient.get<any[]>(`/documents/lead/${lead._id}`).catch(() => ({ data: [] }));
-          (leadDocs.data || []).forEach((d) => {
-            allDocs.push({ ...d, studentName: lead.name, leadId: lead._id });
-          });
-        }
-        setDocs(allDocs);
-      }
+      setDocs(Array.isArray(res.data) ? res.data : []);
     } catch (err: any) {
-      // If /documents fails, fallback
-      try {
-        const leadsRes = await apiClient.get<any[]>('/leads', { limit: 50 });
-        const allDocs: any[] = [];
-        for (const lead of leadsRes.data || []) {
-          const leadDocs = await apiClient.get<any[]>(`/documents/lead/${lead._id}`).catch(() => ({ data: [] }));
-          (leadDocs.data || []).forEach((d) => {
-            allDocs.push({ ...d, studentName: lead.name, leadId: lead._id });
-          });
-        }
-        setDocs(allDocs);
-      } catch (fallbackErr: any) {
-        error(fallbackErr.message || 'Failed to load documents');
-      }
+      error(err.message || 'Failed to load documents');
     } finally {
       setLoading(false);
     }
@@ -109,472 +126,364 @@ export const DocumentsPage: React.FC = () => {
     fetchDocs();
   }, []);
 
-  const handleReview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDoc) return;
-    setSubmittingReview(true);
+  const counts = useMemo(() => {
+    const c: Record<Tab, number> = { all: docs.length, pending: 0, rejected: 0, awaiting: 0, approved: 0 };
+    docs.forEach((d) => {
+      c[getReviewState(d)] += 1;
+    });
+    return c;
+  }, [docs]);
+
+  const visibleDocs = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return docs.filter((d) => {
+      if (tab !== 'all' && getReviewState(d) !== tab) return false;
+      if (!q) return true;
+      return [d.studentName, d.title, d.category, d.studentCode].some((v) => String(v || '').toLowerCase().includes(q));
+    });
+  }, [docs, tab, searchQuery]);
+
+  // Keep the chosen document selected while it is in view; otherwise fall to the first one, so
+  // approving the top item in "To review" moves straight on to the next.
+  const selected = visibleDocs.find((d) => d._id === selectedId) || visibleDocs[0] || null;
+
+  useEffect(() => {
+    setPanelMode('idle');
+    setReason('');
+  }, [selected?._id]);
+
+  const submitReview = async (status: DocumentStatus.APPROVED | DocumentStatus.REJECTED) => {
+    if (!selected) return;
+    if (status === DocumentStatus.REJECTED && !reason.trim()) {
+      error('Add a reason so the student knows what to fix.');
+      return;
+    }
+    setSubmitting(true);
     try {
-      await apiClient.put(`/documents/${selectedDoc._id}/review`, {
-        status: decision,
-        rejectionReason: decision === DocumentStatus.REJECTED ? reason : undefined,
+      await apiClient.put(`/documents/${selected._id}/review`, {
+        status,
+        rejectionReason: status === DocumentStatus.REJECTED ? reason.trim() : undefined,
       });
-      success(`Document marked as ${decision}.`);
-      setIsReviewOpen(false);
-      fetchDocs();
+      success(
+        status === DocumentStatus.APPROVED
+          ? `Approved ${selected.title} for ${selected.studentName || 'the student'}.`
+          : `Asked ${selected.studentName || 'the student'} to re-upload ${selected.title}.`
+      );
+      await fetchDocs();
     } catch (err: any) {
       error(err.message || 'Review failed');
     } finally {
-      setSubmittingReview(false);
+      setSubmitting(false);
     }
   };
 
-  const handleQuickApprove = async (doc: any) => {
-    try {
-      await apiClient.put(`/documents/${doc._id}/review`, {
-        status: DocumentStatus.APPROVED,
-      });
-      success(`Approved ${doc.title} for ${doc.studentName || 'student'}.`);
-      fetchDocs();
-    } catch (err: any) {
-      error(err.message || 'Approval failed');
-    }
-  };
-
-  const isApprovedDoc = (status: DocumentStatus) => status === DocumentStatus.APPROVED || (status as string) === 'SUCCESSFUL';
-  const isRejectedDoc = (status: DocumentStatus) => status === DocumentStatus.REJECTED || (status as string) === 'FAILED';
-
-  const stats = useMemo(() => {
-    const pending = docs.filter(
-      (d) => d.status === DocumentStatus.PENDING || d.status === DocumentStatus.REQUESTED
-    ).length;
-    const approved = docs.filter((d) => isApprovedDoc(d.status)).length;
-    const rejected = docs.filter((d) => isRejectedDoc(d.status)).length;
-    const mandatory = docs.filter((d) => d.isMandatory).length;
-    return {
-      total: docs.length,
-      pending,
-      approved,
-      rejected,
-      mandatory,
-    };
-  }, [docs]);
-
-  const filteredDocs = useMemo(() => {
-    return docs.filter((d) => {
-      const matchesSearch =
-        !searchQuery ||
-        d.studentName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        d.category?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      if (!matchesSearch) return false;
-
-      if (activeFilter === 'pending') {
-        return (
-          d.status === DocumentStatus.PENDING ||
-          d.status === DocumentStatus.REQUESTED
-        );
-      }
-      if (activeFilter === 'approved') {
-        return isApprovedDoc(d.status);
-      }
-      if (activeFilter === 'rejected') {
-        return isRejectedDoc(d.status);
-      }
-      if (activeFilter === 'mandatory') {
-        return d.isMandatory;
-      }
-      return true;
-    });
-  }, [docs, searchQuery, activeFilter]);
+  const selectedState = selected ? getReviewState(selected) : null;
+  const showDecisionButtons = selectedState === 'pending' || panelMode === 'changing';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
-      {/* Header Row */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', width: '100%', maxWidth: '100%' }}>
       <div>
-        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-          Document Verification Hub
-        </h1>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
-          Audit student dossier submissions, verify mandatory credentials, and resolve rejection notices.
-        </p>
+        <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Documents</h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Review student uploads one at a time.</p>
       </div>
 
-      {/* KPI Stats Strip */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          width: '100%',
-        }}
-      >
-        <div
-          className="card"
-          onClick={() => setActiveFilter('all')}
-          style={{
-            cursor: 'pointer',
-            padding: '16px 20px',
-            borderColor: activeFilter === 'all' ? '#0057F8' : undefined,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Total Documents
-            </span>
-            <FileText size={16} color="var(--primary)" />
-          </div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {stats.total}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Across all student dossiers
-          </div>
-        </div>
-
-        <div
-          className="card"
-          onClick={() => setActiveFilter('pending')}
-          style={{
-            cursor: 'pointer',
-            padding: '16px 20px',
-            borderColor: activeFilter === 'pending' ? '#D97706' : undefined,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Pending Review
-            </span>
-            <Clock size={16} color="#D97706" />
-          </div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: '#D97706' }}>
-            {stats.pending}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Needs advisor verification
-          </div>
-        </div>
-
-        <div
-          className="card"
-          onClick={() => setActiveFilter('approved')}
-          style={{
-            cursor: 'pointer',
-            padding: '16px 20px',
-            borderColor: activeFilter === 'approved' ? '#059669' : undefined,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Approved
-            </span>
-            <CheckCircle2 size={16} color="#059669" />
-          </div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: '#059669' }}>
-            {stats.approved}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Verified credentials
-          </div>
-        </div>
-
-        <div
-          className="card"
-          onClick={() => setActiveFilter('rejected')}
-          style={{
-            cursor: 'pointer',
-            padding: '16px 20px',
-            borderColor: activeFilter === 'rejected' ? '#DC2626' : undefined,
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Rejected / Re-upload
-            </span>
-            <AlertCircle size={16} color="#DC2626" />
-          </div>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: '#DC2626' }}>
-            {stats.rejected}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Pending student corrections
-          </div>
-        </div>
-      </div>
-
-      {/* Control Bar */}
+      {/* Tabs + search */}
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
           flexWrap: 'wrap',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
           gap: '12px',
+          borderBottom: '1px solid var(--border-color)',
         }}
       >
-        <div className="view-mode-toggle">
-          <button
-            className={`view-mode-toggle-btn ${activeFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('all')}
-          >
-            All ({stats.total})
-          </button>
-          <button
-            className={`view-mode-toggle-btn ${activeFilter === 'pending' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('pending')}
-          >
-            Pending ({stats.pending})
-          </button>
-          <button
-            className={`view-mode-toggle-btn ${activeFilter === 'approved' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('approved')}
-          >
-            Approved ({stats.approved})
-          </button>
-          <button
-            className={`view-mode-toggle-btn ${activeFilter === 'rejected' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('rejected')}
-          >
-            Rejected ({stats.rejected})
-          </button>
-          <button
-            className={`view-mode-toggle-btn ${activeFilter === 'mandatory' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('mandatory')}
-          >
-            Mandatory ({stats.mandatory})
-          </button>
+        <div className="tabs-header" role="tablist" aria-label="Document status" style={{ marginBottom: '-1px', borderBottom: 'none' }}>
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              className={`tab-btn ${tab === t.key ? 'active' : ''}`}
+              style={{ fontSize: '14px' }}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label} <span style={{ fontSize: '12px', fontWeight: 600, marginLeft: '4px' }}>{counts[t.key]}</span>
+            </button>
+          ))}
         </div>
 
-        <div style={{ position: 'relative', width: '240px' }}>
+        <label style={{ position: 'relative', width: '260px', marginBottom: '8px', display: 'flex' }}>
+          <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Search documents</span>
           <Search
             size={14}
-            style={{
-              position: 'absolute',
-              left: '10px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--text-muted)',
-            }}
+            aria-hidden="true"
+            style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
           />
           <input
-            type="text"
-            placeholder="Search student or doc title..."
+            type="search"
+            placeholder="Search student or document"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              padding: '6px 10px 6px 30px',
-              fontSize: '12px',
+              padding: '8px 10px 8px 30px',
+              fontSize: '13px',
               borderRadius: 'var(--radius-md)',
               border: '1px solid var(--border-color)',
               backgroundColor: 'var(--bg-surface)',
               color: 'var(--text-primary)',
             }}
           />
-        </div>
+        </label>
       </div>
 
-      {/* Document Table */}
-      <Table
-        columns={[
-          {
-            header: 'STUDENT NAME',
-            render: (d) => (
-              <div>
-                <strong
-                  style={{ color: 'var(--primary)', cursor: 'pointer' }}
-                  onClick={() => navigate(`/students/${d.leadId}`)}
-                >
-                  {d.studentName}
-                </strong>
-                {d.targetCountry && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>📍 {d.targetCountry}</div>
-                )}
-              </div>
-            ),
-          },
-          {
-            header: 'DOCUMENT TITLE',
-            render: (d) => (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <strong>{d.title}</strong>
-                  {d.isMandatory && (
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        backgroundColor: '#FEE2E2',
-                        color: '#DC2626',
-                        padding: '1px 5px',
-                        borderRadius: '3px',
-                      }}
-                    >
-                      REQUIRED
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {d.category || 'General'}
-                </div>
-              </div>
-            ),
-          },
-          {
-            header: 'ATTACHMENT',
-            render: (d) =>
-              d.fileUrl ? (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', alignItems: 'flex-start' }}>
+        {/* Document list */}
+        <div
+          style={{
+            flex: '999 1 520px',
+            minWidth: 0,
+            backgroundColor: 'var(--bg-surface, #FFFFFF)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            overflow: 'hidden',
+          }}
+        >
+          {loading ? (
+            <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>Loading documents…</div>
+          ) : visibleDocs.length === 0 ? (
+            <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              No documents here.
+            </div>
+          ) : (
+            visibleDocs.map((d) => {
+              const isSelected = selected?._id === d._id;
+              return (
                 <button
+                  key={d._id}
                   type="button"
-                  onClick={() => setPreviewDoc(d)}
-                  title="Preview document"
-                  style={filePreviewLinkStyle}
-                >
-                  <FileText size={14} />
-                  <span>{d.originalFileName || 'View Document'}</span>
-                  <Eye size={12} />
-                </button>
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Not Uploaded</span>
-              ),
-          },
-          {
-            header: 'STATUS',
-            render: (d) => <StatusBadge status={d.status} />,
-          },
-          {
-            header: 'ACTIONS',
-            align: 'right',
-            render: (d) => (
-              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                {d.fileUrl && d.status !== DocumentStatus.APPROVED && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<Check size={12} />}
-                    onClick={() => handleQuickApprove(d)}
-                    title="Quick Approve"
-                  >
-                    Approve
-                  </Button>
-                )}
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedDoc(d);
-                    setDecision(DocumentStatus.APPROVED);
-                    setReason(d.rejectionReason || '');
-                    setIsReviewOpen(true);
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedId(d._id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    width: '100%',
+                    minHeight: '62px',
+                    padding: '11px 18px',
+                    border: 'none',
+                    borderBottom: '1px solid var(--border-light, #F1F2F4)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    font: 'inherit',
+                    backgroundColor: isSelected ? '#F0F5FF' : 'transparent',
+                    boxShadow: isSelected ? 'inset 3px 0 0 var(--primary)' : 'none',
                   }}
                 >
-                  Review
-                </Button>
-              </div>
-            ),
-          },
-        ]}
-        data={filteredDocs}
-        loading={loading}
-        emptyMessage="No documents found matching the filter."
-      />
+                  <StudentAvatar name={d.studentName} />
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontSize: '13.5px',
+                          fontWeight: 600,
+                          color: 'var(--text-primary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {d.title}
+                      </span>
+                      {d.isMandatory && <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 600, color: '#9F1239' }}>Required</span>}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#4B5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.studentName} · {toTitle(d.category)}
+                    </span>
+                  </span>
+                  <span style={{ flexShrink: 0, width: '140px' }}>
+                    <StatusLabel state={getReviewState(d)} />
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
 
-      {/* Review Modal */}
-      <Modal
-        isOpen={isReviewOpen}
-        onClose={() => setIsReviewOpen(false)}
-        title={`Review Document: ${selectedDoc?.title}`}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setIsReviewOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleReview} disabled={submittingReview}>
-              {submittingReview ? 'Submitting...' : 'Submit Verification'}
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleReview} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div
+        {/* Detail panel */}
+        {selected && selectedState && (
+          <aside
+            aria-label="Selected document"
             style={{
-              padding: '12px 14px',
-              backgroundColor: 'var(--bg-subtle)',
-              borderRadius: 'var(--radius-md)',
+              flex: '1 1 360px',
+              minWidth: 0,
+              backgroundColor: 'var(--bg-surface, #FFFFFF)',
               border: '1px solid var(--border-color)',
+              borderRadius: '12px',
+              padding: '22px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
+              gap: '18px',
+              boxSizing: 'border-box',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Student:</span>
-              <strong>{selectedDoc?.studentName || 'Student'}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Category:</span>
-              <span>{selectedDoc?.category || 'General'}</span>
-            </div>
-            {selectedDoc?.fileUrl && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '4px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>Uploaded File:</span>
-                <button
-                  type="button"
-                  onClick={() => setPreviewDoc(selectedDoc)}
-                  title="Preview document"
-                  style={{ ...filePreviewLinkStyle, fontWeight: 600 }}
-                >
-                  <FileText size={13} /> {selectedDoc.originalFileName || 'Open File'} <Eye size={12} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <Select
-            label="Verification Decision *"
-            value={decision}
-            onChange={(e) => setDecision(e.target.value as any)}
-            options={[
-              { value: DocumentStatus.APPROVED, label: 'Approve Document (Verified)' },
-              { value: DocumentStatus.REJECTED, label: 'Reject Document (Requires Reason)' },
-            ]}
-          />
-
-          {decision === DocumentStatus.REJECTED && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Quick reason presets:</span>
-                {['Blurry scan', 'Expired document', 'Missing signature', 'Incorrect format'].map((preset) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <StatusLabel state={selectedState} />
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, lineHeight: 1.3, color: 'var(--text-primary)' }}>{selected.title}</h2>
+              <span style={{ fontSize: '13px', color: '#4B5563' }}>
+                {selected.leadId ? (
                   <button
                     type="button"
-                    key={preset}
-                    onClick={() => setReason(preset)}
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 6px',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--border-color)',
-                      backgroundColor: 'var(--bg-surface)',
-                      cursor: 'pointer',
-                    }}
+                    onClick={() => navigate(`/students/${selected.leadId}`)}
+                    style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }}
                   >
-                    {preset}
+                    {selected.studentName}
                   </button>
-                ))}
-              </div>
-              <Textarea
-                label="Rejection Reason *"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="State clearly why this document was rejected so the student can rectify it..."
-                required
-              />
+                ) : (
+                  selected.studentName
+                )}
+                {selected.studentCode ? ` · ${selected.studentCode}` : selected.studentEmail ? ` · ${selected.studentEmail}` : ''}
+              </span>
             </div>
-          )}
-        </form>
-      </Modal>
 
-      {/* Document Preview Modal */}
+            {selected.fileUrl ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <InlinePreview doc={selected} height="300px" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <span style={{ fontSize: '12.5px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {selected.originalFileName || 'Uploaded file'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDoc(selected)}
+                    style={{ flexShrink: 0, background: 'none', border: 'none', padding: 0, font: 'inherit', fontSize: '13px', fontWeight: 600, color: 'var(--primary)', cursor: 'pointer' }}
+                  >
+                    Open full size
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  height: '110px',
+                  borderRadius: '10px',
+                  border: '1px dashed var(--border-color)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '13px',
+                  color: '#4B5563',
+                }}
+              >
+                The student hasn't uploaded this yet.
+              </div>
+            )}
+
+            <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: '110px 1fr', rowGap: '9px', columnGap: '12px', fontSize: '13px' }}>
+              <dt style={{ color: '#4B5563' }}>Category</dt>
+              <dd style={{ margin: 0 }}>{toTitle(selected.category)}</dd>
+              <dt style={{ color: '#4B5563' }}>Required</dt>
+              <dd style={{ margin: 0 }}>{selected.isMandatory ? 'Yes' : 'No'}</dd>
+              {selected.fileUrl ? (
+                <>
+                  <dt style={{ color: '#4B5563' }}>Uploaded</dt>
+                  <dd style={{ margin: 0 }}>{timeAgo(selected.uploadedAt || selected.updatedAt) || '—'}</dd>
+                </>
+              ) : (
+                <>
+                  <dt style={{ color: '#4B5563' }}>Requested</dt>
+                  <dd style={{ margin: 0 }}>
+                    {timeAgo(selected.createdAt) || '—'}
+                    {selected.requestedByName ? ` by ${selected.requestedByName}` : ''}
+                  </dd>
+                </>
+              )}
+              {selected.reviewedByName && (selectedState === 'approved' || selectedState === 'rejected') && (
+                <>
+                  <dt style={{ color: '#4B5563' }}>Reviewed by</dt>
+                  <dd style={{ margin: 0 }}>
+                    {selected.reviewedByName}
+                    {selected.reviewedAt ? `, ${timeAgo(selected.reviewedAt)}` : ''}
+                  </dd>
+                </>
+              )}
+            </dl>
+
+            {selectedState === 'rejected' && selected.rejectionReason && (
+              <div style={{ fontSize: '13px', lineHeight: 1.5, color: '#7F1D1D', backgroundColor: '#FEF2F2', borderRadius: '10px', padding: '12px 14px' }}>
+                {selected.rejectionReason}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div style={{ borderTop: '1px solid var(--border-light, #F1F2F4)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {panelMode === 'rejecting' ? (
+                <>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: '#4B5563' }}>Quick reasons:</span>
+                    {REJECT_PRESETS.map((preset) => (
+                      <button
+                        type="button"
+                        key={preset}
+                        onClick={() => setReason(preset)}
+                        style={{
+                          fontSize: '12px',
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-color)',
+                          backgroundColor: reason === preset ? '#EEF4FF' : 'var(--bg-surface)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <Textarea
+                    label="What should the student fix?"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. The scan is blurry. Please upload a clearer copy where all four corners are visible."
+                    rows={3}
+                  />
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <Button variant="secondary" style={{ flex: 1 }} onClick={() => setPanelMode('idle')} disabled={submitting}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      style={{ flex: 1 }}
+                      onClick={() => submitReview(DocumentStatus.REJECTED)}
+                      loading={submitting}
+                    >
+                      Send back to student
+                    </Button>
+                  </div>
+                </>
+              ) : showDecisionButtons ? (
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <Button variant="secondary" style={{ flex: 1, color: '#B91C1C' }} onClick={() => setPanelMode('rejecting')} disabled={submitting}>
+                    Ask to re-upload
+                  </Button>
+                  <Button variant="primary" style={{ flex: 1 }} onClick={() => submitReview(DocumentStatus.APPROVED)} loading={submitting}>
+                    Approve
+                  </Button>
+                </div>
+              ) : selectedState === 'awaiting' ? (
+                <span style={{ fontSize: '13px', color: '#4B5563' }}>Waiting for the student to upload this document.</span>
+              ) : (
+                <Button variant="secondary" onClick={() => setPanelMode('changing')}>
+                  Change decision
+                </Button>
+              )}
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {/* Full-size preview */}
       <Modal
         isOpen={!!previewDoc}
         onClose={() => setPreviewDoc(null)}
@@ -590,13 +499,7 @@ export const DocumentsPage: React.FC = () => {
             >
               <Download size={14} /> Download
             </a>
-            <a
-              href={previewDoc?.fileUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-secondary"
-              style={{ textDecoration: 'none' }}
-            >
+            <a href={previewDoc?.fileUrl} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ textDecoration: 'none' }}>
               <ExternalLink size={14} /> Open in New Tab
             </a>
             <Button variant="primary" onClick={() => setPreviewDoc(null)}>
@@ -605,42 +508,7 @@ export const DocumentsPage: React.FC = () => {
           </>
         }
       >
-        {previewDoc?.fileUrl && (
-          <div
-            style={{
-              height: '70vh',
-              backgroundColor: 'var(--bg-subtle)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-color)',
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            {getPreviewKind(previewDoc) === 'image' ? (
-              <img
-                src={previewDoc.fileUrl}
-                alt={previewDoc.originalFileName || previewDoc.title || 'Document'}
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-              />
-            ) : getPreviewKind(previewDoc) === 'pdf' ? (
-              <iframe
-                src={previewDoc.fileUrl}
-                title={previewDoc.originalFileName || previewDoc.title || 'Document preview'}
-                style={{ width: '100%', height: '100%', border: 'none', backgroundColor: '#FFFFFF' }}
-              />
-            ) : (
-              <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px', padding: '20px' }}>
-                <FileText size={32} style={{ marginBottom: '8px', color: 'var(--text-muted)' }} />
-                <div>This file type can't be previewed here.</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Use Download or Open in New Tab to view it.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {previewDoc?.fileUrl && <InlinePreview doc={previewDoc} height="70vh" />}
       </Modal>
     </div>
   );

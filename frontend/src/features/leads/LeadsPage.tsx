@@ -19,51 +19,9 @@ import { Button } from '../../components/Button';
 import { Badge, StatusBadge } from '../../components/Badge';
 import { Drawer } from '../../components/Modal';
 import { Input, Select, Textarea } from '../../components/Form';
+import { timeAgo } from '../../utils/timeAgo';
+import { StudentAvatar } from '../../components/StudentAvatar';
 
-// Background / text pairs; each student gets the same pair every time, picked from their name.
-const AVATAR_COLORS = [
-  { bg: '#EEF4FF', fg: '#0057F8' },
-  { bg: '#ECFDF5', fg: '#047857' },
-  { bg: '#FFF7ED', fg: '#C2410C' },
-  { bg: '#F5F3FF', fg: '#6D28D9' },
-  { bg: '#FDF2F8', fg: '#BE185D' },
-  { bg: '#F0F9FF', fg: '#0369A1' },
-];
-
-const StudentAvatar: React.FC<{ name?: string }> = ({ name }) => {
-  const clean = (name || '').trim();
-  const initials =
-    clean
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part.charAt(0).toUpperCase())
-      .join('') || 'S';
-  let hash = 0;
-  for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) | 0;
-  const color = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-
-  return (
-    <div
-      aria-hidden="true"
-      style={{
-        width: '36px',
-        height: '36px',
-        flexShrink: 0,
-        borderRadius: '8px',
-        backgroundColor: color.bg,
-        color: color.fg,
-        fontSize: '13px',
-        fontWeight: 700,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {initials}
-    </div>
-  );
-};
 
 // Same rule the backend uses for the Students list: Interested, or a student portal account exists.
 const isConvertedLead = (l: Lead) => !!l.studentUserId || l.status === LeadStatus.INTERESTED;
@@ -177,18 +135,6 @@ const ActivityCell: React.FC<{ lead: Lead }> = ({ lead }) => {
   );
 };
 
-const timeAgo = (iso?: string) => {
-  if (!iso) return '';
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diffMs / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`;
-  const days = Math.round(hours / 24);
-  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-};
 
 export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly = false }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -288,8 +234,9 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   useEffect(() => {
     const fetchBranches = async () => {
       try {
-        const bRes = await apiClient.get<any>('/branches');
-        setBranches(bRes.data?.branches || (Array.isArray(bRes.data) ? bRes.data : []));
+        // /branches/options works for every staff role; /branches itself is Owner Admin only.
+        const bRes = await apiClient.get<any>('/branches/options');
+        setBranches(Array.isArray(bRes.data) ? bRes.data : bRes.data?.branches || []);
       } catch (err) {}
     };
     fetchBranches();
