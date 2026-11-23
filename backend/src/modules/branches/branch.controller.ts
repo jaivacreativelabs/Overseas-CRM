@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { BranchService } from './branch.service';
 import { ApiResponse } from '../../utils/api-response';
+import { UserRole } from '../../config/constants';
 
 export class BranchController {
   public static createBranch = async (req: Request, res: Response) => {
@@ -20,6 +21,13 @@ export class BranchController {
       sortOrder: req.query.sortOrder as 'asc' | 'desc',
     });
     return ApiResponse.success(res, 'Branches fetched successfully', result);
+  };
+
+  public static getBranchOptions = async (req: Request, res: Response) => {
+    const onlyBranchId =
+      req.user?.role === UserRole.COUNSELLOR ? String((req.user as any).branchId || '') || null : undefined;
+    const branches = await BranchService.getBranchOptions(onlyBranchId);
+    return ApiResponse.success(res, 'Branch options fetched successfully', branches);
   };
 
   public static getBranchById = async (req: Request, res: Response) => {

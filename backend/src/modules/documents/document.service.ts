@@ -26,15 +26,20 @@ export class DocumentService {
 
   static async getAllDocuments(): Promise<any[]> {
     const docs = await DocumentModel.find()
-      .populate('leadId', 'name email phone country stage status')
+      .populate('leadId', 'name email phone country targetCountry stage status studentId')
+      // Fallback for the name when the lead record is gone: the student's portal account.
+      .populate('studentId', 'name email')
       .sort({ updatedAt: -1 })
       .lean();
     return docs.map((d: any) => ({
       ...d,
-      studentName: d.leadId?.name || 'Unknown Student',
-      studentEmail: d.leadId?.email,
+      studentName: d.leadId?.name || d.studentId?.name || 'Unknown Student',
+      studentEmail: d.leadId?.email || d.studentId?.email,
       studentPhone: d.leadId?.phone,
-      targetCountry: d.leadId?.country,
+      targetCountry: d.leadId?.targetCountry || d.leadId?.country,
+      // The human-readable student ID (e.g. IIEC-2026-0142), when the lead has one.
+      studentCode: d.leadId?.studentId,
+      studentId: d.studentId?._id ? d.studentId._id.toString() : d.studentId?.toString(),
       leadId: d.leadId?._id ? d.leadId._id.toString() : d.leadId?.toString(),
     }));
   }

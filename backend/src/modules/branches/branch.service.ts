@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { Types } from 'mongoose';
 import { BranchModel, IBranch, IBranchBankDetails } from './branch.model';
 import { LeadModel } from '../leads/lead.model';
 import { UserModel } from '../users/user.model';
@@ -339,6 +340,20 @@ export class BranchService {
         pages: Math.ceil(total / limit) || 1,
       },
     };
+  }
+
+  /**
+   * Minimal branch list for dropdowns. `onlyBranchId`: undefined = every branch, a string = just
+   * that branch, null = none (a counsellor with no branch assigned).
+   */
+  public static async getBranchOptions(onlyBranchId?: string | null) {
+    if (onlyBranchId === null) return [];
+    const filter: any = { isArchived: false };
+    if (onlyBranchId) {
+      if (!Types.ObjectId.isValid(onlyBranchId)) return [];
+      filter._id = new Types.ObjectId(onlyBranchId);
+    }
+    return BranchModel.find(filter).select('name city state branchId status').sort({ name: 1 }).lean();
   }
 
   /**
