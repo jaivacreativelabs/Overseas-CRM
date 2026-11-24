@@ -100,6 +100,8 @@ export const AuditLogsPage: React.FC = () => {
   const [meta, setMeta] = useState<any>({ total: 0, totalPages: 1, limit: PAGE_SIZE });
   const [actions, setActions] = useState<string[]>([]);
   const [actionFilter, setActionFilter] = useState('');
+  const [branches, setBranches] = useState<{ _id: string; name: string; city?: string }[]>([]);
+  const [branchFilter, setBranchFilter] = useState('');
 
   const { error } = useToast();
   const { user } = useAuth();
@@ -112,6 +114,15 @@ export const AuditLogsPage: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  // Branch filter is Owner Admin only: everyone else already sees just their own entries.
+  useEffect(() => {
+    if (!isOwnerAdmin) return;
+    apiClient
+      .get<any>('/branches/options')
+      .then((res) => setBranches(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, [isOwnerAdmin]);
+
   useEffect(() => {
     const fetchLogs = async () => {
       setLoading(true);
@@ -120,6 +131,7 @@ export const AuditLogsPage: React.FC = () => {
           page,
           limit: PAGE_SIZE,
           action: actionFilter || undefined,
+          branchId: branchFilter || undefined,
         });
         setLogs(res.data || []);
         if (res.meta) setMeta(res.meta);
@@ -130,7 +142,7 @@ export const AuditLogsPage: React.FC = () => {
       }
     };
     fetchLogs();
-  }, [page, actionFilter]);
+  }, [page, actionFilter, branchFilter]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -144,25 +156,50 @@ export const AuditLogsPage: React.FC = () => {
           </p>
         </div>
 
-        <label style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Filter by action</span>
-          <select
-            className="form-select"
-            style={{ width: '240px' }}
-            value={actionFilter}
-            onChange={(e) => {
-              setActionFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All actions</option>
-            {actions.map((a) => (
-              <option key={a} value={a}>
-                {humanize(a).replace(/^\w/, (c) => c.toUpperCase())}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          {isOwnerAdmin && (
+            <label style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Filter by branch</span>
+              <select
+                className="form-select"
+                style={{ width: '200px' }}
+                value={branchFilter}
+                onChange={(e) => {
+                  setBranchFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All branches</option>
+                {branches.map((b) => (
+                  <option key={b._id} value={b._id}>
+                    {b.name}
+                    {b.city ? ` (${b.city})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+  
+          <label style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Filter by action</span>
+            <select
+              className="form-select"
+              style={{ width: '240px' }}
+              value={actionFilter}
+              onChange={(e) => {
+                setActionFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All actions</option>
+              {actions.map((a) => (
+                <option key={a} value={a}>
+                  {humanize(a).replace(/^\w/, (c) => c.toUpperCase())}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <Table
@@ -214,7 +251,13 @@ export const AuditLogsPage: React.FC = () => {
         ]}
         data={logs}
         loading={loading}
-        emptyMessage={actionFilter ? 'No entries for this action.' : 'No activity recorded yet.'}
+        emptyMessage={
+          branchFilter
+            ? 'No activity from this branch’s staff or students' + (actionFilter ? ' for this action.' : ' yet.')
+            : actionFilter
+              ? 'No entries for this action.'
+              : 'No activity recorded yet.'
+        }
       />
 
       <Pagination currentPage={page} totalPages={meta.totalPages} totalItems={meta.total} pageSize={PAGE_SIZE} onPageChange={setPage} />
