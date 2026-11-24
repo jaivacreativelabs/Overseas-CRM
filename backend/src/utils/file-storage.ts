@@ -52,6 +52,12 @@ export const serveStoredFile = async (req: Request, res: Response, next: NextFun
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
+    // HEAD only asks whether the file exists (the Documents page checks before previewing): skip the body.
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+
     bucket
       .openDownloadStream(file._id)
       .on('error', (err) => next(err))
