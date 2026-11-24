@@ -93,7 +93,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
   };
 
   const { success, error } = useToast();
-  const { isAdmin, user } = useAuth();
+  const { isOwnerAdmin } = useAuth();
   const navigate = useNavigate();
 
   const fetchLeads = useCallback(async () => {
@@ -238,19 +238,22 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
         <div className="filter-group">
           <SearchInput value={searchInput} onChange={setSearchInput} placeholder="Search by name, email, phone, city..." />
 
-          <select
-            className="form-select"
-            style={{ width: '160px' }}
-            value={branchFilter}
-            onChange={(e) => setBranchFilter(e.target.value)}
-          >
-            <option value="">All Branches</option>
-            {branches.map((b) => (
-              <option key={b._id} value={b._id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
+          {/* Only the Owner Admin works across branches, so only they get the branch filter. */}
+          {isOwnerAdmin && (
+            <select
+              className="form-select"
+              style={{ width: '160px' }}
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value)}
+            >
+              <option value="">All Branches</option>
+              {branches.map((b) => (
+                <option key={b._id} value={b._id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* The New Leads tab is always status NEW, so the status filter only applies on Lead Logs. */}
           {!showNewOnly && (
@@ -335,7 +338,7 @@ export const LeadsPage: React.FC<{ isStudentOnly?: boolean }> = ({ isStudentOnly
           {(
             [
               { key: 'all', label: 'All leads', hint: 'Everyone who has enquired', dot: '#6B7280' },
-              { key: 'lead', label: 'Still a lead', hint: 'Not converted yet', dot: JOURNEY_STYLES.lead.dot },
+              { key: 'lead', label: 'New lead', hint: 'Not converted yet', dot: JOURNEY_STYLES.lead.dot },
               { key: 'converted', label: 'Converted', hint: 'Became students', dot: JOURNEY_STYLES.converted.dot },
               { key: 'closed', label: 'Closed', hint: 'Lost or not interested', dot: JOURNEY_STYLES.closed.dot },
             ] as const
