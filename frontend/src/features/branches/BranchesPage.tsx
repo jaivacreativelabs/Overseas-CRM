@@ -21,6 +21,7 @@ import {
   Landmark,
 } from 'lucide-react';
 import { apiClient } from '../../services/api-client';
+import { BranchAnalytics } from './BranchAnalytics';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType, MetaFormMapping } from '../../types';
 
@@ -152,7 +153,7 @@ export const BranchesPage: React.FC = () => {
     branch: Branch;
     assignedStudents: Lead[];
   } | null>(null);
-  const [drawerActiveTab, setDrawerActiveTab] = useState<'overview' | 'students' | 'staff' | 'applications' | 'history'>('overview');
+  const [drawerActiveTab, setDrawerActiveTab] = useState<'overview' | 'analytics' | 'students' | 'staff' | 'applications' | 'history'>('overview');
   const [branchApplications, setBranchApplications] = useState<Application[]>([]);
   const [branchLogs, setBranchLogs] = useState<IntegrationLog[]>([]);
   const [isLoadingTabContent, setIsLoadingTabContent] = useState(false);
@@ -500,7 +501,7 @@ export const BranchesPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = async (tab: 'overview' | 'students' | 'staff' | 'applications' | 'history') => {
+  const handleTabChange = async (tab: 'overview' | 'analytics' | 'students' | 'staff' | 'applications' | 'history') => {
     setDrawerActiveTab(tab);
     if (!selectedBranchDetails) return;
 
@@ -1481,7 +1482,7 @@ export const BranchesPage: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', backgroundColor: '#FFFFFF', overflowX: 'auto' }}>
-              {(['overview', 'students', 'staff', 'applications', 'history'] as const).map((tab) => (
+              {(['overview', 'analytics', 'students', 'staff', 'applications', 'history'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => handleTabChange(tab)}
@@ -1506,6 +1507,10 @@ export const BranchesPage: React.FC = () => {
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              {drawerActiveTab === 'analytics' && (
+                <BranchAnalytics key={selectedBranchDetails.branch._id} branchId={selectedBranchDetails.branch._id} />
+              )}
+
               {drawerActiveTab === 'overview' && (
                 <div>
                   <div style={{ display: 'flex', gap: '10px', backgroundColor: '#F9FAFB', padding: '14px', borderRadius: '8px', marginBottom: '20px', textAlign: 'center' }}>
