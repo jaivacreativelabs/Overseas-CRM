@@ -109,7 +109,7 @@ export class UserService {
 
   static async updateUser(
     id: string,
-    updates: Partial<IUser>,
+    updates: Partial<IUser> & { password?: string },
     actorUserId?: string,
     actorRole?: UserRole
   ): Promise<IUser> {
@@ -118,9 +118,11 @@ export class UserService {
       throw new NotFoundError('User not found');
     }
 
+    const roleChanging = !!updates.role && updates.role !== user.role;
+
     // Owner Admin Protection
     if (user.adminType === AdminType.OWNER_ADMIN) {
-      if (updates.role && updates.role !== UserRole.ADMIN) {
+      if (roleChanging) {
         throw new OwnerAdminProtectionError('Owner Admin cannot be demoted or have role modified.');
       }
       if (updates.isActive === false) {
@@ -128,14 +130,44 @@ export class UserService {
       }
     }
 
-    const beforeState = user.toObject();
+    // Students are managed from the Students page; only staff roles can be switched here.
+    if (roleChanging && user.role === UserRole.STUDENT) {
+      throw new ValidationError('A student account cannot be given a staff role.');
+    }
+
+    // Nobody can lock themselves out by changing their own role or deactivating their own account.
+    if (actorUserId && actorUserId === user._id.toString()) {
+      if (roleChanging) throw new ForbiddenError('You cannot change your own role.');
+      if (updates.isActive === false) throw new ForbiddenError('You cannot deactivate your own account.');
+    }
+
+    // Audit entries never carry the password hash.
+    const { passwordHash: _beforeHash, ...beforeState } = user.toObject();
+
+    if (updates.email) {
+      const email = updates.email.toLowerCase().trim();
+      if (email !== user.email) {
+        const taken = await UserModel.exists({ email, _id: { $ne: user._id } });
+        if (taken) throw new ValidationError('A user with this email address already exists.');
+        user.email = email;
+      }
+    }
 
     if (updates.name) user.name = updates.name;
     if (updates.phone !== undefined) user.phone = updates.phone;
     if (updates.isActive !== undefined) user.isActive = updates.isActive;
     if (updates.avatar) user.avatar = updates.avatar;
+    if (roleChanging) {
+      user.role = updates.role as UserRole;
+      user.adminType = user.role === UserRole.ADMIN ? AdminType.ADMIN : undefined;
+    }
+    if (updates.password) {
+      user.passwordHash = await bcrypt.hash(updates.password, await bcrypt.genSalt(10));
+    }
 
     await user.save();
+
+    const { passwordHash: _afterHash, ...afterState } = user.toObject();
 
     if (actorUserId) {
       await AuditService.log({
@@ -145,11 +177,11 @@ export class UserService {
         entityType: 'User',
         entityId: user._id.toString(),
         before: beforeState,
-        after: user.toObject(),
+        after: { ...afterState, ...(updates.password ? { passwordReset: true } : {}) },
       });
     }
 
-    return user;
+    return afterState as unknown as IUser;
   }
 
   static async deleteUser(id: string, actorUserId?: string, actorRole?: UserRole): Promise<void> {
