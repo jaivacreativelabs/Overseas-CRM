@@ -8,6 +8,7 @@ import { IntegrationConfigModel, IntegrationStatus } from './integration-config.
 import { TaskModel } from '../tasks/task.model';
 import { LeadModel } from '../leads/lead.model';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
+import { waitUntil } from '@vercel/functions';
 import { EmailService } from './email.service';
 import { WhatsAppService, WhatsAppSendResult } from './whatsapp.service';
 
@@ -443,7 +444,23 @@ export class AutomationService {
   /**
    * Main Engine: Executes all active workflows listening to a specific trigger
    */
-  public static async triggerWorkflows(
+  public static triggerWorkflows(
+    trigger: WorkflowTrigger,
+    payload: Record<string, any>,
+    triggeredByUserId?: string
+  ): Promise<{ executedCount: number; logs: any[] }> {
+    const run = this.runWorkflows(trigger, payload, triggeredByUserId);
+    // Callers fire-and-forget this; on Vercel the function is frozen once the response is sent,
+    // which killed emails/WhatsApp mid-flight. waitUntil keeps it alive (no-op outside Vercel).
+    try {
+      waitUntil(run.catch(() => undefined));
+    } catch {
+      // Not running inside a Vercel request context
+    }
+    return run;
+  }
+
+  private static async runWorkflows(
     trigger: WorkflowTrigger,
     payload: Record<string, any>,
     triggeredByUserId?: string
