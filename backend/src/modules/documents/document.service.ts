@@ -66,25 +66,27 @@ export class DocumentService {
       status: { $in: [DocumentStatus.PENDING, DocumentStatus.REQUESTED] },
     });
 
+    let doc: IDocument;
     if (existing) {
+      // Requesting a still-pending document again re-sends the email/WhatsApp as a reminder
       if (data.description && existing.description !== data.description) {
         existing.description = data.description;
         await existing.save();
       }
-      return existing;
+      doc = existing;
+    } else {
+      doc = await DocumentModel.create({
+        leadId: lead._id,
+        studentId: lead.studentUserId,
+        title: data.title.trim(),
+        category: data.category || 'ACADEMIC',
+        description: data.description,
+        isMandatory: data.isMandatory !== undefined ? data.isMandatory : true,
+        status: DocumentStatus.PENDING,
+        requestedById: new Types.ObjectId(actorUserId),
+        requestedByName: actorName,
+      });
     }
-
-    const doc = await DocumentModel.create({
-      leadId: lead._id,
-      studentId: lead.studentUserId,
-      title: data.title.trim(),
-      category: data.category || 'ACADEMIC',
-      description: data.description,
-      isMandatory: data.isMandatory !== undefined ? data.isMandatory : true,
-      status: DocumentStatus.PENDING,
-      requestedById: new Types.ObjectId(actorUserId),
-      requestedByName: actorName,
-    });
 
     await ActivityService.log({
       leadId: lead._id.toString(),
@@ -93,8 +95,8 @@ export class DocumentService {
       actorName,
       actorRole,
       action: 'DOCUMENT_REQUESTED',
-      title: 'Document Requested',
-      description: `Requested document: ${doc.title} (${doc.category})`,
+      title: existing ? 'Document Request Reminder Sent' : 'Document Requested',
+      description: `${existing ? 'Reminded student about' : 'Requested'} document: ${doc.title} (${doc.category})`,
     });
 
     void AutomationService.triggerWorkflows('document.requested', {
@@ -104,6 +106,7 @@ export class DocumentService {
       name: lead.name,
       email: lead.email,
       studentEmail: lead.email,
+      phone: lead.phone,
       title: doc.title,
       category: doc.category,
       isMandatory: doc.isMandatory,

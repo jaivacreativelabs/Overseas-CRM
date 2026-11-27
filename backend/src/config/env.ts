@@ -18,4 +18,11 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER || 'gagandk2007@gmail.com',
   SMTP_PASS: process.env.SMTP_PASS || 'bdsyffvamwnsnket',
   EMAIL_FROM: process.env.EMAIL_FROM || 'Overseas Admissions <gagandk2007@gmail.com>',
+  WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN || '',
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+  WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION || 'v21.0',
+  WHATSAPP_DEFAULT_COUNTRY_CODE: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '91',
+  WHATSAPP_TEMPLATE_LANGUAGE: process.env.WHATSAPP_TEMPLATE_LANGUAGE || 'en',
+  WHATSAPP_TEMPLATE_DOCUMENT_REQUESTED: process.env.WHATSAPP_TEMPLATE_DOCUMENT_REQUESTED || '',
+  WHATSAPP_DRY_RUN: process.env.WHATSAPP_DRY_RUN === 'true',
 };
