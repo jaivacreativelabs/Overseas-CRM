@@ -3,6 +3,12 @@
   "regions": [
     "bom1"
   ],
+  "crons": [
+    {
+      "path": "/api/v1/integrations/meta-ads/leads/cron",
+      "schedule": "30 3 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",

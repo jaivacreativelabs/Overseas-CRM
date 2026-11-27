@@ -922,11 +922,16 @@ export class LeadService {
       existing = await LeadModel.findOne({ metaLeadId: data.metaLeadId, isArchived: false });
     }
 
-    if (!existing) {
+    // Placeholder values (form had no email/phone question) must not match other leads.
+    const contactMatch: any[] = [];
+    if (!/^lead_.*@meta\.com$|^meta_\d+@lead\.com$/.test(emailClean)) contactMatch.push({ email: emailClean });
+    if (phoneClean && !/^0+$/.test(phoneClean)) contactMatch.push({ phone: phoneClean });
+
+    if (!existing && contactMatch.length) {
       existing = await LeadModel.findOne({
         isArchived: false,
         createdAt: { $gte: twentyFourHoursAgo },
-        $or: [{ email: emailClean }, { phone: phoneClean }],
+        $or: contactMatch,
       });
     }
 

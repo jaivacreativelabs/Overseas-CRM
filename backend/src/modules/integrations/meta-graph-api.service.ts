@@ -164,44 +164,148 @@ export class MetaGraphApiService {
     }
   }
 
+  private static async graphGet(pathOrUrl: string, accessToken?: string): Promise<any> {
+    const url = pathOrUrl.startsWith('http')
+      ? pathOrUrl
+      : `${this.GRAPH_API_BASE}/${pathOrUrl}${pathOrUrl.includes('?') ? '&' : '?'}access_token=${encodeURIComponent(accessToken || '')}`;
+    const res = await fetch(url);
+    const data: any = await res.json();
+    if (data?.error) {
+      throw new Error(data.error.message || 'Meta Graph API request failed');
+    }
+    return data;
+  }
+
+  /**
+   * Turns a raw Graph API Lead object (field_data array) into CRM-friendly fields.
+   */
+  static parseLead(raw: any): ParsedMetaLead {
+    const fields: Record<string, string> = {};
+    if (Array.isArray(raw?.field_data)) {
+      for (const item of raw.field_data) {
+        const val = Array.isArray(item.values) ? item.values[0] : item.values;
+        if (item.name) fields[item.name] = val ?? '';
+      }
+    }
+
+    const leadgenId: string = raw.id;
+    const fullName =
+      fields.full_name || fields.name || `${fields.first_name || ''} ${fields.last_name || ''}`.trim();
+
+    return {
+      leadgenId,
+      createdTime: raw.created_time,
+      formId: raw.form_id,
+      campaignId: raw.campaign_id,
+      campaignName: raw.campaign_name,
+      name: fullName || 'Meta Lead',
+      email: fields.email || fields.work_email || `lead_${leadgenId}@meta.com`,
+      phone: fields.phone_number || fields.phone || fields.work_phone_number || '0000000000',
+      city: fields.city || fields.state || '',
+      country: fields.country || '',
+      rawFields: fields,
+    };
+  }
+
   /**
    * Fetches real lead payload from Meta when an incoming leadgen webhook arrives
    */
-  static async getLeadData(leadgenId: string, accessToken: string): Promise<any> {
+  static async getLeadData(leadgenId: string, accessToken: string): Promise<ParsedMetaLead> {
     try {
-      const res = await fetch(
-        `${this.GRAPH_API_BASE}/${leadgenId}?fields=created_time,id,field_data,form_id,campaign_id,campaign_name&access_token=${encodeURIComponent(accessToken)}`
-      );
-      const data = await res.json();
-      if ((data as any).error) {
-        throw new Error((data as any).error.message || 'Failed to fetch lead payload from Meta Graph API');
-      }
-
-      // Parse field_data array into key-value map
-      const fields: Record<string, string> = {};
-      if (Array.isArray((data as any).field_data)) {
-        for (const item of (data as any).field_data) {
-          const val = Array.isArray(item.values) ? item.values[0] : item.values;
-          fields[item.name] = val;
-        }
-      }
-
-      return {
-        leadgenId: (data as any).id,
-        createdTime: (data as any).created_time,
-        formId: (data as any).form_id,
-        campaignId: (data as any).campaign_id,
-        campaignName: (data as any).campaign_name,
-        name: fields.full_name || fields.name || `${fields.first_name || ''} ${fields.last_name || ''}`.trim() || 'Meta Lead',
-        email: fields.email || `lead_${leadgenId}@meta.com`,
-        phone: fields.phone_number || fields.phone || '0000000000',
-        city: fields.city || fields.state || '',
-        country: fields.country || '',
-        rawFields: fields,
-      };
+      const data = await this.graphGet(`${leadgenId}?fields=${LEAD_FIELDS}`, accessToken);
+      return this.parseLead(data);
     } catch (err: any) {
       logger.error('Meta Graph API getLeadData failed:', err);
       throw err;
     }
   }
+
+  /**
+   * Exchanges a user/system-user token for the Page access token (needed to read leads).
+   * Falls back to the given token, which may already be a Page token.
+   */
+  static async getPageAccessToken(pageId: string, accessToken: string): Promise<string> {
+    try {
+      const data = await this.graphGet(`${pageId}?fields=access_token`, accessToken);
+      return data.access_token || accessToken;
+    } catch {
+      return accessToken;
+    }
+  }
+
+  /**
+   * Lists the Instant (lead gen) forms that exist on a Facebook Page.
+   */
+  static async getLeadForms(pageId: string, pageAccessToken: string): Promise<MetaLeadForm[]> {
+    const forms: MetaLeadForm[] = [];
+    let next: string | null = `${pageId}/leadgen_forms?fields=id,name,status,leads_count,created_time&limit=100`;
+    let guard = 0;
+    while (next && guard++ < 20) {
+      const data = await this.graphGet(next, pageAccessToken);
+      forms.push(...(data.data || []));
+      next = data.paging?.next || null;
+    }
+    return forms;
+  }
+
+  /**
+   * Pulls leads submitted on a form, optionally only those created after `sinceUnix` (seconds).
+   */
+  static async getFormLeads(formId: string, pageAccessToken: string, sinceUnix?: number): Promise<ParsedMetaLead[]> {
+    let path = `${formId}/leads?fields=${LEAD_FIELDS}&limit=100`;
+    if (sinceUnix) {
+      const filtering = JSON.stringify([{ field: 'time_created', operator: 'GREATER_THAN', value: sinceUnix }]);
+      path += `&filtering=${encodeURIComponent(filtering)}`;
+    }
+
+    const leads: ParsedMetaLead[] = [];
+    let next: string | null = path;
+    let guard = 0;
+    while (next && guard++ < 50) {
+      const data = await this.graphGet(next, pageAccessToken);
+      for (const raw of data.data || []) leads.push(this.parseLead(raw));
+      next = data.paging?.next || null;
+    }
+    return leads;
+  }
+
+  /**
+   * Subscribes our Meta App to the Page's `leadgen` webhook field so new leads are pushed in real time.
+   */
+  static async subscribePageToLeadgen(pageId: string, pageAccessToken: string): Promise<boolean> {
+    const res = await fetch(`${this.GRAPH_API_BASE}/${pageId}/subscribed_apps`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ subscribed_fields: 'leadgen', access_token: pageAccessToken }).toString(),
+    });
+    const data: any = await res.json();
+    if (data?.error) {
+      throw new Error(data.error.message || 'Failed to subscribe Page to leadgen webhooks');
+    }
+    return data?.success === true;
+  }
+}
+
+const LEAD_FIELDS = 'id,created_time,field_data,form_id,campaign_id,campaign_name';
+
+export interface ParsedMetaLead {
+  leadgenId: string;
+  createdTime?: string;
+  formId?: string;
+  campaignId?: string;
+  campaignName?: string;
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  country: string;
+  rawFields: Record<string, string>;
+}
+
+export interface MetaLeadForm {
+  id: string;
+  name: string;
+  status?: string;
+  leads_count?: number;
+  created_time?: string;
 }

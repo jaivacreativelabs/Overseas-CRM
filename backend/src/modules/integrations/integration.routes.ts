@@ -19,6 +19,9 @@ const router = Router();
 // Public incoming webhooks endpoint (bypasses auth token check for external provider callbacks)
 router.post('/webhooks/incoming/:providerId', IntegrationController.handleIncomingWebhook);
 
+// Scheduled Meta lead pull (Vercel Cron or an external cron service), guarded by CRON_SECRET
+router.get('/meta-ads/leads/cron', IntegrationController.cronSyncMetaLeads);
+
 // Protected routes require authentication & strict Owner Admin authorization
 router.use(authenticate);
 router.use(requireOwnerAdmin);
@@ -38,6 +41,9 @@ router.post('/meta-ads/mappings', validate(saveMetaFormMappingSchema), Integrati
 router.delete('/meta-ads/mappings/:id', validate(objectIdParamsSchema), IntegrationController.deleteMetaFormMapping);
 router.post('/meta-ads/simulate-lead', validate(simulateMetaLeadSchema), IntegrationController.simulateMetaLead);
 router.get('/meta-ads/analytics', IntegrationController.getMetaAnalytics);
+router.get('/meta-ads/lead-forms', IntegrationController.getMetaLeadForms);
+router.post('/meta-ads/leads/sync', IntegrationController.syncMetaLeads);
+router.post('/meta-ads/leads/subscribe-webhook', IntegrationController.subscribeMetaLeadWebhook);
 
 // Provider Connections
 router.post('/:providerId/connect', validate(connectProviderSchema), IntegrationController.connectProvider);

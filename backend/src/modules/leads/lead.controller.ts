@@ -470,7 +470,8 @@ export class LeadController {
       const signature = req.headers['x-hub-signature-256'] as string | undefined;
 
       if (signature) {
-        const secret = process.env.META_WEBHOOK_SECRET || process.env.META_VERIFY_TOKEN || 'jaiva_meta_token_2026';
+        // Meta signs X-Hub-Signature-256 with the App Secret
+        const secret = process.env.META_APP_SECRET || process.env.META_WEBHOOK_SECRET || process.env.META_VERIFY_TOKEN || 'jaiva_meta_token_2026';
         const rawBody: string = (req as any).rawBody || Buffer.from(JSON.stringify(req.body)).toString('utf8');
         const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 
@@ -481,11 +482,56 @@ export class LeadController {
         return res.status(401).send('Missing X-Hub-Signature-256');
       }
 
-      const entry = req.body.entry?.[0];
-      const change = entry?.changes?.[0]?.value;
+      // Meta batches events: every entry can carry several leadgen changes.
+      const leadgenChanges: any[] = (Array.isArray(req.body.entry) ? req.body.entry : [])
+        .flatMap((entry: any) => (Array.isArray(entry?.changes) ? entry.changes : []))
+        .filter((c: any) => c?.field === 'leadgen' || c?.value?.leadgen_id)
+        .map((c: any) => c.value)
+        .filter((v: any) => v?.leadgen_id);
 
-      const formId = change?.form_id || req.body.formId || req.body.metaFormId;
-      const campaignName = req.body.campaignName || change?.campaign_name || req.body.campaign;
+      if (leadgenChanges.length) {
+        const { MetaGraphApiService } = require('../integrations/meta-graph-api.service');
+        let pageAccessToken: string | null = null;
+        try {
+          ({ pageAccessToken } = await MetaAdsService.getLeadAccess());
+        } catch {
+          // Continue with placeholders; the polling sync fills in real data later
+        }
+
+        for (const change of leadgenChanges) {
+          let parsed: any = null;
+          if (pageAccessToken) {
+            try {
+              parsed = await MetaGraphApiService.getLeadData(String(change.leadgen_id), pageAccessToken);
+            } catch {
+              // Graceful fallback if token is invalid or permissions pending
+            }
+          }
+          if (!parsed) {
+            const id = String(change.leadgen_id);
+            parsed = {
+              leadgenId: id,
+              formId: change.form_id,
+              name: `Meta Lead ${id.slice(-4)}`,
+              email: `lead_${id}@meta.com`,
+              phone: '0000000000',
+              city: '',
+              country: '',
+              rawFields: {},
+            };
+          }
+          try {
+            await MetaAdsService.ingestParsedLead(parsed, { formId: change.form_id, source: 'webhook' });
+          } catch {
+            // One bad lead must not drop the rest of the batch
+          }
+        }
+        return res.status(200).send('EVENT_RECEIVED');
+      }
+
+      // Manual / test payloads (not from Meta's leadgen webhook)
+      const formId = req.body.formId || req.body.metaFormId;
+      const campaignName = req.body.campaignName || req.body.campaign;
 
       let routing: any = null;
       try {
@@ -497,36 +543,7 @@ export class LeadController {
       const assignedBranchId = routing ? routing.branchId.toString() : (req.body.branchId || undefined);
       const assignedFormName = routing?.formName || req.body.formName || formId;
 
-      if (change && change.leadgen_id) {
-        // Fetch real lead data from Meta Graph API if access token is available
-        let leadData: any = null;
-        try {
-          const { IntegrationConfigModel } = require('../integrations/integration-config.model');
-          const { MetaGraphApiService } = require('../integrations/meta-graph-api.service');
-          const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' });
-          const token = metaConfig?.credentials?.pageAccessToken || metaConfig?.credentials?.accessToken || process.env.META_ACCESS_TOKEN;
-          if (token) {
-            leadData = await MetaGraphApiService.getLeadData(change.leadgen_id, token);
-          }
-        } catch (err: any) {
-          // Graceful fallback if token is invalid or permissions pending
-        }
-
-        const result = await LeadService.ingestMetaLead({
-          metaLeadId: change.leadgen_id,
-          name: leadData?.name || req.body.name || `Meta Lead ${change.leadgen_id.slice(-4)}`,
-          email: leadData?.email || req.body.email || `lead_${change.leadgen_id}@meta.com`,
-          phone: leadData?.phone || req.body.phone || '0000000000',
-          preferredCountry: leadData?.country || req.body.preferredCountry,
-          campaignName: leadData?.campaignName || campaignName || 'Meta Ad Campaign',
-          branchId: assignedBranchId,
-          metaFormId: leadData?.formId || formId,
-          metaFormName: assignedFormName,
-        });
-        if (!result.isDuplicate) {
-          await MetaAdsService.recordRoutedLead(formId, campaignName);
-        }
-      } else if (req.body.email || req.body.name) {
+      if (req.body.email || req.body.name) {
         const result = await LeadService.ingestMetaLead({
           metaLeadId: req.body.metaLeadId || req.body.id || `meta_${Date.now()}`,
           name: req.body.name || 'Meta Ad Lead',

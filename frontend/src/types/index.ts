@@ -711,8 +711,19 @@ export interface MetaFormMapping {
   branchName: string;
   totalLeadsRouted: number;
   lastLeadAt?: string;
+  lastLeadSyncAt?: string;
   isActive: boolean;
   notes?: string;
   createdAt: string;
+}
+
+/** A real Instant Form on the connected Facebook Page (from the Graph API). */
+export interface MetaPageLeadForm {
+  id: string;
+  name: string;
+  status?: string;
+  leadsCount?: number;
+  branchId?: string;
+  branchName?: string;
 }
 
