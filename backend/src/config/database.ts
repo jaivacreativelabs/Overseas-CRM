@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
+import { attachDatabasePool } from '@vercel/functions';
 import { env } from './env';
 import { logger } from '../utils/logger';
 
@@ -32,13 +33,23 @@ export const connectDatabase = async (): Promise<void> => {
     logger.info(`Attempting database connection to: ${env.MONGODB_URI}`);
     
     // Set a 5-second serverSelectionTimeoutMS so if local/remote MongoDB is unreachable, it fails quickly to memory fallback in dev
+    // Small pool + idle timeout: every Vercel instance opens its own pool (per replica-set node),
+    // and the free Atlas tier caps the cluster at 500 connections.
     await mongoose.connect(env.MONGODB_URI, {
       serverSelectionTimeoutMS: 5000,
-      maxPoolSize: 10,
-      minPoolSize: 1,
+      maxPoolSize: 5,
+      minPoolSize: 0,
+      maxIdleTimeMS: 10000,
       socketTimeoutMS: 20000,
       connectTimeoutMS: 5000,
     });
+
+    // Lets Vercel close idle connections before suspending the instance (no-op outside Vercel)
+    try {
+      attachDatabasePool(mongoose.connection.getClient());
+    } catch (err: any) {
+      logger.warn(`attachDatabasePool skipped: ${err?.message}`);
+    }
 
     isConnected = true;
     logger.info('MongoDB Atlas / Database connection successfully established.');
