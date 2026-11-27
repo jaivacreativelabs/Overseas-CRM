@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { IntegrationService } from './integration.service';
 import { AutomationService } from './automation.service';
 import { CSVService } from './csv.service';
@@ -146,6 +147,44 @@ export class IntegrationController {
       result,
       201
     );
+  };
+
+  public static getMetaLeadForms = async (req: Request, res: Response) => {
+    const result = await MetaAdsService.listPageLeadForms();
+    return ApiResponse.success(res, 'Meta lead forms fetched', result);
+  };
+
+  public static syncMetaLeads = async (req: Request, res: Response) => {
+    const result = await MetaAdsService.syncLeadsFromMeta();
+    return ApiResponse.success(
+      res,
+      result.configured ? `Meta lead sync finished: ${result.created} new lead(s)` : 'Meta is not configured yet',
+      result
+    );
+  };
+
+  /**
+   * Called by Vercel Cron (sends `Authorization: Bearer <CRON_SECRET>`) or an external cron
+   * service (may pass `?key=<CRON_SECRET>` instead). Refuses everything when CRON_SECRET is unset.
+   */
+  public static cronSyncMetaLeads = async (req: Request, res: Response) => {
+    const secret = process.env.CRON_SECRET;
+    const header = req.headers.authorization || '';
+    const provided = header.startsWith('Bearer ') ? header.slice(7) : String(req.query.key || '');
+    const ok =
+      Boolean(secret) &&
+      provided.length === secret!.length &&
+      crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(secret!));
+    if (!ok) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+    const result = await MetaAdsService.syncLeadsFromMeta();
+    return ApiResponse.success(res, `Meta lead sync finished: ${result.created} new lead(s)`, result);
+  };
+
+  public static subscribeMetaLeadWebhook = async (req: Request, res: Response) => {
+    const result = await MetaAdsService.subscribePageToLeadWebhook();
+    return ApiResponse.success(res, 'Page subscribed to Meta lead webhooks', result);
   };
 
   public static getMetaAnalytics = async (req: Request, res: Response) => {

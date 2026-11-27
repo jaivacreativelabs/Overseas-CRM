@@ -23,7 +23,7 @@ import {
 import { apiClient } from '../../services/api-client';
 import { BranchAnalytics } from './BranchAnalytics';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType, MetaFormMapping } from '../../types';
+import { UserRole, AdminType, Branch, Lead, Application, IntegrationLog, User as UserType, MetaFormMapping, MetaPageLeadForm } from '../../types';
 
 // Meta Facebook SVG Icon
 const FacebookColorIcon = ({ size = 15 }: { size?: number }) => (
@@ -216,19 +216,27 @@ export const BranchesPage: React.FC = () => {
     campaignName: '',
   });
 
-  const DEFAULT_KNOWN_FORMS = [
-    { formId: 'meta_form_uk_blr', formName: 'UK Masters FastTrack Form (South India)', campaignName: 'UK Admissions 2026' },
-    { formId: 'meta_form_uk_pune', formName: 'UK STEM & Business Form (West India)', campaignName: 'UK Admissions 2026' },
-    { formId: 'meta_form_can_pune', formName: 'Canada SDS & Express Visa Form', campaignName: 'Canada Visa Express' },
-    { formId: 'meta_form_aus_che', formName: 'Australia GTE & Scholarship Form', campaignName: 'Australia Direct 2027' },
-  ];
+  // Real Instant Forms on the connected Facebook Page
+  const [pageLeadForms, setPageLeadForms] = useState<MetaPageLeadForm[]>([]);
+  const [pageFormsStatus, setPageFormsStatus] = useState<{ configured: boolean; error?: string } | null>(null);
+  const [isSyncingMetaLeads, setIsSyncingMetaLeads] = useState(false);
 
   const allKnownForms = [
-    ...DEFAULT_KNOWN_FORMS,
+    ...pageLeadForms.map((f) => ({
+      formId: f.id,
+      formName: f.name,
+      campaignName: undefined as string | undefined,
+      status: f.status,
+      leadsCount: f.leadsCount,
+      mappedBranchName: f.branchName,
+    })),
     ...metaForms.map((m) => ({
       formId: m.formId,
       formName: m.formName,
       campaignName: m.campaignName,
+      status: undefined as string | undefined,
+      leadsCount: undefined as number | undefined,
+      mappedBranchName: m.branchName,
     })),
   ].filter(
     (form, index, self) =>
@@ -244,9 +252,45 @@ export const BranchesPage: React.FC = () => {
     }
   };
 
+  const fetchPageLeadForms = async () => {
+    try {
+      const res = await apiClient.get<any>('/integrations/meta-ads/lead-forms');
+      setPageLeadForms(res.data?.forms || []);
+      setPageFormsStatus({ configured: Boolean(res.data?.configured), error: res.data?.error });
+    } catch {
+      setPageFormsStatus(null);
+    }
+  };
+
   useEffect(() => {
     fetchMetaForms();
+    fetchPageLeadForms();
   }, []);
+
+  const handleSyncMetaLeads = async (quiet = false) => {
+    setIsSyncingMetaLeads(true);
+    try {
+      const res = await apiClient.post<any>('/integrations/meta-ads/leads/sync', {});
+      const r = res.data || {};
+      if (!r.configured) {
+        if (!quiet) setError('Meta is not connected yet. Add META_PAGE_ID and META_ACCESS_TOKEN to the backend .env.');
+      } else if (r.errors?.length) {
+        setError(`Lead sync failed for ${r.errors.map((e: any) => `"${e.formName}": ${e.message}`).join('; ')}`);
+      } else if (!quiet || r.created) {
+        setSuccessMsg(
+          r.created
+            ? `${r.created} new lead(s) pulled from Meta.`
+            : `No new leads. Checked ${r.formsChecked} connected form(s).`
+        );
+        setTimeout(() => setSuccessMsg(null), 4000);
+      }
+      fetchMetaForms();
+    } catch (err: any) {
+      if (!quiet) setError(err.message || 'Failed to sync leads from Meta');
+    } finally {
+      setIsSyncingMetaLeads(false);
+    }
+  };
 
   const handleConnectFormToBranch = async (branchId: string, formId: string) => {
     if (!formId) return;
@@ -266,6 +310,9 @@ export const BranchesPage: React.FC = () => {
       setSuccessMsg(`Meta Lead Form "${formObj?.formName || formId}" connected to ${branchObj?.name || 'branch'}! Any incoming leads will auto-assign here.`);
       setTimeout(() => setSuccessMsg(null), 4000);
       fetchMetaForms();
+      fetchPageLeadForms();
+      // Pull the form's existing leads (last 90 days) right away
+      handleSyncMetaLeads(true);
     } catch (err: any) {
       setError(err.message || 'Failed to connect Meta form');
     } finally {
@@ -310,6 +357,7 @@ export const BranchesPage: React.FC = () => {
       setCustomFormInput({ formId: '', formName: '', campaignName: '' });
       setTimeout(() => setSuccessMsg(null), 4000);
       fetchMetaForms();
+      handleSyncMetaLeads(true);
     } catch (err: any) {
       setError(err.message || 'Failed to register custom form');
     }
@@ -1590,13 +1638,35 @@ export const BranchesPage: React.FC = () => {
                         <FacebookColorIcon size={16} />
                         <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>Connected Meta Lead Forms</strong>
                       </div>
-                      <button
-                        onClick={() => setShowAddCustomFormModal(selectedBranchDetails.branch._id)}
-                        style={{ padding: '4px 8px', fontSize: '11px', color: '#1877F2', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
-                      >
-                        + Add Custom Form ID
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          onClick={() => handleSyncMetaLeads()}
+                          disabled={isSyncingMetaLeads}
+                          title="Pull new leads from Meta for every connected form"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', fontSize: '11px', color: '#334155', backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '4px', cursor: isSyncingMetaLeads ? 'wait' : 'pointer', fontWeight: 600 }}
+                        >
+                          <RefreshCw size={12} className={isSyncingMetaLeads ? 'spin-animation' : undefined} />
+                          {isSyncingMetaLeads ? 'Syncing…' : 'Sync leads'}
+                        </button>
+                        <button
+                          onClick={() => setShowAddCustomFormModal(selectedBranchDetails.branch._id)}
+                          style={{ padding: '4px 8px', fontSize: '11px', color: '#1877F2', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          + Add Custom Form ID
+                        </button>
+                      </div>
                     </div>
+
+                    {pageFormsStatus && !pageFormsStatus.configured && (
+                      <div style={{ fontSize: '12px', color: '#92400E', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '6px', padding: '8px 10px', marginBottom: '10px' }}>
+                        Meta Page isn't connected, so your real forms can't be listed. Add <code>META_PAGE_ID</code> and <code>META_ACCESS_TOKEN</code> to the backend <code>.env</code> and restart. Until then you can still enter a Form ID by hand.
+                      </div>
+                    )}
+                    {pageFormsStatus?.error && (
+                      <div style={{ fontSize: '12px', color: '#991B1B', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '6px', padding: '8px 10px', marginBottom: '10px' }}>
+                        Couldn't load forms from Meta: {pageFormsStatus.error}
+                      </div>
+                    )}
 
                     {(() => {
                       const bForms = metaForms.filter(
@@ -1641,6 +1711,8 @@ export const BranchesPage: React.FC = () => {
                           {unconnectedForms.map((f) => (
                             <option key={f.formId} value={f.formId}>
                               {f.formName}
+                              {f.status && f.status !== 'ACTIVE' ? ` (${f.status.toLowerCase()})` : ''}
+                              {f.mappedBranchName ? ` · now routed to ${f.mappedBranchName}` : ''}
                             </option>
                           ))}
                           <option value="__custom__">+ Enter custom form ID…</option>

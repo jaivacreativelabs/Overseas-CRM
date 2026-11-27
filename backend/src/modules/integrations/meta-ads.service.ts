@@ -6,7 +6,7 @@ import { LeadService } from '../leads/lead.service';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { IntegrationLogModel, LogStatus } from './integration-log.model';
 import { IntegrationConfigModel } from './integration-config.model';
-import { MetaGraphApiService } from './meta-graph-api.service';
+import { MetaGraphApiService, ParsedMetaLead } from './meta-graph-api.service';
 import { logger } from '../../utils/logger';
 
 export class MetaAdsService {
@@ -754,6 +754,192 @@ export class MetaAdsService {
     }
 
     return { user, adAccounts, primaryAccount };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Real lead capture from Meta Instant Forms (webhook + polling sync)
+  // ---------------------------------------------------------------------------
+
+  private static isSyncingLeads = false;
+
+  /**
+   * Resolves the Page ID and a Page access token able to read leads.
+   * Sources (first match wins): env vars, then credentials saved via the Meta connect flow.
+   */
+  static async getLeadAccess(): Promise<{ pageId: string | null; pageAccessToken: string | null }> {
+    const metaConfig = await IntegrationConfigModel.findOne({ providerId: 'meta_ads' }).lean();
+    const creds: any = metaConfig?.credentials || {};
+    const pageId: string | null = process.env.META_PAGE_ID || creds.pageId || null;
+
+    const directPageToken = process.env.META_PAGE_ACCESS_TOKEN || creds.pageAccessToken;
+    if (directPageToken) return { pageId, pageAccessToken: directPageToken };
+
+    const userToken = process.env.META_ACCESS_TOKEN || creds.accessToken;
+    if (!userToken) return { pageId, pageAccessToken: null };
+    if (!pageId) return { pageId, pageAccessToken: userToken };
+
+    return { pageId, pageAccessToken: await MetaGraphApiService.getPageAccessToken(pageId, userToken) };
+  }
+
+  /**
+   * Lists the real Instant Forms on the connected Facebook Page, flagged with the branch each one routes to.
+   */
+  static async listPageLeadForms(): Promise<{
+    configured: boolean;
+    pageId: string | null;
+    forms: Array<{ id: string; name: string; status?: string; leadsCount?: number; branchId?: string; branchName?: string }>;
+    error?: string;
+  }> {
+    const { pageId, pageAccessToken } = await this.getLeadAccess();
+    if (!pageId || !pageAccessToken) {
+      return { configured: false, pageId, forms: [] };
+    }
+
+    try {
+      const [forms, mappings] = await Promise.all([
+        MetaGraphApiService.getLeadForms(pageId, pageAccessToken),
+        MetaFormMappingModel.find().lean(),
+      ]);
+      return {
+        configured: true,
+        pageId,
+        forms: forms.map((f) => {
+          const m = mappings.find((x) => x.formId === f.id);
+          return {
+            id: f.id,
+            name: f.name,
+            status: f.status,
+            leadsCount: f.leads_count,
+            branchId: m?.branchId?.toString(),
+            branchName: m?.branchName,
+          };
+        }),
+      };
+    } catch (err: any) {
+      logger.warn('Could not list Meta lead forms:', err.message);
+      return { configured: true, pageId, forms: [], error: err.message };
+    }
+  }
+
+  /**
+   * Routes and stores one lead coming from Meta (webhook or sync). Returns whether a new CRM lead was created.
+   */
+  static async ingestParsedLead(
+    lead: ParsedMetaLead,
+    context: { formId?: string; campaignName?: string; source: 'webhook' | 'sync' }
+  ): Promise<{ isDuplicate: boolean; leadId: string }> {
+    const formId = lead.formId || context.formId;
+    const campaignName = lead.campaignName || context.campaignName;
+    const routing = await this.routeIncomingMetaLead(formId, campaignName);
+
+    // Keep the answers to custom questions so counsellors can see them on the lead.
+    const standardKeys = new Set(['full_name', 'name', 'first_name', 'last_name', 'email', 'work_email', 'phone_number', 'phone', 'work_phone_number']);
+    const extraAnswers = Object.entries(lead.rawFields || {})
+      .filter(([k, v]) => !standardKeys.has(k) && v)
+      .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`);
+
+    const result = await LeadService.ingestMetaLead({
+      metaLeadId: lead.leadgenId,
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      preferredCountry: lead.country || undefined,
+      campaignName: campaignName || 'Meta Ad Campaign',
+      branchId: routing?.branchId,
+      metaFormId: formId,
+      metaFormName: routing?.formName || formId,
+      notes: [
+        context.source === 'sync' ? 'Imported from Meta Instant Form (sync)' : 'Received from Meta Instant Form (webhook)',
+        ...extraAnswers,
+      ].join('\n'),
+    });
+
+    if (!result.isDuplicate) {
+      await this.recordRoutedLead(formId, campaignName);
+    }
+    return { isDuplicate: result.isDuplicate, leadId: result.lead._id.toString() };
+  }
+
+  /**
+   * Pulls new leads from every connected (active) form directly from Meta.
+   * Works without a public webhook URL, so it also covers localhost and missed webhook deliveries.
+   * Meta keeps leads for 90 days, so a form's first sync imports up to the last 90 days.
+   */
+  static async syncLeadsFromMeta(): Promise<{
+    configured: boolean;
+    formsChecked: number;
+    fetched: number;
+    created: number;
+    duplicates: number;
+    errors: Array<{ formId: string; formName: string; message: string }>;
+  }> {
+    const summary = { configured: false, formsChecked: 0, fetched: 0, created: 0, duplicates: 0, errors: [] as Array<{ formId: string; formName: string; message: string }> };
+
+    if (this.isSyncingLeads) return { ...summary, configured: true };
+    const { pageAccessToken } = await this.getLeadAccess();
+    if (!pageAccessToken) return summary;
+    summary.configured = true;
+
+    this.isSyncingLeads = true;
+    const startedAt = Date.now();
+    try {
+      // Real Meta form IDs are numeric; skip demo/seeded IDs like "meta_form_uk_blr".
+      const mappings = await MetaFormMappingModel.find({ isActive: true, formId: { $regex: /^\d+$/ } });
+      const ninetyDaysAgo = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60;
+
+      for (const mapping of mappings) {
+        summary.formsChecked += 1;
+        try {
+          const since = mapping.lastLeadSyncAt ? Math.floor(mapping.lastLeadSyncAt.getTime() / 1000) : ninetyDaysAgo;
+          const leads = await MetaGraphApiService.getFormLeads(mapping.formId, pageAccessToken, since);
+          // Oldest first, so lastLeadSyncAt only moves forward over leads that were stored.
+          leads.sort((a, b) => new Date(a.createdTime || 0).getTime() - new Date(b.createdTime || 0).getTime());
+
+          for (const lead of leads) {
+            summary.fetched += 1;
+            const { isDuplicate } = await this.ingestParsedLead(lead, { formId: mapping.formId, source: 'sync' });
+            if (isDuplicate) summary.duplicates += 1;
+            else summary.created += 1;
+
+            if (lead.createdTime) {
+              const created = new Date(lead.createdTime);
+              if (!mapping.lastLeadSyncAt || created > mapping.lastLeadSyncAt) {
+                mapping.lastLeadSyncAt = created;
+              }
+            }
+          }
+          await MetaFormMappingModel.updateOne({ _id: mapping._id }, { $set: { lastLeadSyncAt: mapping.lastLeadSyncAt } });
+        } catch (err: any) {
+          summary.errors.push({ formId: mapping.formId, formName: mapping.formName, message: err.message });
+        }
+      }
+
+      await IntegrationLogModel.create({
+        providerId: 'meta_ads',
+        eventType: 'meta_ads.leads.sync',
+        operation: 'Synced leads from Meta Instant Forms',
+        status: summary.errors.length && !summary.fetched ? LogStatus.FAILED : LogStatus.SUCCESS,
+        requestData: { formsChecked: summary.formsChecked },
+        responseData: { fetched: summary.fetched, created: summary.created, duplicates: summary.duplicates, errors: summary.errors },
+        durationMs: Date.now() - startedAt,
+      });
+    } finally {
+      this.isSyncingLeads = false;
+    }
+    return summary;
+  }
+
+  /**
+   * Subscribes the configured Page to `leadgen` webhooks so leads are pushed in real time
+   * (requires the CRM backend to be on a public URL registered in the Meta App's Webhooks settings).
+   */
+  static async subscribePageToLeadWebhook(): Promise<{ subscribed: boolean; pageId: string }> {
+    const { pageId, pageAccessToken } = await this.getLeadAccess();
+    if (!pageId || !pageAccessToken) {
+      throw new BadRequestError('Set META_PAGE_ID and a Meta access token before subscribing the Page to lead webhooks');
+    }
+    const subscribed = await MetaGraphApiService.subscribePageToLeadgen(pageId, pageAccessToken);
+    return { subscribed, pageId };
   }
 }
 

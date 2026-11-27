@@ -31,6 +31,7 @@ export interface IMetaFormMapping extends Document {
   branchName: string; // Cached branch name for fast UI queries
   totalLeadsRouted: number;
   lastLeadAt?: Date;
+  lastLeadSyncAt?: Date; // created_time of the newest lead pulled from Meta by the polling sync
   isActive: boolean;
   notes?: string;
   createdAt: Date;
@@ -72,6 +73,7 @@ const metaFormMappingSchema = new Schema<IMetaFormMapping>(
     branchName: { type: String, required: true, trim: true },
     totalLeadsRouted: { type: Number, default: 0 },
     lastLeadAt: { type: Date },
+    lastLeadSyncAt: { type: Date },
     isActive: { type: Boolean, default: true, index: true },
     notes: { type: String, default: '' },
   },
