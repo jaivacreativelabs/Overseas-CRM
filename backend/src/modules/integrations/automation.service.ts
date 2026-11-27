@@ -9,6 +9,13 @@ import { TaskModel } from '../tasks/task.model';
 import { LeadModel } from '../leads/lead.model';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
 import { EmailService } from './email.service';
+import { WhatsAppService, WhatsAppSendResult } from './whatsapp.service';
+
+const DOCUMENT_REQUESTED_WHATSAPP_ACTION = {
+  actionType: 'SEND_WHATSAPP' as const,
+  providerId: 'whatsapp_business',
+  config: { templateName: 'document_request' },
+};
 
 export class AutomationService {
   /**
@@ -110,6 +117,7 @@ export class AutomationService {
               template: 'document_requested',
             },
           },
+          DOCUMENT_REQUESTED_WHATSAPP_ACTION,
         ],
       },
       {
@@ -354,6 +362,12 @@ export class AutomationService {
       );
     }
 
+    // Workflows seeded before WhatsApp support existed: add the WhatsApp step next to the email
+    await AutomationWorkflowModel.updateMany(
+      { trigger: 'document.requested', name: 'Document Requested Notification', 'actions.actionType': { $ne: 'SEND_WHATSAPP' } },
+      { $push: { actions: DOCUMENT_REQUESTED_WHATSAPP_ACTION } }
+    );
+
     // Ensure lead.created workflow is disabled so manual lead creation never triggers emails
     await AutomationWorkflowModel.updateMany(
       { trigger: 'lead.created' },
@@ -503,17 +517,38 @@ export class AutomationService {
             }
 
             case 'SEND_WHATSAPP': {
-              const phone = payload.phone || payload.studentPhone || '+919876543210';
+              const phone = payload.phone || payload.studentPhone;
+              const message = WhatsAppService.buildMessage(trigger, payload, act.config);
+              const waResult = message
+                ? await WhatsAppService.sendTemplate(phone, message)
+                : { success: false, skipped: true, errorMessage: 'No WhatsApp template configured for this action.', durationMs: 0 } as WhatsAppSendResult;
+
+              let operation: string;
+              if (waResult.success && waResult.skipped) {
+                operation = `WhatsApp Dry Run (not sent) to ${waResult.to}`;
+              } else if (waResult.success) {
+                operation = `Automated WhatsApp Sent to ${waResult.to}`;
+              } else if (waResult.skipped) {
+                operation = 'Automated WhatsApp Skipped';
+              } else {
+                operation = `Automated WhatsApp Failed to ${waResult.to}`;
+              }
+
               await IntegrationLogModel.create({
                 providerId: act.providerId || 'whatsapp_business',
                 eventType: trigger,
-                operation: `Automated WhatsApp Message to ${phone}`,
-                status: LogStatus.SUCCESS,
-                requestData: { to: phone, template: act.config.templateName || 'generic_alert' },
-                responseData: { messageId: `wmid.${Date.now()}`, status: 'sent' },
-                durationMs: Date.now() - startTime,
+                operation,
+                status: waResult.success ? LogStatus.SUCCESS : LogStatus.FAILED,
+                requestData: waResult.request || { to: phone, template: message?.templateName },
+                responseData: waResult.success ? { messageId: waResult.messageId } : undefined,
+                errorMessage: waResult.errorMessage,
+                durationMs: waResult.durationMs,
                 triggeredBy: triggeredByUserId,
               });
+              // A skipped send (WhatsApp not set up / no phone) must not mark the workflow as failed
+              if (!waResult.success && !waResult.skipped) {
+                wfSuccess = false;
+              }
               break;
             }
 

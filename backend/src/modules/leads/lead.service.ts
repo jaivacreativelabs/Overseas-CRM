@@ -366,7 +366,13 @@ export class LeadService {
 
     const beforeState = lead.toObject();
 
-    Object.assign(lead, updates);
+    // The edit form sends "" for an unassigned counsellor/branch; "" can't be cast to an ObjectId
+    const cleanUpdates: Record<string, any> = { ...updates };
+    for (const key of ['counsellorId', 'branchId']) {
+      if (cleanUpdates[key] === '') delete cleanUpdates[key];
+    }
+
+    Object.assign(lead, cleanUpdates);
     await lead.save();
 
     if (actorUserId) {
